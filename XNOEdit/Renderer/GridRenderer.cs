@@ -6,7 +6,7 @@ namespace XNOEdit.Renderer
     public class GridRenderer : IDisposable
     {
         private GL _gl;
-        private Shader _shader;
+        private XeShader _shader;
         private uint _vao;
         private uint _vbo;
         private int _lineCount;
@@ -108,50 +108,7 @@ namespace XNOEdit.Renderer
 
         private void CreateShader()
         {
-            const string vertexShader = @"
-#version 330 core
-
-layout (location = 0) in vec3 aPosition;
-layout (location = 1) in vec3 aColor;
-
-out vec3 Color;
-out float Distance;
-
-uniform mat4 uModel;
-uniform mat4 uView;
-uniform mat4 uProjection;
-uniform vec3 uCameraPos;
-
-void main()
-{
-    vec4 worldPos = uModel * vec4(aPosition, 1.0);
-    Color = aColor;
-    Distance = length(worldPos.xyz - uCameraPos);
-    gl_Position = uProjection * uView * worldPos;
-}
-";
-
-            const string fragmentShader = @"
-#version 330 core
-
-in vec3 Color;
-in float Distance;
-
-out vec4 FragColor;
-
-uniform float uFadeStart;
-uniform float uFadeEnd;
-
-void main()
-{
-    // Distance-based fading
-    float alpha = 1.0 - smoothstep(uFadeStart, uFadeEnd, Distance);
-    
-    FragColor = vec4(Color, alpha);
-}
-";
-
-            _shader = new Shader(_gl, vertexShader, fragmentShader);
+            _shader = new XeShader(_gl, "XNOEdit/Shaders/Grid.vert", "XNOEdit/Shaders/Grid.frag");
         }
 
         public unsafe void Draw(Matrix4x4 view, Matrix4x4 projection, Matrix4x4 model, Vector3 cameraPos, float fadeDistance)

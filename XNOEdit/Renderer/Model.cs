@@ -81,13 +81,13 @@ namespace XNOEdit.Renderer
             Console.WriteLine($"Loaded {_sharedVertexBuffers.Count} vertex buffers, {_meshes.Count} meshes");
         }
 
-        public void Draw(Shader shader)
+        public void Draw(XeShader xeShader)
         {
-            shader.Use();
+            xeShader.Use();
 
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(shader);
+                mesh.Draw(xeShader);
             }
 
             _gl.BindVertexArray(0);
@@ -179,7 +179,7 @@ namespace XNOEdit.Renderer
             _gl.BindVertexArray(0);
         }
 
-        public unsafe void Draw(Shader shader)
+        public unsafe void Draw(XeShader xeShader)
         {
             if (_indexCount == 0) return;
 

@@ -9,6 +9,7 @@ using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
+using XNOEdit.Panels;
 using XNOEdit.Renderer;
 
 namespace XNOEdit
@@ -25,7 +26,7 @@ namespace XNOEdit
         private static readonly Dictionary<string, uint> Textures = [];
 
         private static Camera _camera;
-        private static Renderer.Shader _shader;
+        private static XeShader _shader;
         private static Model _model;
         private static GridRenderer _grid;
         private static SkyboxRenderer _skybox;
@@ -84,8 +85,7 @@ namespace XNOEdit
             _controller = new ImGuiController(_gl, _window, _input);
             _camera = new Camera();
 
-            // Create shader and grid
-            _shader = new Renderer.Shader(_gl, ShaderSources.VertexShader, ShaderSources.FragmentShader);
+            _shader = new XeShader(_gl, "XNOEdit/Shaders/BasicModel.vert", "XNOEdit/Shaders/BasicModel.frag");
             _grid = new GridRenderer(_gl, 100.0f);
             _skybox = new SkyboxRenderer(_gl);
 

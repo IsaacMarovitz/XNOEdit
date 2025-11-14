@@ -3,17 +3,17 @@ using Silk.NET.OpenGL;
 
 namespace XNOEdit.Renderer
 {
-    public class Shader : IDisposable
+    public class XeShader : IDisposable
     {
         private readonly uint _handle;
         private readonly GL _gl;
 
-        public Shader(GL gl, string vertexSource, string fragmentSource)
+        public XeShader(GL gl, string vertexPath, string fragmentPath)
         {
             _gl = gl;
 
-            var vertex = LoadShader(ShaderType.VertexShader, vertexSource);
-            var fragment = LoadShader(ShaderType.FragmentShader, fragmentSource);
+            var vertex = LoadShader(ShaderType.VertexShader, EmbeddedResources.ReadAllText(vertexPath));
+            var fragment = LoadShader(ShaderType.FragmentShader, EmbeddedResources.ReadAllText(fragmentPath));
 
             _handle = _gl.CreateProgram();
             _gl.AttachShader(_handle, vertex);

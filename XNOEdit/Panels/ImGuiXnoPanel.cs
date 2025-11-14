@@ -3,7 +3,7 @@ using ImGuiNET;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 
-namespace XNOEdit
+namespace XNOEdit.Panels
 {
     public class ImGuiXnoPanel
     {

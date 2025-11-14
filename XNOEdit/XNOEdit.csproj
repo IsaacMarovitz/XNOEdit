@@ -16,9 +16,18 @@
       <PackageReference Include="Silk.NET.OpenGL.Extensions.ImGui" Version="2.22.0" />
       <PackageReference Include="Silk.NET.Windowing" Version="2.22.0" />
     </ItemGroup>
-    
+
     <ItemGroup>
-        <ProjectReference Include="../Marathon/Marathon/Marathon.csproj" />
+        <ProjectReference Include="..\Marathon/Marathon\Marathon.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Shaders\BasicModel.vert" />
+        <EmbeddedResource Include="Shaders\BasicModel.frag" />
+        <EmbeddedResource Include="Shaders\Grid.vert" />
+        <EmbeddedResource Include="Shaders\Grid.frag" />
+        <EmbeddedResource Include="Shaders\Skybox.vert" />
+        <EmbeddedResource Include="Shaders\Skybox.frag" />
     </ItemGroup>
 
 </Project>
