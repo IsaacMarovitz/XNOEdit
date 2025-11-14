@@ -18,7 +18,7 @@ void main()
 
     // Diffuse
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(-uLightDir);
+    vec3 lightDir = normalize(uLightDir);
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * uLightColor;
 

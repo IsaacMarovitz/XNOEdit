@@ -11,12 +11,17 @@ out vec4 Color;
 uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
+uniform float uVertColorStrength;
 
 void main()
 {
-    FragPos = vec3(uModel * vec4(aPosition, 1.0));
-    Normal = mat3(transpose(inverse(uModel))) * aNormal;
-    Color = aColor;
+    vec4 worldPos = uModel * vec4(aPosition, 1.0);
+    FragPos = worldPos.xyz;
 
-    gl_Position = uProjection * uView * vec4(FragPos, 1.0);
+    // Transform normal to world space (handles non-uniform scaling)
+    Normal = mat3(transpose(inverse(uModel))) * aNormal;
+
+    Color = mix(vec4(1.0), aColor, uVertColorStrength);
+
+    gl_Position = uProjection * uView * worldPos;
 }

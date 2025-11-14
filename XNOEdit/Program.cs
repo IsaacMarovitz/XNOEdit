@@ -22,6 +22,7 @@ namespace XNOEdit
 
         private static ImGuiController _controller;
         private static ImGuiXnoPanel _xnoPanel;
+        private static ImGuiAlertPanel _alertPanel;
         private static IInputContext _input;
         private static readonly Dictionary<string, uint> Textures = [];
 
@@ -32,7 +33,7 @@ namespace XNOEdit
         private static SkyboxRenderer _skybox;
         private static bool _wireframeMode;
         private static bool _showGrid = true;
-        private static bool _showAxes = true;
+        private static bool _vertexColors = true;
         private static bool _backfaceCulling;
         private static bool _mouseCaptured;
         private static Vector3 _modelCenter = Vector3.Zero;
@@ -83,6 +84,7 @@ namespace XNOEdit
 
             _gl = _window.CreateOpenGL();
             _controller = new ImGuiController(_gl, _window, _input);
+            _alertPanel = new ImGuiAlertPanel();
             _camera = new Camera();
 
             _shader = new XeShader(_gl, "XNOEdit/Shaders/BasicModel.vert", "XNOEdit/Shaders/BasicModel.frag");
@@ -161,7 +163,8 @@ namespace XNOEdit
                 _shader.SetUniform("uModel", Matrix4x4.Identity);
                 _shader.SetUniform("uView", view);
                 _shader.SetUniform("uProjection", projection);
-                _shader.SetUniform("uLightDir", new Vector3(0.5f, -1.0f, 0.5f));
+                _shader.SetUniform("uVertColorStrength", _vertexColors ? 1.0f : 0.0f);
+                _shader.SetUniform("uLightDir", _sunDirection);
                 _shader.SetUniform("uViewPos", _camera.Transform.Position);
                 _shader.SetUniform("uLightColor", new Vector3(1.0f, 1.0f, 1.0f));
 
@@ -183,6 +186,7 @@ namespace XNOEdit
                 ImGui.End();
             }
 
+            _alertPanel.Render(deltaTime);
             _controller.Render();
         }
 
@@ -211,9 +215,10 @@ namespace XNOEdit
             }
         }
 
-        private static unsafe void OnMouseWheel(IMouse mouse, ScrollWheel scrollWheel)
+        private static void OnMouseWheel(IMouse mouse, ScrollWheel scrollWheel)
         {
-            _camera.ProcessMouseScroll(scrollWheel.Y);
+            if (!ImGui.GetIO().WantCaptureMouse)
+                _camera.ProcessMouseScroll(scrollWheel.Y);
         }
 
         private static void OnClose()
@@ -240,6 +245,8 @@ namespace XNOEdit
                 {
                     var xno = new NinjaNext(file);
                     _xnoPanel = new ImGuiXnoPanel(xno);
+
+                    _window.Title = $"XNOEdit - {xno.Name}";
 
                     foreach (var texture in Textures)
                     {
@@ -314,8 +321,7 @@ namespace XNOEdit
                         {
                             foreach (var meshSet in subObj.MeshSets)
                             {
-                                if (!vertexListUsage.ContainsKey(meshSet.VertexListIndex))
-                                    vertexListUsage[meshSet.VertexListIndex] = 0;
+                                vertexListUsage.TryAdd(meshSet.VertexListIndex, 0);
                                 vertexListUsage[meshSet.VertexListIndex]++;
                             }
                         }
@@ -362,40 +368,45 @@ namespace XNOEdit
             if (key == Key.Escape)
                 _window.Close();
 
+            var alert = string.Empty;
+
             // Toggle wireframe mode with F key
             if (key == Key.F)
             {
                 _wireframeMode = !_wireframeMode;
-                Console.WriteLine($"Wireframe mode: {(_wireframeMode ? "ON" : "OFF")}");
+                alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
             }
 
             // Toggle grid with G key
             if (key == Key.G)
             {
                 _showGrid = !_showGrid;
-                Console.WriteLine($"Grid: {(_showGrid ? "ON" : "OFF")}");
-            }
-
-            // Toggle axes with X key
-            if (key == Key.X)
-            {
-                _showAxes = !_showAxes;
-                Console.WriteLine($"Axes: {(_showAxes ? "ON" : "OFF")}");
+                alert = $"Grid: {(_showGrid ? "ON" : "OFF")}";
             }
 
             // Toggle backface culling with C key
             if (key == Key.C)
             {
                 _backfaceCulling = !_backfaceCulling;
-                Console.WriteLine($"Backface culling: {(_backfaceCulling ? "ON" : "OFF")}");
+                alert = $"Backface Culling: {(_backfaceCulling ? "ON" : "OFF")}";
+            }
+
+            // Toggle vertex colors with V key
+            if (key == Key.V)
+            {
+                _vertexColors = !_vertexColors;
+                alert = $"Vertex Colors: {(_vertexColors ? "ON" : "OFF")}";
             }
 
             // Reset camera with R key
             if (key == Key.R)
             {
                 ResetCamera();
-                Console.WriteLine("Camera reset");
+                alert = "Camera Reset";
             }
+
+            if (alert != string.Empty)
+                _alertPanel.TriggerAlert(alert);
         }
 
         private static float DegreesToRadians(float degrees)
