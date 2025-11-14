@@ -1,0 +1,4 @@
+[submodule "Marathon"]
+	path = Marathon
+	url = https://www.github.com/hyperbx/Marathon
+	branch = v2.0.0

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Marathon/Marathon/Marathon.csproj" />
+  <Project Path="XNOEdit/XNOEdit.csproj" />
+</Solution>
