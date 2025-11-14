@@ -28,6 +28,14 @@
         <EmbeddedResource Include="Shaders\Grid.frag" />
         <EmbeddedResource Include="Shaders\Skybox.vert" />
         <EmbeddedResource Include="Shaders\Skybox.frag" />
+        <EmbeddedResource Include="Shaders\shader_common.h" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Content Include="Native\XenosRecomp.dylib" Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <Link>XenosRecomp.dylib</Link>
+        </Content>
     </ItemGroup>
 
 </Project>

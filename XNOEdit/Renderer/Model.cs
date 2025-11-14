@@ -2,6 +2,7 @@ using System.Numerics;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.OpenGL;
+using XNOEdit.Shaders;
 
 namespace XNOEdit.Renderer
 {
@@ -10,14 +11,17 @@ namespace XNOEdit.Renderer
         private readonly GL _gl;
         private readonly List<ModelMesh> _meshes = [];
         private readonly Dictionary<int, BufferObject<float>> _sharedVertexBuffers = new();
+        private readonly ShaderArchive _shaderArchive;
 
-        public Model(GL gl, ObjectChunk objectChunk)
+        public Model(GL gl, ObjectChunk objectChunk, EffectListChunk effectListChunk, ShaderArchive shaderArchive)
         {
             _gl = gl;
-            LoadModel(objectChunk);
+            _shaderArchive = shaderArchive;
+
+            LoadModel(objectChunk,  effectListChunk);
         }
 
-        private void LoadModel(ObjectChunk objectChunk)
+        private void LoadModel(ObjectChunk objectChunk, EffectListChunk effectListChunk)
         {
             // Create shared vertex buffers for each unique VertexList
             for (int i = 0; i < objectChunk.VertexLists.Count; i++)
@@ -67,13 +71,22 @@ namespace XNOEdit.Renderer
                 {
                     var vertexListIndex = meshSet.VertexListIndex;
                     var primitiveList = meshSet.GetPrimitiveList(objectChunk);
+                    var technique = meshSet.GetTechnique(effectListChunk);
+                    var effect = technique.GetEffect(effectListChunk);
 
                     if (primitiveList == null || !_sharedVertexBuffers.TryGetValue(vertexListIndex, out var buffer))
                     {
                         continue;
                     }
 
-                    var mesh = new ModelMesh(_gl, buffer, primitiveList);
+                    var shaderFile = _shaderArchive.GetFile($"xenon/shader/std/{effect.Name}o");
+                    var shaderData = shaderFile.GetData();
+                    var containers = ShaderArchive.ExtractShaderContainers(shaderData);
+
+                    var recompiler = new ShaderRecompiler(EmbeddedResources.ReadAllText("XNOEdit/Shaders/shader_common.h"));
+                    var spirv = recompiler.Recompile(containers[0]);
+
+                    var mesh = new ModelMesh(_gl, buffer, primitiveList, effect.Name, technique.Name);
                     _meshes.Add(mesh);
                 }
             }
@@ -87,7 +100,7 @@ namespace XNOEdit.Renderer
 
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(xeShader);
+                mesh.Draw();
             }
 
             _gl.BindVertexArray(0);
@@ -115,9 +128,15 @@ namespace XNOEdit.Renderer
         private BufferObject<ushort> _ebo;
         private int _indexCount;
 
-        public ModelMesh(GL gl, BufferObject<float> sharedVbo, PrimitiveList primitiveList)
+        private string _effect;
+        private string _technique;
+
+        public ModelMesh(GL gl, BufferObject<float> sharedVbo, PrimitiveList primitiveList, string effect, string technique)
         {
             _gl = gl;
+            _effect = effect;
+            _technique = technique;
+
             LoadMesh(sharedVbo, primitiveList);
         }
 
@@ -179,7 +198,7 @@ namespace XNOEdit.Renderer
             _gl.BindVertexArray(0);
         }
 
-        public unsafe void Draw(XeShader xeShader)
+        public unsafe void Draw()
         {
             if (_indexCount == 0) return;
 

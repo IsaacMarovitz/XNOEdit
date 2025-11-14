@@ -11,6 +11,7 @@ using Silk.NET.OpenGL.Extensions.ImGui;
 using Silk.NET.Windowing;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
+using XNOEdit.Shaders;
 
 namespace XNOEdit
 {
@@ -28,6 +29,7 @@ namespace XNOEdit
 
         private static Camera _camera;
         private static XeShader _shader;
+        private static ShaderArchive _shaderArchive;
         private static Model _model;
         private static GridRenderer _grid;
         private static SkyboxRenderer _skybox;
@@ -39,7 +41,7 @@ namespace XNOEdit
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
         private static Vector3 _sunDirection = Vector3.Normalize(new Vector3(0.5f, 0.5f, 0.5f));
-        private static Vector3 _sunColor = Vector3.Normalize(new Vector3(1.0f, 0.5f, 0.3f));
+        private static Vector3 _sunColor = Vector3.Normalize(new Vector3(1.0f, 0.95f, 0.8f));
 
         private static Vector2 _lastMousePosition;
 
@@ -238,123 +240,141 @@ namespace XNOEdit
             _gl.Dispose();
         }
 
-        private static unsafe void OnFileDrop(string[] files)
+        private static void OnFileDrop(string[] files)
         {
             foreach (var file in files)
             {
-                try
+                var extension = Path.GetExtension(file);
+
+                switch (extension)
                 {
-                    var xno = new NinjaNext(file);
-                    _xnoPanel = new ImGuiXnoPanel(xno);
+                    case ".arc":
+                        _shaderArchive = new ShaderArchive(file);
+                        return;
+                    case ".xno":
+                        ReadXno(file);
+                        return;
+                }
+            }
+        }
 
-                    _window.Title = $"XNOEdit - {xno.Name}";
+        private static unsafe void ReadXno(string file)
+        {
+            try
+            {
+                var xno = new NinjaNext(file);
+                _xnoPanel = new ImGuiXnoPanel(xno);
 
-                    foreach (var texture in Textures)
+                _window.Title = $"XNOEdit - {xno.Name}";
+
+                foreach (var texture in Textures)
+                {
+                    _gl.DeleteTexture(texture.Value);
+                }
+
+                Textures.Clear();
+
+                // Load textures
+                var textureListChunk = xno.GetChunk<TextureListChunk>();
+                if (textureListChunk != null)
+                {
+                    Console.WriteLine($"Loading {textureListChunk.Textures.Count} textures...");
+                    foreach (var texture in textureListChunk.Textures)
                     {
-                        _gl.DeleteTexture(texture.Value);
-                    }
-                    Textures.Clear();
+                        var folderPath = Path.GetDirectoryName(file);
+                        var texturePath = Path.Combine(folderPath, texture.Name);
 
-                    // Load textures
-                    var textureListChunk = xno.GetChunk<TextureListChunk>();
-                    if (textureListChunk != null)
-                    {
-                        Console.WriteLine($"Loading {textureListChunk.Textures.Count} textures...");
-                        foreach (var texture in textureListChunk.Textures)
+                        if (!File.Exists(texturePath))
                         {
-                            var folderPath = Path.GetDirectoryName(file);
-                            var texturePath = Path.Combine(folderPath, texture.Name);
+                            Console.WriteLine($"  Warning: Texture not found: {texture.Name}");
+                            continue;
+                        }
 
-                            if (!File.Exists(texturePath))
-                            {
-                                Console.WriteLine($"  Warning: Texture not found: {texture.Name}");
-                                continue;
-                            }
+                        using var image = Pfimage.FromFile(texturePath);
 
-                            using var image = Pfimage.FromFile(texturePath);
+                        var glTexture = _gl.GenTexture();
+                        _gl.ActiveTexture(TextureUnit.Texture0);
+                        _gl.BindTexture(TextureTarget.Texture2D, glTexture);
 
-                            var glTexture = _gl.GenTexture();
-                            _gl.ActiveTexture(TextureUnit.Texture0);
-                            _gl.BindTexture(TextureTarget.Texture2D, glTexture);
+                        fixed (byte* ptr = image.Data)
+                        {
+                            _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, (uint) image.Width,
+                                (uint) image.Height, 0, PixelFormat.Bgra, PixelType.UnsignedByte, ptr);
+                        }
 
-                            fixed (byte* ptr = image.Data)
-                            {
-                                _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, (uint) image.Width,
-                                    (uint) image.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
-                            }
+                        var glMinFilter = texture.MinFilter switch
+                        {
+                            MinFilter.NND_MIN_NEAREST => (int)TextureMinFilter.Nearest,
+                            MinFilter.NND_MIN_LINEAR => (int)TextureMinFilter.Linear,
+                            MinFilter.NND_MIN_NEAREST_MIPMAP_NEAREST => (int)TextureMinFilter.NearestMipmapNearest,
+                            MinFilter.NND_MIN_NEAREST_MIPMAP_LINEAR => (int)TextureMinFilter.NearestMipmapLinear,
+                            MinFilter.NND_MIN_LINEAR_MIPMAP_NEAREST => (int)TextureMinFilter.LinearMipmapNearest,
+                            MinFilter.NND_MIN_LINEAR_MIPMAP_LINEAR => (int)TextureMinFilter.LinearMipmapLinear,
+                            _ => (int)TextureMinFilter.Linear
+                        };
 
-                            var glMinFilter = texture.MinFilter switch
-                            {
-                                MinFilter.NND_MIN_NEAREST => (int)TextureMinFilter.Nearest,
-                                MinFilter.NND_MIN_LINEAR => (int)TextureMinFilter.Linear,
-                                MinFilter.NND_MIN_NEAREST_MIPMAP_NEAREST => (int)TextureMinFilter.NearestMipmapNearest,
-                                MinFilter.NND_MIN_NEAREST_MIPMAP_LINEAR => (int)TextureMinFilter.NearestMipmapLinear,
-                                MinFilter.NND_MIN_LINEAR_MIPMAP_NEAREST => (int)TextureMinFilter.LinearMipmapNearest,
-                                MinFilter.NND_MIN_LINEAR_MIPMAP_LINEAR => (int)TextureMinFilter.LinearMipmapLinear,
-                                _ => (int)TextureMinFilter.Linear
-                            };
+                        var glMagFilter = texture.MagFilter switch
+                        {
+                            MagFilter.NND_MAG_NEAREST => (int)TextureMinFilter.Nearest,
+                            MagFilter.NND_MAG_LINEAR => (int)TextureMinFilter.Linear,
+                            _ => (int)TextureMinFilter.Linear
+                        };
 
-                            var glMagFilter = texture.MagFilter switch
-                            {
-                                MagFilter.NND_MAG_NEAREST => (int)TextureMinFilter.Nearest,
-                                MagFilter.NND_MAG_LINEAR => (int)TextureMinFilter.Linear,
-                                _ => (int)TextureMinFilter.Linear
-                            };
+                        _gl.GenerateMipmap(TextureTarget.Texture2D);
+                        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, glMinFilter);
+                        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, glMagFilter);
 
-                            _gl.GenerateMipmap(TextureTarget.Texture2D);
-                            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, glMinFilter);
-                            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, glMagFilter);
+                        _gl.BindTexture(TextureTarget.Texture2D, 0);
 
-                            _gl.BindTexture(TextureTarget.Texture2D, 0);
+                        Textures.Add(texture.Name, glTexture);
+                    }
+                }
 
-                            Textures.Add(texture.Name, glTexture);
+                // Load and create model
+                _model?.Dispose();
+                var objectChunk = xno.GetChunk<ObjectChunk>();
+                var effectChunk = xno.GetChunk<EffectListChunk>();
+
+                if (objectChunk != null && effectChunk != null)
+                {
+                    // In OnFileDrop, after loading ObjectChunk:
+                    var vertexListUsage = new Dictionary<int, int>();
+                    foreach (var subObj in objectChunk.SubObjects)
+                    {
+                        foreach (var meshSet in subObj.MeshSets)
+                        {
+                            vertexListUsage.TryAdd(meshSet.VertexListIndex, 0);
+                            vertexListUsage[meshSet.VertexListIndex]++;
                         }
                     }
 
-                    // Load and create model
-                    _model?.Dispose();
-                    var objectChunk = xno.GetChunk<ObjectChunk>();
-                    if (objectChunk != null)
-                    {
-                        // In OnFileDrop, after loading ObjectChunk:
-                        var vertexListUsage = new Dictionary<int, int>();
-                        foreach (var subObj in objectChunk.SubObjects)
-                        {
-                            foreach (var meshSet in subObj.MeshSets)
-                            {
-                                vertexListUsage.TryAdd(meshSet.VertexListIndex, 0);
-                                vertexListUsage[meshSet.VertexListIndex]++;
-                            }
-                        }
+                    var totalMeshes = objectChunk.SubObjects.Sum(sub => sub.MeshSets.Count);
+                    Console.WriteLine($"Found {objectChunk.SubObjects.Count} sub-objects with {totalMeshes} total mesh sets");
 
-                        var totalMeshes = objectChunk.SubObjects.Sum(sub => sub.MeshSets.Count);
-                        Console.WriteLine($"Found {objectChunk.SubObjects.Count} sub-objects with {totalMeshes} total mesh sets");
+                    _model = new Model(_gl, objectChunk, effectChunk, _shaderArchive);
 
-                        _model = new Model(_gl, objectChunk);
+                    // Use object-level bounding info for camera positioning
+                    _modelCenter = objectChunk.Centre;
+                    _modelRadius = objectChunk.Radius;
 
-                        // Use object-level bounding info for camera positioning
-                        _modelCenter = objectChunk.Centre;
-                        _modelRadius = objectChunk.Radius;
+                    _camera.NearPlane = Math.Max(_modelRadius * 0.01f, 0.1f);
+                    _camera.FarPlane = Math.Max(_modelRadius * 10.0f, 1000.0f);
 
-                        _camera.NearPlane = Math.Max(_modelRadius * 0.01f, 0.1f);
-                        _camera.FarPlane = Math.Max(_modelRadius * 10.0f, 1000.0f);
+                    _grid?.Dispose();
+                    var gridSize = _modelRadius * 4.0f;
+                    _grid = new GridRenderer(_gl, gridSize);
 
-                        _grid?.Dispose();
-                        var gridSize = _modelRadius * 4.0f;
-                        _grid = new GridRenderer(_gl, gridSize);
-
-                        ResetCamera();
-                    }
-                    else
-                    {
-                        Console.WriteLine("Error: No ObjectChunk found in file");
-                    }
+                    ResetCamera();
                 }
-                catch (Exception ex)
+                else
                 {
-                    Console.WriteLine($"Error loading file: {ex.Message}");
-                    Console.WriteLine(ex.StackTrace);
+                    Console.WriteLine("Error: No ObjectChunk found in file");
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading file: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
             }
         }
 
@@ -371,39 +391,33 @@ namespace XNOEdit
 
             var alert = string.Empty;
 
-            // Toggle wireframe mode with F key
-            if (key == Key.F)
+            switch (key)
             {
-                _wireframeMode = !_wireframeMode;
-                alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
-            }
-
-            // Toggle grid with G key
-            if (key == Key.G)
-            {
-                _showGrid = !_showGrid;
-                alert = $"Grid: {(_showGrid ? "ON" : "OFF")}";
-            }
-
-            // Toggle backface culling with C key
-            if (key == Key.C)
-            {
-                _backfaceCulling = !_backfaceCulling;
-                alert = $"Backface Culling: {(_backfaceCulling ? "ON" : "OFF")}";
-            }
-
-            // Toggle vertex colors with V key
-            if (key == Key.V)
-            {
-                _vertexColors = !_vertexColors;
-                alert = $"Vertex Colors: {(_vertexColors ? "ON" : "OFF")}";
-            }
-
-            // Reset camera with R key
-            if (key == Key.R)
-            {
-                ResetCamera();
-                alert = "Camera Reset";
+                // Toggle wireframe mode with F key
+                case Key.F:
+                    _wireframeMode = !_wireframeMode;
+                    alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
+                    break;
+                // Toggle grid with G key
+                case Key.G:
+                    _showGrid = !_showGrid;
+                    alert = $"Grid: {(_showGrid ? "ON" : "OFF")}";
+                    break;
+                // Toggle backface culling with C key
+                case Key.C:
+                    _backfaceCulling = !_backfaceCulling;
+                    alert = $"Backface Culling: {(_backfaceCulling ? "ON" : "OFF")}";
+                    break;
+                // Toggle vertex colors with V key
+                case Key.V:
+                    _vertexColors = !_vertexColors;
+                    alert = $"Vertex Colors: {(_vertexColors ? "ON" : "OFF")}";
+                    break;
+                // Reset camera with R key
+                case Key.R:
+                    ResetCamera();
+                    alert = "Camera Reset";
+                    break;
             }
 
             if (alert != string.Empty)
