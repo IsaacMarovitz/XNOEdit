@@ -39,6 +39,7 @@ namespace XNOEdit
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
         private static Vector3 _sunDirection = Vector3.Normalize(new Vector3(0.5f, 0.5f, 0.5f));
+        private static Vector3 _sunColor = Vector3.Normalize(new Vector3(1.0f, 0.5f, 0.3f));
 
         private static Vector2 _lastMousePosition;
 
@@ -134,7 +135,7 @@ namespace XNOEdit
             var projection = _camera.GetProjectionMatrix((float)size.X / size.Y);
 
             _gl.Disable(EnableCap.CullFace);
-            _skybox.Draw(view, projection, _sunDirection);
+            _skybox.Draw(view, projection, _sunDirection, _sunColor);
 
             if (_showGrid)
             {
@@ -165,8 +166,8 @@ namespace XNOEdit
                 _shader.SetUniform("uProjection", projection);
                 _shader.SetUniform("uVertColorStrength", _vertexColors ? 1.0f : 0.0f);
                 _shader.SetUniform("uLightDir", _sunDirection);
+                _shader.SetUniform("uLightColor", _sunColor);
                 _shader.SetUniform("uViewPos", _camera.Transform.Position);
-                _shader.SetUniform("uLightColor", new Vector3(1.0f, 1.0f, 1.0f));
 
                 _model.Draw(_shader);
             }
@@ -407,11 +408,6 @@ namespace XNOEdit
 
             if (alert != string.Empty)
                 _alertPanel.TriggerAlert(alert);
-        }
-
-        private static float DegreesToRadians(float degrees)
-        {
-            return MathF.PI / 180f * degrees;
         }
     }
 }

@@ -20,7 +20,7 @@ namespace XNOEdit.Renderer
         private void CreateQuad()
         {
             // Full-screen quad in NDC coordinates
-            var vertices = new float[]
+            var vertices = new[]
             {
                 -1.0f, -1.0f, 0.999f,  // Bottom-left (far depth)
                  1.0f, -1.0f, 0.999f,  // Bottom-right
@@ -56,7 +56,7 @@ namespace XNOEdit.Renderer
             _shader = new XeShader(_gl, "XNOEdit/Shaders/Skybox.vert", "XNOEdit/Shaders/Skybox.frag");
         }
 
-        public unsafe void Draw(Matrix4x4 view, Matrix4x4 projection, Vector3 sunDirection)
+        public void Draw(Matrix4x4 view, Matrix4x4 projection, Vector3 sunDirection, Vector3 sunColor)
         {
             // Disable depth writing so skybox is always behind everything
             _gl.DepthMask(false);
@@ -65,6 +65,7 @@ namespace XNOEdit.Renderer
             _shader.SetUniform("uView", view);
             _shader.SetUniform("uProjection", projection);
             _shader.SetUniform("uSunDirection", sunDirection);
+            _shader.SetUniform("uSunColor", sunColor);
 
             _gl.BindVertexArray(_vao);
             _gl.DrawArrays(GLEnum.TriangleFan, 0, 4);
