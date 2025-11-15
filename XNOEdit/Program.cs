@@ -14,7 +14,7 @@ using VertexFormat = Silk.NET.WebGPU.VertexFormat;
 
 namespace XNOEdit
 {
-    unsafe class Program
+    internal static unsafe class Program
     {
         private static IWindow _window;
         private static WebGPU _wgpu;
@@ -51,7 +51,7 @@ namespace XNOEdit
         private static Vector4 _sunColor = Vector4.Normalize(new Vector4(1.0f, 0.95f, 0.8f, 0.0f));
         private static Vector2 _lastMousePosition;
 
-        static void Main(string[] args)
+        private static void Main()
         {
             var options = WindowOptions.Default with
             {
@@ -230,21 +230,25 @@ namespace XNOEdit
 
         private static void OnMouseDown(IMouse mouse, MouseButton button)
         {
-            if (button == MouseButton.Right)
+            if (button != MouseButton.Left || ImGui.GetIO().WantCaptureMouse)
             {
-                _mouseCaptured = true;
-                mouse.Cursor.CursorMode = CursorMode.Raw;
-                _lastMousePosition = default;
+                return;
             }
+
+            _mouseCaptured = true;
+            mouse.Cursor.CursorMode = CursorMode.Raw;
+            _lastMousePosition = default;
         }
 
         private static void OnMouseUp(IMouse mouse, MouseButton button)
         {
-            if (button == MouseButton.Right)
+            if (button != MouseButton.Left || ImGui.GetIO().WantCaptureMouse)
             {
-                _mouseCaptured = false;
-                mouse.Cursor.CursorMode = CursorMode.Normal;
+                return;
             }
+
+            _mouseCaptured = false;
+            mouse.Cursor.CursorMode = CursorMode.Normal;
         }
 
         private static void OnUpdate(double deltaTime)

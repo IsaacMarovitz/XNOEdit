@@ -12,7 +12,7 @@ namespace XNOEdit.Renderer
 {
     public unsafe class ImGuiController : IDisposable
     {
-        private readonly WebGPU _webGPU;
+        private readonly WebGPU _wgpu;
         private readonly Device* _device;
         private readonly Queue* _queue;
         private readonly IView _view;
@@ -35,22 +35,22 @@ namespace XNOEdit.Renderer
 
         private Buffer* _uniformsBuffer;
 
-        private WindowRenderBuffers _windowRenderBuffers = new();
+        private WindowRenderBuffers _windowRenderBuffers;
 
         private readonly Dictionary<nint, nint> _viewsById = [];
         private readonly List<char> _pressedChars = [];
         private readonly Dictionary<Key, bool> _keyEvents = [];
 
-        public ImGuiController(WebGPU webGPU, Device* device, IView view, IInputContext inputContext, uint framesInFlight, TextureFormat swapChainFormat, TextureFormat? depthFormat)
+        public ImGuiController(WebGPU wgpu, Device* device, IView view, IInputContext inputContext, uint framesInFlight, TextureFormat swapChainFormat, TextureFormat? depthFormat)
         {
-            _webGPU = webGPU;
+            _wgpu = wgpu;
             _device = device;
             _view = view;
             _inputContext = inputContext;
             _swapChainFormat = swapChainFormat;
             _depthFormat = depthFormat;
             _framesInFlight = framesInFlight;
-            _queue = _webGPU.DeviceGetQueue(_device);
+            _queue = _wgpu.DeviceGetQueue(_device);
 
             Init();
         }
@@ -68,13 +68,13 @@ namespace XNOEdit.Renderer
             DrawImGui(encoder);
         }
 
-        public BindGroup* BindImGuiTextureView(TextureView* view)
+        public void BindImGuiTextureView(TextureView* view)
         {
             var id = (nint)view;
 
-            if (_viewsById.TryGetValue(id, out nint ptr))
+            if (_viewsById.TryGetValue(id, out var ptr))
             {
-                return (BindGroup*)ptr;
+                return;
             }
 
             BindGroupEntry imageEntry = new()
@@ -94,10 +94,8 @@ namespace XNOEdit.Renderer
                 Entries = &imageEntry
             };
 
-            var bindGroup = _webGPU.DeviceCreateBindGroup(_device, ref imageDesc);
+            var bindGroup = _wgpu.DeviceCreateBindGroup(_device, in imageDesc);
             _viewsById[id] = (nint)bindGroup;
-
-            return bindGroup;
         }
 
         private void Init()
@@ -136,7 +134,7 @@ namespace XNOEdit.Renderer
                 NextInChain = (ChainedStruct*)(&wgslDescriptor)
             };
 
-            _shaderModule = _webGPU.DeviceCreateShaderModule(_device, ref descriptor);
+            _shaderModule = _wgpu.DeviceCreateShaderModule(_device, in descriptor);
 
             SilkMarshal.Free(src);
             SilkMarshal.Free(shaderName);
@@ -144,12 +142,12 @@ namespace XNOEdit.Renderer
 
         private void InitFonts()
         {
-            ImGui.GetIO().Fonts.GetTexDataAsRGBA32(out byte* pixels, out int width, out int height, out int sizePerPixel);
+            ImGui.GetIO().Fonts.GetTexDataAsRGBA32(out byte* pixels, out var width, out var height, out var sizePerPixel);
 
             TextureDescriptor textureDescriptor = new()
             {
                 Dimension = TextureDimension.Dimension2D,
-                Size = new()
+                Size = new Extent3D
                 {
                     Width = (uint)width,
                     Height = (uint)height,
@@ -161,7 +159,7 @@ namespace XNOEdit.Renderer
                 Usage = TextureUsage.CopyDst | TextureUsage.TextureBinding
             };
 
-            _fontTexture = _webGPU.DeviceCreateTexture(_device, ref textureDescriptor);
+            _fontTexture = _wgpu.DeviceCreateTexture(_device, in textureDescriptor);
 
             TextureViewDescriptor textureViewDescriptor = new()
             {
@@ -174,7 +172,7 @@ namespace XNOEdit.Renderer
                 Aspect = TextureAspect.All
             };
 
-            _fontView = _webGPU.TextureCreateView(_fontTexture, ref textureViewDescriptor);
+            _fontView = _wgpu.TextureCreateView(_fontTexture, in textureViewDescriptor);
 
             ImageCopyTexture imageCopyTexture = new()
             {
@@ -195,7 +193,7 @@ namespace XNOEdit.Renderer
                 DepthOrArrayLayers = 1,
             };
 
-            _webGPU.QueueWriteTexture(_queue, &imageCopyTexture, pixels, (nuint)(width * height * sizePerPixel), ref textureDataLayout, ref extent);
+            _wgpu.QueueWriteTexture(_queue, &imageCopyTexture, pixels, (nuint)(width * height * sizePerPixel), in textureDataLayout, in extent);
 
             SamplerDescriptor samplerDescriptor = new()
             {
@@ -208,14 +206,14 @@ namespace XNOEdit.Renderer
                 MaxAnisotropy = 1,
             };
 
-            _fontSampler = _webGPU.DeviceCreateSampler(_device, ref samplerDescriptor);
+            _fontSampler = _wgpu.DeviceCreateSampler(_device, in samplerDescriptor);
 
             ImGui.GetIO().Fonts.SetTexID((nint)_fontView);
         }
 
         private void InitBindGroupLayouts()
         {
-            BindGroupLayoutEntry* commonBgLayoutEntries = stackalloc BindGroupLayoutEntry[2];
+            var commonBgLayoutEntries = stackalloc BindGroupLayoutEntry[2];
             commonBgLayoutEntries[0].Binding = 0;
             commonBgLayoutEntries[0].Visibility = ShaderStage.Vertex | ShaderStage.Fragment;
             commonBgLayoutEntries[0].Buffer.Type = BufferBindingType.Uniform;
@@ -223,7 +221,7 @@ namespace XNOEdit.Renderer
             commonBgLayoutEntries[1].Visibility = ShaderStage.Fragment;
             commonBgLayoutEntries[1].Sampler.Type = SamplerBindingType.Filtering;
 
-            BindGroupLayoutEntry* imageBgLayoutEntries = stackalloc BindGroupLayoutEntry[1];
+            var imageBgLayoutEntries = stackalloc BindGroupLayoutEntry[1];
             imageBgLayoutEntries[0].Binding = 0;
             imageBgLayoutEntries[0].Visibility = ShaderStage.Fragment;
             imageBgLayoutEntries[0].Texture.SampleType = TextureSampleType.Float;
@@ -241,22 +239,23 @@ namespace XNOEdit.Renderer
                 Entries = imageBgLayoutEntries,
             };
 
-            _commonBindGroupLayout = _webGPU.DeviceCreateBindGroupLayout(_device, ref commonBgLayoutDesc);
-            _imageBindGroupLayout = _webGPU.DeviceCreateBindGroupLayout(_device, ref imageBgLayoutDesc);
+            _commonBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_device, in commonBgLayoutDesc);
+            _imageBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_device, in imageBgLayoutDesc);
         }
 
         private void InitPipeline()
         {
-            BindGroupLayout** bgLayouts = stackalloc BindGroupLayout*[2];
+            var bgLayouts = stackalloc BindGroupLayout*[2];
             bgLayouts[0] = _commonBindGroupLayout;
             bgLayouts[1] = _imageBindGroupLayout;
+
             PipelineLayoutDescriptor layoutDesc = new() { BindGroupLayoutCount = 2, BindGroupLayouts = bgLayouts };
-            PipelineLayout* layout = _webGPU.DeviceCreatePipelineLayout(_device, ref layoutDesc);
+            var layout = _wgpu.DeviceCreatePipelineLayout(_device, in layoutDesc);
 
             var vertexEntry = SilkMarshal.StringToPtr("vs_main");
             var fragmentEntry = SilkMarshal.StringToPtr("fs_main");
 
-            VertexAttribute* vertexAttrib = stackalloc VertexAttribute[3];
+            var vertexAttrib = stackalloc VertexAttribute[3];
             vertexAttrib[0].Format = VertexFormat.Float32x2;
             vertexAttrib[0].Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.pos));
             vertexAttrib[0].ShaderLocation = 0;
@@ -344,11 +343,11 @@ namespace XNOEdit.Renderer
                 renderPipelineDescriptor.DepthStencil = &depthStencilState;
             }
 
-            _renderPipeline = _webGPU.DeviceCreateRenderPipeline(_device, ref renderPipelineDescriptor);
+            _renderPipeline = _wgpu.DeviceCreateRenderPipeline(_device, in renderPipelineDescriptor);
 
             SilkMarshal.Free(vertexEntry);
             SilkMarshal.Free(fragmentEntry);
-            _webGPU.PipelineLayoutRelease(layout);
+            _wgpu.PipelineLayoutRelease(layout);
         }
 
         private void InitUniformBuffers()
@@ -356,19 +355,19 @@ namespace XNOEdit.Renderer
             BufferDescriptor bufferDescriptor = new()
             {
                 Usage = BufferUsage.CopyDst | BufferUsage.Uniform,
-                Size = (ulong)Helpers.Align(sizeof(Uniforms), 16)
+                Size = (ulong)Align(sizeof(Uniforms), 16)
             };
 
-            _uniformsBuffer = _webGPU.DeviceCreateBuffer(_device, ref bufferDescriptor);
+            _uniformsBuffer = _wgpu.DeviceCreateBuffer(_device, in bufferDescriptor);
         }
 
         private void InitBindGroups()
         {
-            BindGroupEntry* bindGroupEntries = stackalloc BindGroupEntry[2];
+            var bindGroupEntries = stackalloc BindGroupEntry[2];
             bindGroupEntries[0].Binding = 0;
             bindGroupEntries[0].Buffer = _uniformsBuffer;
             bindGroupEntries[0].Offset = 0;
-            bindGroupEntries[0].Size = (ulong)Helpers.Align(sizeof(Uniforms), 16);
+            bindGroupEntries[0].Size = (ulong)Align(sizeof(Uniforms), 16);
             bindGroupEntries[0].Sampler = null;
             bindGroupEntries[1].Binding = 1;
             bindGroupEntries[1].Buffer = null;
@@ -383,14 +382,14 @@ namespace XNOEdit.Renderer
                 Entries = bindGroupEntries
             };
 
-            _commonBindGroup = _webGPU.DeviceCreateBindGroup(_device, ref bgCommonDesc);
+            _commonBindGroup = _wgpu.DeviceCreateBindGroup(_device, in bgCommonDesc);
 
             BindImGuiTextureView(_fontView);
         }
 
-        private static bool TryMapKeys(Key key, out ImGuiKey imguikey)
+        private static bool TryMapKeys(Key key, out ImGuiKey imguiKey)
         {
-            imguikey = key switch
+            imguiKey = key switch
             {
                 Key.Backspace => ImGuiKey.Backspace,
                 Key.Tab => ImGuiKey.Tab,
@@ -440,7 +439,7 @@ namespace XNOEdit.Renderer
                 _ => ImGuiKey.None,
             };
 
-            return imguikey != ImGuiKey.None;
+            return imguiKey != ImGuiKey.None;
         }
 
         private void UpdateImGuiInput()
@@ -465,9 +464,9 @@ namespace XNOEdit.Renderer
 
             foreach (var evt in _keyEvents)
             {
-                if (TryMapKeys(evt.Key, out ImGuiKey imguikey))
+                if (TryMapKeys(evt.Key, out var imguiKey))
                 {
-                    io.AddKeyEvent(imguikey, evt.Value);
+                    io.AddKeyEvent(imguiKey, evt.Value);
                 }
             }
             _keyEvents.Clear();
@@ -492,8 +491,8 @@ namespace XNOEdit.Renderer
             var drawData = ImGui.GetDrawData();
             drawData.ScaleClipRects(ImGui.GetIO().DisplayFramebufferScale);
 
-            int framebufferWidth = (int)(drawData.DisplaySize.X * drawData.FramebufferScale.X);
-            int framebufferHeight = (int)(drawData.DisplaySize.Y * drawData.FramebufferScale.Y);
+            var framebufferWidth = (int)(drawData.DisplaySize.X * drawData.FramebufferScale.X);
+            var framebufferHeight = (int)(drawData.DisplaySize.Y * drawData.FramebufferScale.Y);
             if (framebufferWidth <= 0 || framebufferHeight <= 0)
             {
                 return;
@@ -507,28 +506,28 @@ namespace XNOEdit.Renderer
             }
 
             _windowRenderBuffers.Index = (_windowRenderBuffers.Index + 1) % _windowRenderBuffers.Count;
-            ref FrameRenderBuffer frameRenderBuffer = ref _windowRenderBuffers.FrameRenderBuffers[_windowRenderBuffers.Index];
+            ref var frameRenderBuffer = ref _windowRenderBuffers.FrameRenderBuffers[_windowRenderBuffers.Index];
 
             if (drawData.TotalVtxCount > 0)
             {
-                ulong vertSize = (ulong)Helpers.Align(drawData.TotalVtxCount * sizeof(ImDrawVert), 4);
-                ulong indexSize = (ulong)Helpers.Align(drawData.TotalIdxCount * sizeof(ushort), 4);
+                var vertSize = (ulong)Align(drawData.TotalVtxCount * sizeof(ImDrawVert), 4);
+                var indexSize = (ulong)Align(drawData.TotalIdxCount * sizeof(ushort), 4);
                 CreateOrUpdateBuffers(ref frameRenderBuffer, vertSize, indexSize);
 
-                ImDrawVert* vtxDst = frameRenderBuffer.VertexBufferMemory.AsPtr<ImDrawVert>();
-                ushort* idxDst = frameRenderBuffer.IndexBufferMemory.AsPtr<ushort>();
-                for (int n = 0; n < drawData.CmdListsCount; n++)
+                var vtxDst = frameRenderBuffer.VertexBufferMemory.AsPtr<ImDrawVert>();
+                var idxDst = frameRenderBuffer.IndexBufferMemory.AsPtr<ushort>();
+                for (var n = 0; n < drawData.CmdListsCount; n++)
                 {
-                    ImDrawListPtr cmd_list = drawData.CmdLists[n];
-                    Unsafe.CopyBlock(vtxDst, cmd_list.VtxBuffer.Data.ToPointer(), (uint)cmd_list.VtxBuffer.Size * (uint)sizeof(ImDrawVert));
-                    Unsafe.CopyBlock(idxDst, cmd_list.IdxBuffer.Data.ToPointer(), (uint)cmd_list.IdxBuffer.Size * sizeof(ushort));
-                    vtxDst += cmd_list.VtxBuffer.Size;
-                    idxDst += cmd_list.IdxBuffer.Size;
+                    var cmdList = drawData.CmdLists[n];
+                    Unsafe.CopyBlock(vtxDst, cmdList.VtxBuffer.Data.ToPointer(), (uint)cmdList.VtxBuffer.Size * (uint)sizeof(ImDrawVert));
+                    Unsafe.CopyBlock(idxDst, cmdList.IdxBuffer.Data.ToPointer(), (uint)cmdList.IdxBuffer.Size * sizeof(ushort));
+                    vtxDst += cmdList.VtxBuffer.Size;
+                    idxDst += cmdList.IdxBuffer.Size;
                 }
 
                 // Mapping might be better?
-                _webGPU.QueueWriteBuffer(_queue, frameRenderBuffer.VertexBufferGpu, 0, frameRenderBuffer.VertexBufferMemory, (nuint)vertSize);
-                _webGPU.QueueWriteBuffer(_queue, frameRenderBuffer.IndexBufferGpu, 0, frameRenderBuffer.IndexBufferMemory, (nuint)indexSize);
+                _wgpu.QueueWriteBuffer(_queue, frameRenderBuffer.VertexBufferGpu, 0, frameRenderBuffer.VertexBufferMemory, (nuint)vertSize);
+                _wgpu.QueueWriteBuffer(_queue, frameRenderBuffer.IndexBufferGpu, 0, frameRenderBuffer.IndexBufferMemory, (nuint)indexSize);
             }
 
             var io = ImGui.GetIO();
@@ -544,53 +543,49 @@ namespace XNOEdit.Renderer
                 )
             };
 
-            _webGPU.QueueWriteBuffer(_queue, _uniformsBuffer, 0, &uniforms, (nuint)sizeof(Uniforms));
-
-            _webGPU.RenderPassEncoderSetPipeline(encoder, _renderPipeline);
+            _wgpu.QueueWriteBuffer(_queue, _uniformsBuffer, 0, &uniforms, (nuint)sizeof(Uniforms));
+            _wgpu.RenderPassEncoderSetPipeline(encoder, _renderPipeline);
 
             if (drawData.TotalVtxCount > 0)
             {
-                _webGPU.RenderPassEncoderSetVertexBuffer(encoder, 0, frameRenderBuffer.VertexBufferGpu, 0, frameRenderBuffer.VertexBufferSize);
-                _webGPU.RenderPassEncoderSetIndexBuffer(encoder, frameRenderBuffer.IndexBufferGpu, IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferSize);
+                _wgpu.RenderPassEncoderSetVertexBuffer(encoder, 0, frameRenderBuffer.VertexBufferGpu, 0, frameRenderBuffer.VertexBufferSize);
+                _wgpu.RenderPassEncoderSetIndexBuffer(encoder, frameRenderBuffer.IndexBufferGpu, IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferSize);
                 uint dynamicOffsets = 0;
-                _webGPU.RenderPassEncoderSetBindGroup(encoder, 0, _commonBindGroup, 0, ref dynamicOffsets);
+                _wgpu.RenderPassEncoderSetBindGroup(encoder, 0, _commonBindGroup, 0, in dynamicOffsets);
             }
 
-            _webGPU.RenderPassEncoderSetViewport(encoder, 0, 0, drawData.FramebufferScale.X * drawData.DisplaySize.X, drawData.FramebufferScale.Y * drawData.DisplaySize.Y, 0, 1);
+            _wgpu.RenderPassEncoderSetViewport(encoder, 0, 0, drawData.FramebufferScale.X * drawData.DisplaySize.X, drawData.FramebufferScale.Y * drawData.DisplaySize.Y, 0, 1);
 
-            int vtxOffset = 0;
-            int idxOffset = 0;
-            for (int n = 0; n < drawData.CmdListsCount; n++)
+            var vtxOffset = 0;
+            var idxOffset = 0;
+            for (var n = 0; n < drawData.CmdListsCount; n++)
             {
                 var cmdList = drawData.CmdLists[n];
-                for (int i = 0; i < cmdList.CmdBuffer.Size; i++)
+                for (var i = 0; i < cmdList.CmdBuffer.Size; i++)
                 {
                     var cmd = cmdList.CmdBuffer[i];
-                    if (cmd.UserCallback != IntPtr.Zero)
-                    {
-
-                    }
-                    else
+                    if (cmd.UserCallback == IntPtr.Zero)
                     {
                         var texId = cmd.TextureId;
                         if (texId != IntPtr.Zero)
                         {
-                            if (_viewsById.TryGetValue(texId, out nint value))
+                            if (_viewsById.TryGetValue(texId, out var value))
                             {
                                 uint dynamicOffsets = 0;
-                                _webGPU.RenderPassEncoderSetBindGroup(encoder, 1, (BindGroup*)value, 0, ref dynamicOffsets);
+                                _wgpu.RenderPassEncoderSetBindGroup(encoder, 1, (BindGroup*)value, 0,
+                                    in dynamicOffsets);
                             }
                         }
                     }
 
-                    Vector2 clipMin = new((cmd.ClipRect.X ), (cmd.ClipRect.Y ));
-                    Vector2 clipMax = new((cmd.ClipRect.Z), (cmd.ClipRect.W ));
+                    Vector2 clipMin = new(cmd.ClipRect.X, cmd.ClipRect.Y);
+                    Vector2 clipMax = new(cmd.ClipRect.Z, cmd.ClipRect.W);
 
                     if (clipMax.X <= clipMin.X || clipMax.Y <= clipMin.Y)
                         continue;
 
-                    _webGPU.RenderPassEncoderSetScissorRect(encoder, (uint)clipMin.X, (uint)clipMin.Y, (uint)(clipMax.X - clipMin.X), (uint)(clipMax.Y - clipMin.Y));
-                    _webGPU.RenderPassEncoderDrawIndexed(encoder, cmd.ElemCount, 1, (uint)(idxOffset + cmd.IdxOffset), (int)(vtxOffset + cmd.VtxOffset), 0);
+                    _wgpu.RenderPassEncoderSetScissorRect(encoder, (uint)clipMin.X, (uint)clipMin.Y, (uint)(clipMax.X - clipMin.X), (uint)(clipMax.Y - clipMin.Y));
+                    _wgpu.RenderPassEncoderDrawIndexed(encoder, cmd.ElemCount, 1, (uint)(idxOffset + cmd.IdxOffset), (int)(vtxOffset + cmd.VtxOffset), 0);
                 }
 
                 vtxOffset += cmdList.VtxBuffer.Size;
@@ -602,13 +597,12 @@ namespace XNOEdit.Renderer
         {
             if (frameRenderBuffer.VertexBufferGpu == null || frameRenderBuffer.VertexBufferSize < vertSize)
             {
-
                 frameRenderBuffer.VertexBufferMemory?.Dispose();
 
                 if (frameRenderBuffer.VertexBufferGpu != null)
                 {
-                    _webGPU.BufferDestroy(frameRenderBuffer.VertexBufferGpu);
-                    _webGPU.BufferRelease(frameRenderBuffer.VertexBufferGpu);
+                    _wgpu.BufferDestroy(frameRenderBuffer.VertexBufferGpu);
+                    _wgpu.BufferRelease(frameRenderBuffer.VertexBufferGpu);
                 }
 
                 BufferDescriptor desc = new()
@@ -617,7 +611,7 @@ namespace XNOEdit.Renderer
                     Usage = BufferUsage.Vertex | BufferUsage.CopyDst,
                 };
 
-                frameRenderBuffer.VertexBufferGpu = _webGPU.DeviceCreateBuffer(_device, ref desc);
+                frameRenderBuffer.VertexBufferGpu = _wgpu.DeviceCreateBuffer(_device, in desc);
                 frameRenderBuffer.VertexBufferSize = vertSize;
                 frameRenderBuffer.VertexBufferMemory = GlobalMemory.Allocate((int)vertSize);
             }
@@ -628,8 +622,8 @@ namespace XNOEdit.Renderer
 
                 if (frameRenderBuffer.IndexBufferGpu != null)
                 {
-                    _webGPU.BufferDestroy(frameRenderBuffer.IndexBufferGpu);
-                    _webGPU.BufferRelease(frameRenderBuffer.IndexBufferGpu);
+                    _wgpu.BufferDestroy(frameRenderBuffer.IndexBufferGpu);
+                    _wgpu.BufferRelease(frameRenderBuffer.IndexBufferGpu);
                 }
 
                 BufferDescriptor desc = new()
@@ -638,7 +632,7 @@ namespace XNOEdit.Renderer
                     Usage = BufferUsage.Index | BufferUsage.CopyDst,
                 };
 
-                frameRenderBuffer.IndexBufferGpu = _webGPU.DeviceCreateBuffer(_device, ref desc);
+                frameRenderBuffer.IndexBufferGpu = _wgpu.DeviceCreateBuffer(_device, in desc);
                 frameRenderBuffer.IndexBufferSize = indexSize;
                 frameRenderBuffer.IndexBufferMemory = GlobalMemory.Allocate((int)indexSize);
             }
@@ -661,15 +655,14 @@ namespace XNOEdit.Renderer
 
         public void Dispose()
         {
-
             if (_windowRenderBuffers.FrameRenderBuffers != null)
             {
                 foreach (var renderBuffer in _windowRenderBuffers.FrameRenderBuffers)
                 {
-                    _webGPU.BufferDestroy(renderBuffer.VertexBufferGpu);
-                    _webGPU.BufferRelease(renderBuffer.VertexBufferGpu);
-                    _webGPU.BufferDestroy(renderBuffer.IndexBufferGpu);
-                    _webGPU.BufferRelease(renderBuffer.IndexBufferGpu);
+                    _wgpu.BufferDestroy(renderBuffer.VertexBufferGpu);
+                    _wgpu.BufferRelease(renderBuffer.VertexBufferGpu);
+                    _wgpu.BufferDestroy(renderBuffer.IndexBufferGpu);
+                    _wgpu.BufferRelease(renderBuffer.IndexBufferGpu);
                     renderBuffer.IndexBufferMemory?.Dispose();
                     renderBuffer.VertexBufferMemory?.Dispose();
                 }
@@ -677,34 +670,34 @@ namespace XNOEdit.Renderer
 
             foreach (var bg in _viewsById)
             {
-                _webGPU.BindGroupRelease((BindGroup*)bg.Value);
+                _wgpu.BindGroupRelease((BindGroup*)bg.Value);
             }
 
-            _webGPU.BindGroupRelease(_commonBindGroup);
+            _wgpu.BindGroupRelease(_commonBindGroup);
 
-            _webGPU.BufferDestroy(_uniformsBuffer);
-            _webGPU.BufferRelease(_uniformsBuffer);
+            _wgpu.BufferDestroy(_uniformsBuffer);
+            _wgpu.BufferRelease(_uniformsBuffer);
 
-            _webGPU.RenderPipelineRelease(_renderPipeline);
+            _wgpu.RenderPipelineRelease(_renderPipeline);
 
-            _webGPU.BindGroupLayoutRelease(_commonBindGroupLayout);
-            _webGPU.BindGroupLayoutRelease(_imageBindGroupLayout);
+            _wgpu.BindGroupLayoutRelease(_commonBindGroupLayout);
+            _wgpu.BindGroupLayoutRelease(_imageBindGroupLayout);
 
-            _webGPU.SamplerRelease(_fontSampler);
-            _webGPU.TextureViewRelease(_fontView);
-            _webGPU.TextureDestroy(_fontTexture);
-            _webGPU.TextureRelease(_fontTexture);
+            _wgpu.SamplerRelease(_fontSampler);
+            _wgpu.TextureViewRelease(_fontView);
+            _wgpu.TextureDestroy(_fontTexture);
+            _wgpu.TextureRelease(_fontTexture);
 
-            _webGPU.ShaderModuleRelease(_shaderModule);
+            _wgpu.ShaderModuleRelease(_shaderModule);
 
             _inputContext.Keyboards[0].KeyChar -= KeyChar;
             _inputContext.Keyboards[0].KeyUp -= KeyUp;
             _inputContext.Keyboards[0].KeyDown -= KeyDown;
         }
 
-        private class Helpers
+        private static int Align(int size, int align)
         {
-            public static int Align(int size, int align) => (((size) + ((align) - 1)) & ~((align) - 1));
+            return (size + (align - 1)) & ~(align - 1);
         }
 
         private struct Uniforms
@@ -712,7 +705,7 @@ namespace XNOEdit.Renderer
             public Matrix4x4 Mvp;
         }
 
-        internal struct FrameRenderBuffer
+        private struct FrameRenderBuffer
         {
             public ulong VertexBufferSize;
             public ulong IndexBufferSize;
