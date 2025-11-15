@@ -10,10 +10,11 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
       <PackageReference Include="Pfim" Version="0.11.3" />
       <PackageReference Include="Silk.NET.Input" Version="2.22.0" />
-      <PackageReference Include="Silk.NET.OpenGL" Version="2.22.0" />
-      <PackageReference Include="Silk.NET.OpenGL.Extensions.ImGui" Version="2.22.0" />
+      <PackageReference Include="Silk.NET.WebGPU" Version="2.22.0" />
+      <PackageReference Include="Silk.NET.WebGPU.Native.WGPU" Version="2.22.0" />
       <PackageReference Include="Silk.NET.Windowing" Version="2.22.0" />
     </ItemGroup>
 
@@ -22,13 +23,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <EmbeddedResource Include="Shaders\BasicModel.vert" />
-        <EmbeddedResource Include="Shaders\BasicModel.frag" />
-        <EmbeddedResource Include="Shaders\Grid.vert" />
-        <EmbeddedResource Include="Shaders\Grid.frag" />
-        <EmbeddedResource Include="Shaders\Skybox.vert" />
-        <EmbeddedResource Include="Shaders\Skybox.frag" />
         <EmbeddedResource Include="Shaders\shader_common.h" />
+        <EmbeddedResource Include="Shaders\BasicModel.wgsl" />
+        <EmbeddedResource Include="Shaders\Grid.wgsl" />
+        <EmbeddedResource Include="Shaders\Skybox.wgsl" />
+        <EmbeddedResource Include="Shaders\ImGui.wgsl" />
     </ItemGroup>
     
     <ItemGroup>

@@ -2,33 +2,40 @@
 using ImGuiNET;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
-using Marathon.Formats.Ninja.Flags;
 using Pfim;
 using Silk.NET.Input;
 using Silk.NET.Maths;
-using Silk.NET.OpenGL;
-using Silk.NET.OpenGL.Extensions.ImGui;
+using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Shaders;
+using VertexFormat = Silk.NET.WebGPU.VertexFormat;
 
 namespace XNOEdit
 {
-    class Program
+    unsafe class Program
     {
         private static IWindow _window;
-        private static GL _gl;
-        private static IKeyboard _primaryKeyboard;
+        private static WebGPU _wgpu;
+        private static Instance* _instance;
+        private static Adapter* _adapter;
+        private static Device* _device;
+        private static Queue* _queue;
+        private static Surface* _surface;
+        private static TextureFormat _surfaceFormat = TextureFormat.Bgra8Unorm;
+        private static Texture* _depthTexture;
+        private static TextureView* _depthTextureView;
 
+        private static IKeyboard _primaryKeyboard;
         private static ImGuiController _controller;
         private static ImGuiXnoPanel _xnoPanel;
         private static ImGuiAlertPanel _alertPanel;
         private static IInputContext _input;
-        private static readonly Dictionary<string, uint> Textures = [];
+        private static readonly Dictionary<string, IntPtr> Textures = [];
 
         private static Camera _camera;
-        private static XeShader _shader;
+        private static WgpuShader _shader;
         private static ShaderArchive _shaderArchive;
         private static Model _model;
         private static GridRenderer _grid;
@@ -40,9 +47,8 @@ namespace XNOEdit
         private static bool _mouseCaptured;
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
-        private static Vector3 _sunDirection = Vector3.Normalize(new Vector3(0.5f, 0.5f, 0.5f));
-        private static Vector3 _sunColor = Vector3.Normalize(new Vector3(1.0f, 0.95f, 0.8f));
-
+        private static Vector4 _sunDirection = Vector4.Normalize(new Vector4(0.5f, 0.5f, 0.5f, 0.0f));
+        private static Vector4 _sunColor = Vector4.Normalize(new Vector4(1.0f, 0.95f, 0.8f, 0.0f));
         private static Vector2 _lastMousePosition;
 
         static void Main(string[] args)
@@ -50,7 +56,8 @@ namespace XNOEdit
             var options = WindowOptions.Default with
             {
                 Size = new Vector2D<int>(1280, 720),
-                Title = "XNOEdit"
+                Title = "XNOEdit",
+                API = GraphicsAPI.None
             };
 
             _window = Window.Create(options);
@@ -78,27 +85,147 @@ namespace XNOEdit
 
             foreach (var mouse in _input.Mice)
             {
-                mouse.Cursor.CursorMode = CursorMode.Normal; // Changed from Raw
+                mouse.Cursor.CursorMode = CursorMode.Normal;
                 mouse.MouseMove += OnMouseMove;
                 mouse.Scroll += OnMouseWheel;
                 mouse.MouseDown += OnMouseDown;
                 mouse.MouseUp += OnMouseUp;
             }
 
-            _gl = _window.CreateOpenGL();
-            _controller = new ImGuiController(_gl, _window, _input);
+            InitializeWgpu();
+
+            _controller = new ImGuiController(_wgpu, _device, _window, _input, 2, _surfaceFormat, TextureFormat.Depth24Plus);
             _alertPanel = new ImGuiAlertPanel();
             _camera = new Camera();
 
-            _shader = new XeShader(_gl, "XNOEdit/Shaders/BasicModel.vert", "XNOEdit/Shaders/BasicModel.frag");
-            _grid = new GridRenderer(_gl, 100.0f);
-            _skybox = new SkyboxRenderer(_gl);
+            CreateShaders();
+            CreateDepthTexture();
 
-            // Sky blue background
-            _gl.ClearColor(0.53f, 0.81f, 0.92f, 1.0f);
-            _gl.Enable(EnableCap.DepthTest);
-            _gl.Enable(EnableCap.Blend);
-            _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            _grid = new GridRenderer(_wgpu, _device, _queue, _surfaceFormat, 100.0f);
+            _skybox = new SkyboxRenderer(_wgpu, _device, _queue, _surfaceFormat);
+        }
+
+        private static void InitializeWgpu()
+        {
+            _wgpu = WebGPU.GetApi();
+
+            var instanceDesc = new InstanceDescriptor();
+            _instance = _wgpu.CreateInstance(&instanceDesc);
+            _surface = _window.CreateWebGPUSurface(_wgpu, _instance);
+
+            var adapterOptions = new RequestAdapterOptions
+            {
+                PowerPreference = PowerPreference.HighPerformance,
+                CompatibleSurface = _surface
+            };
+
+            Adapter* adapter = null;
+            _wgpu.InstanceRequestAdapter(
+                _instance,
+                &adapterOptions,
+                new PfnRequestAdapterCallback((status, adapterPtr, message, userdata) =>
+                {
+                    if (status == RequestAdapterStatus.Success)
+                    {
+                        adapter = adapterPtr;
+                    }
+                }),
+                null);
+
+            _adapter = adapter;
+
+            var deviceDesc = new DeviceDescriptor();
+            Device* device = null;
+
+            _wgpu.AdapterRequestDevice(
+                _adapter,
+                &deviceDesc,
+                new PfnRequestDeviceCallback((status, devicePtr, message, userdata) =>
+                {
+                    if (status == RequestDeviceStatus.Success)
+                    {
+                        device = devicePtr;
+                    }
+                }),
+                null);
+
+            _device = device;
+            _queue = _wgpu.DeviceGetQueue(_device);
+
+            // Configure surface
+            var surfaceConfig = new SurfaceConfiguration
+            {
+                Device = _device,
+                Format = _surfaceFormat,
+                Usage = TextureUsage.RenderAttachment,
+                Width = (uint)_window.FramebufferSize.X,
+                Height = (uint)_window.FramebufferSize.Y,
+                PresentMode = PresentMode.Fifo,
+                AlphaMode = CompositeAlphaMode.Auto
+            };
+
+            _wgpu.SurfaceConfigure(_surface, &surfaceConfig);
+        }
+
+        private static void CreateShaders()
+        {
+            var basicModelWgsl = EmbeddedResources.ReadAllText("XNOEdit/Shaders/BasicModel.wgsl");
+
+            var vertexAttributes = new VertexAttribute[]
+            {
+                new() { Format = VertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 },
+                new() { Format = VertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 },
+                new() { Format = VertexFormat.Float32x4, Offset = 24, ShaderLocation = 2 }
+            };
+
+            fixed (VertexAttribute* pAttributes = vertexAttributes)
+            {
+                var vertexLayout = new VertexBufferLayout
+                {
+                    ArrayStride = 40,
+                    StepMode = VertexStepMode.Vertex,
+                    AttributeCount = 3,
+                    Attributes = pAttributes
+                };
+
+                _shader = new WgpuShader(
+                    _wgpu,
+                    _device,
+                    _queue,
+                    basicModelWgsl,
+                    _surfaceFormat,
+                    [vertexLayout]);
+            }
+        }
+
+        private static void CreateDepthTexture()
+        {
+            var size = _window.FramebufferSize;
+
+            var depthTextureDesc = new TextureDescriptor
+            {
+                Size = new Extent3D { Width = (uint)size.X, Height = (uint)size.Y, DepthOrArrayLayers = 1 },
+                MipLevelCount = 1,
+                SampleCount = 1,
+                Dimension = TextureDimension.Dimension2D,
+                Format = TextureFormat.Depth24Plus,
+                Usage = TextureUsage.RenderAttachment
+            };
+
+            _depthTexture = _wgpu.DeviceCreateTexture(_device, &depthTextureDesc);
+
+            var depthViewDesc = new TextureViewDescriptor
+            {
+                Format = TextureFormat.Depth24Plus,
+                Dimension = TextureViewDimension.Dimension2D,
+                BaseMipLevel = 0,
+                MipLevelCount = 1,
+                BaseArrayLayer = 0,
+                ArrayLayerCount = 1,
+                Aspect = TextureAspect.All
+            };
+
+            _depthTextureView = _wgpu.TextureCreateView(_depthTexture, &depthViewDesc);
         }
 
         private static void OnMouseDown(IMouse mouse, MouseButton button)
@@ -127,57 +254,8 @@ namespace XNOEdit
 
         private static void OnRender(double deltaTime)
         {
-            _controller.Update((float) deltaTime);
+            _controller.Update((float)deltaTime);
 
-            _gl.Enable(EnableCap.DepthTest);
-            _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-            var size = _window.FramebufferSize;
-            var view = _camera.GetViewMatrix();
-            var projection = _camera.GetProjectionMatrix((float)size.X / size.Y);
-
-            _gl.Disable(EnableCap.CullFace);
-            _skybox.Draw(view, projection, _sunDirection, _sunColor);
-
-            if (_showGrid)
-            {
-                var gridModel = Matrix4x4.CreateTranslation(_modelCenter);
-                float fadeDistance = _modelRadius * 5.0f;
-                _grid.Draw(view, projection, gridModel, _camera.Transform.Position, fadeDistance);
-            }
-
-            _gl.PolygonMode(GLEnum.FrontAndBack, _wireframeMode ? GLEnum.Line : GLEnum.Fill);
-            _gl.FrontFace(GLEnum.CW);
-
-            if (_backfaceCulling)
-            {
-                _gl.Enable(EnableCap.CullFace);
-                _gl.CullFace(GLEnum.Back);
-            }
-            else
-            {
-                _gl.Disable(EnableCap.CullFace);
-            }
-
-            // Render the model
-            if (_model != null && _shader != null)
-            {
-                _shader.Use();
-                _shader.SetUniform("uModel", Matrix4x4.Identity);
-                _shader.SetUniform("uView", view);
-                _shader.SetUniform("uProjection", projection);
-                _shader.SetUniform("uVertColorStrength", _vertexColors ? 1.0f : 0.0f);
-                _shader.SetUniform("uLightDir", _sunDirection);
-                _shader.SetUniform("uLightColor", _sunColor);
-                _shader.SetUniform("uViewPos", _camera.Transform.Position);
-
-                _model.Draw(_shader);
-            }
-
-            // Reset to fill mode for UI
-            _gl.PolygonMode(GLEnum.FrontAndBack, GLEnum.Fill);
-
-            // Render UI
             if (_xnoPanel != null)
             {
                 _xnoPanel.Render(Textures);
@@ -188,20 +266,132 @@ namespace XNOEdit
                 ImGui.Text("Drag and drop a .xno file");
                 ImGui.End();
             }
-
             _alertPanel.Render(deltaTime);
-            _controller.Render();
+
+            SurfaceTexture surfaceTexture;
+            _wgpu.SurfaceGetCurrentTexture(_surface, &surfaceTexture);
+
+            if (surfaceTexture.Status != SurfaceGetCurrentTextureStatus.Success)
+            {
+                return;
+            }
+
+            var textureViewDesc = new TextureViewDescriptor
+            {
+                Format = _surfaceFormat,
+                Dimension = TextureViewDimension.Dimension2D,
+                BaseMipLevel = 0,
+                MipLevelCount = 1,
+                BaseArrayLayer = 0,
+                ArrayLayerCount = 1,
+                Aspect = TextureAspect.All
+            };
+
+            var backbuffer = _wgpu.TextureCreateView(surfaceTexture.Texture, &textureViewDesc);
+
+            var size = _window.FramebufferSize;
+            var view = _camera.GetViewMatrix();
+            var projection = _camera.GetProjectionMatrix((float)size.X / size.Y);
+
+            var commandEncoderDesc = new CommandEncoderDescriptor();
+            var encoder = _wgpu.DeviceCreateCommandEncoder(_device, &commandEncoderDesc);
+
+            var colorAttachment = new RenderPassColorAttachment
+            {
+                View = backbuffer,
+                LoadOp = LoadOp.Clear,
+                StoreOp = StoreOp.Store,
+                ClearValue = new Color { R = 0.53, G = 0.81, B = 0.92, A = 1.0 }
+            };
+
+            var depthAttachment = new RenderPassDepthStencilAttachment
+            {
+                View = _depthTextureView,
+                DepthLoadOp = LoadOp.Clear,
+                DepthStoreOp = StoreOp.Store,
+                DepthClearValue = 1.0f
+            };
+
+            var renderPassDesc = new RenderPassDescriptor
+            {
+                ColorAttachmentCount = 1,
+                ColorAttachments = &colorAttachment,
+                DepthStencilAttachment = &depthAttachment
+            };
+
+            var pass = _wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
+
+            _skybox.Draw(pass, view, projection, _sunDirection, _sunColor);
+
+            if (_showGrid)
+            {
+                var gridModel = Matrix4x4.CreateTranslation(_modelCenter);
+                var fadeDistance = _modelRadius * 5.0f;
+                _grid.Draw(pass, view, projection, gridModel, _camera.Transform.Position, fadeDistance);
+            }
+
+            if (_model != null && _shader != null)
+            {
+                var uniforms = new BasicModelUniforms
+                {
+                    Model = Matrix4x4.Identity,
+                    View = view,
+                    Projection = projection,
+                    LightDir = _sunDirection.AsVector3(),
+                    LightColor = _sunColor.AsVector3(),
+                    ViewPos = _camera.Transform.Position,
+                    VertColorStrength = _vertexColors ? 1.0f : 0.0f
+                };
+                _shader.UpdateUniforms(uniforms);
+
+                var pipeline = _shader.GetPipeline(_backfaceCulling);
+                _wgpu.RenderPassEncoderSetPipeline(pass, pipeline);
+                uint dynamicOffset = 0;
+                _wgpu.RenderPassEncoderSetBindGroup(pass, 0, _shader.UniformBindGroup, 0, &dynamicOffset);
+
+                _model.Draw(pass);
+            }
+
+            _controller.Render(pass);
+
+            _wgpu.RenderPassEncoderEnd(pass);
+
+            var commandBuffer = _wgpu.CommandEncoderFinish(encoder, null);
+            _wgpu.QueueSubmit(_queue, 1, &commandBuffer);
+
+            _wgpu.SurfacePresent(_surface);
+            _wgpu.TextureViewRelease(backbuffer);
+            _wgpu.CommandBufferRelease(commandBuffer);
+            _wgpu.CommandEncoderRelease(encoder);
+            _wgpu.RenderPassEncoderRelease(pass);
         }
 
         private static void OnFramebufferResize(Vector2D<int> size)
         {
-            _gl.Viewport(size);
+            var surfaceConfig = new SurfaceConfiguration
+            {
+                Device = _device,
+                Format = _surfaceFormat,
+                Usage = TextureUsage.RenderAttachment,
+                Width = (uint)size.X,
+                Height = (uint)size.Y,
+                PresentMode = PresentMode.Fifo,
+                AlphaMode = CompositeAlphaMode.Auto
+            };
+
+            _wgpu.SurfaceConfigure(_surface, &surfaceConfig);
+
+            if (_depthTextureView != null)
+                _wgpu.TextureViewRelease(_depthTextureView);
+            if (_depthTexture != null)
+                _wgpu.TextureRelease(_depthTexture);
+
+            CreateDepthTexture();
         }
 
         private static void OnMouseMove(IMouse mouse, Vector2 position)
         {
-            if (!_mouseCaptured)
-                return;
+            if (!_mouseCaptured) return;
 
             var lookSensitivity = 0.1f;
             if (_lastMousePosition == default)
@@ -229,15 +419,29 @@ namespace XNOEdit
             _model?.Dispose();
             _shader?.Dispose();
             _grid?.Dispose();
-            _controller.Dispose();
-            _input.Dispose();
+            _skybox?.Dispose();
+            _controller?.Dispose();
+            _input?.Dispose();
 
-            foreach (var texture in Textures)
+            foreach (var texturePtr in Textures.Values)
             {
-                _gl.DeleteTexture(texture.Value);
+                _wgpu.TextureViewRelease((TextureView*)texturePtr);
             }
 
-            _gl.Dispose();
+            if (_depthTextureView != null)
+                _wgpu.TextureViewRelease(_depthTextureView);
+            if (_depthTexture != null)
+                _wgpu.TextureRelease(_depthTexture);
+            if (_surface != null)
+                _wgpu.SurfaceRelease(_surface);
+            if (_queue != null)
+                _wgpu.QueueRelease(_queue);
+            if (_device != null)
+                _wgpu.DeviceRelease(_device);
+            if (_adapter != null)
+                _wgpu.AdapterRelease(_adapter);
+            if (_instance != null)
+                _wgpu.InstanceRelease(_instance);
         }
 
         private static void OnFileDrop(string[] files)
@@ -258,7 +462,7 @@ namespace XNOEdit
             }
         }
 
-        private static unsafe void ReadXno(string file)
+        private static void ReadXno(string file)
         {
             try
             {
@@ -267,14 +471,13 @@ namespace XNOEdit
 
                 _window.Title = $"XNOEdit - {xno.Name}";
 
-                foreach (var texture in Textures)
+                foreach (var texturePtr in Textures.Values)
                 {
-                    _gl.DeleteTexture(texture.Value);
+                    _wgpu.TextureViewRelease((TextureView*)texturePtr);
                 }
 
                 Textures.Clear();
 
-                // Load textures
                 var textureListChunk = xno.GetChunk<TextureListChunk>();
                 if (textureListChunk != null)
                 {
@@ -292,68 +495,90 @@ namespace XNOEdit
 
                         using var image = Pfimage.FromFile(texturePath);
 
-                        var glTexture = _gl.GenTexture();
-                        _gl.ActiveTexture(TextureUnit.Texture0);
-                        _gl.BindTexture(TextureTarget.Texture2D, glTexture);
-
-                        fixed (byte* ptr = image.Data)
+                        var textureDesc = new TextureDescriptor
                         {
-                            _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, (uint) image.Width,
-                                (uint) image.Height, 0, PixelFormat.Bgra, PixelType.UnsignedByte, ptr);
+                            Size = new Extent3D
+                            {
+                                Width = (uint)image.Width,
+                                Height = (uint)image.Height,
+                                DepthOrArrayLayers = 1
+                            },
+                            MipLevelCount = 1,
+                            SampleCount = 1,
+                            Dimension = TextureDimension.Dimension2D,
+                            Format = TextureFormat.Bgra8Unorm,
+                            Usage = TextureUsage.TextureBinding | TextureUsage.CopyDst
+                        };
+
+                        var wgpuTexture = _wgpu.DeviceCreateTexture(_device, &textureDesc);
+
+                        var imageData = image.Data;
+                        if (image.Format == ImageFormat.Rgb24)
+                        {
+                            var rgbaData = new byte[image.Width * image.Height * 4];
+                            for (int i = 0, j = 0; i < imageData.Length; i += 3, j += 4)
+                            {
+                                rgbaData[j] = imageData[i];     // R
+                                rgbaData[j + 1] = imageData[i + 1]; // G
+                                rgbaData[j + 2] = imageData[i + 2]; // B
+                                rgbaData[j + 3] = 255;          // A
+                            }
+                            imageData = rgbaData;
                         }
 
-                        var glMinFilter = texture.MinFilter switch
+                        fixed (byte* pData = imageData)
                         {
-                            MinFilter.NND_MIN_NEAREST => (int)TextureMinFilter.Nearest,
-                            MinFilter.NND_MIN_LINEAR => (int)TextureMinFilter.Linear,
-                            MinFilter.NND_MIN_NEAREST_MIPMAP_NEAREST => (int)TextureMinFilter.NearestMipmapNearest,
-                            MinFilter.NND_MIN_NEAREST_MIPMAP_LINEAR => (int)TextureMinFilter.NearestMipmapLinear,
-                            MinFilter.NND_MIN_LINEAR_MIPMAP_NEAREST => (int)TextureMinFilter.LinearMipmapNearest,
-                            MinFilter.NND_MIN_LINEAR_MIPMAP_LINEAR => (int)TextureMinFilter.LinearMipmapLinear,
-                            _ => (int)TextureMinFilter.Linear
+                            var imageCopyTexture = new ImageCopyTexture
+                            {
+                                Texture = wgpuTexture,
+                                MipLevel = 0,
+                                Origin = new Origin3D { X = 0, Y = 0, Z = 0 },
+                                Aspect = TextureAspect.All
+                            };
+
+                            var textureDataLayout = new TextureDataLayout
+                            {
+                                Offset = 0,
+                                BytesPerRow = (uint)(image.Width * 4),
+                                RowsPerImage = (uint)image.Height
+                            };
+
+                            var writeSize = new Extent3D
+                            {
+                                Width = (uint)image.Width,
+                                Height = (uint)image.Height,
+                                DepthOrArrayLayers = 1
+                            };
+
+                            _wgpu.QueueWriteTexture(_queue, &imageCopyTexture, pData, (nuint)(image.Width * image.Height * 4), &textureDataLayout, &writeSize);
+                        }
+
+                        var viewDesc = new TextureViewDescriptor
+                        {
+                            Format = TextureFormat.Bgra8Unorm,
+                            Dimension = TextureViewDimension.Dimension2D,
+                            BaseMipLevel = 0,
+                            MipLevelCount = 1,
+                            BaseArrayLayer = 0,
+                            ArrayLayerCount = 1,
+                            Aspect = TextureAspect.All
                         };
 
-                        var glMagFilter = texture.MagFilter switch
-                        {
-                            MagFilter.NND_MAG_NEAREST => (int)TextureMinFilter.Nearest,
-                            MagFilter.NND_MAG_LINEAR => (int)TextureMinFilter.Linear,
-                            _ => (int)TextureMinFilter.Linear
-                        };
+                        var textureView = _wgpu.TextureCreateView(wgpuTexture, &viewDesc);
+                        _controller.BindImGuiTextureView(textureView);
 
-                        _gl.GenerateMipmap(TextureTarget.Texture2D);
-                        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, glMinFilter);
-                        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, glMagFilter);
-
-                        _gl.BindTexture(TextureTarget.Texture2D, 0);
-
-                        Textures.Add(texture.Name, glTexture);
+                        Textures.Add(texture.Name, (IntPtr)textureView);
                     }
                 }
 
-                // Load and create model
                 _model?.Dispose();
                 var objectChunk = xno.GetChunk<ObjectChunk>();
                 var effectChunk = xno.GetChunk<EffectListChunk>();
 
                 if (objectChunk != null && effectChunk != null)
                 {
-                    // In OnFileDrop, after loading ObjectChunk:
-                    var vertexListUsage = new Dictionary<int, int>();
-                    foreach (var subObj in objectChunk.SubObjects)
-                    {
-                        foreach (var meshSet in subObj.MeshSets)
-                        {
-                            vertexListUsage.TryAdd(meshSet.VertexListIndex, 0);
-                            vertexListUsage[meshSet.VertexListIndex]++;
-                        }
-                    }
+                    _model = new Model(_wgpu, _device, objectChunk, effectChunk, _shaderArchive);
 
-                    var totalMeshes = objectChunk.SubObjects.Sum(sub => sub.MeshSets.Count);
-                    Console.WriteLine($"Found {objectChunk.SubObjects.Count} sub-objects with {totalMeshes} total mesh sets");
-
-                    _model = new Model(_gl, objectChunk, effectChunk, _shaderArchive);
-
-                    // Use object-level bounding info for camera positioning
                     _modelCenter = objectChunk.Centre;
                     _modelRadius = objectChunk.Radius;
 
@@ -362,13 +587,9 @@ namespace XNOEdit
 
                     _grid?.Dispose();
                     var gridSize = _modelRadius * 4.0f;
-                    _grid = new GridRenderer(_gl, gridSize);
+                    _grid = new GridRenderer(_wgpu, _device, _queue, _surfaceFormat, gridSize);
 
                     ResetCamera();
-                }
-                else
-                {
-                    Console.WriteLine("Error: No ObjectChunk found in file");
                 }
             }
             catch (Exception ex)
@@ -393,27 +614,22 @@ namespace XNOEdit
 
             switch (key)
             {
-                // Toggle wireframe mode with F key
                 case Key.F:
                     _wireframeMode = !_wireframeMode;
                     alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
                     break;
-                // Toggle grid with G key
                 case Key.G:
                     _showGrid = !_showGrid;
                     alert = $"Grid: {(_showGrid ? "ON" : "OFF")}";
                     break;
-                // Toggle backface culling with C key
                 case Key.C:
                     _backfaceCulling = !_backfaceCulling;
                     alert = $"Backface Culling: {(_backfaceCulling ? "ON" : "OFF")}";
                     break;
-                // Toggle vertex colors with V key
                 case Key.V:
                     _vertexColors = !_vertexColors;
                     alert = $"Vertex Colors: {(_vertexColors ? "ON" : "OFF")}";
                     break;
-                // Reset camera with R key
                 case Key.R:
                     ResetCamera();
                     alert = "Camera Reset";

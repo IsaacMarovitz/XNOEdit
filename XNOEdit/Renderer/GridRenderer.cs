@@ -1,143 +1,321 @@
 using System.Numerics;
-using Silk.NET.OpenGL;
+using System.Runtime.InteropServices;
+using Silk.NET.WebGPU;
+using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
-    public class GridRenderer : IDisposable
+    [StructLayout(LayoutKind.Explicit, Size = 224)]
+    struct GridUniforms
     {
-        private GL _gl;
-        private XeShader _shader;
-        private uint _vao;
-        private uint _vbo;
+        [FieldOffset(0)]
+        public Matrix4x4 Model;
+
+        [FieldOffset(64)]
+        public Matrix4x4 View;
+
+        [FieldOffset(128)]
+        public Matrix4x4 Projection;
+
+        [FieldOffset(192)]
+        public Vector3 CameraPos;
+
+        [FieldOffset(204)]
+        public float FadeStart;
+
+        [FieldOffset(208)]
+        public float FadeEnd;
+    }
+
+    public unsafe class GridRenderer : IDisposable
+    {
+        private readonly WebGPU _wgpu;
+        private readonly Device* _device;
+        private readonly Queue* _queue;
+        private ShaderModule* _shaderModule;
+        private RenderPipeline* _pipeline;
+        private BindGroupLayout* _bindGroupLayout;
+        private BindGroup* _bindGroup;
+        private Buffer* _uniformBuffer;
+        private WgpuBuffer<float> _vertexBuffer;
         private int _lineCount;
 
-        public GridRenderer(GL gl, float size = 100.0f, int divisions = 100)
+        public GridRenderer(WebGPU wgpu, Device* device, Queue* queue, TextureFormat swapChainFormat, float size = 100.0f, int divisions = 100)
         {
-            _gl = gl;
+            _wgpu = wgpu;
+            _device = device;
+            _queue = queue;
+
             CreateGrid(size, divisions);
-            CreateShader();
+            CreateShaderAndPipeline(swapChainFormat);
         }
 
         private void CreateGrid(float size, int divisions)
         {
             var vertices = new List<float>();
-
-            float step = size / divisions;
-            float halfSize = size / 2.0f;
+            var step = size / divisions;
+            var halfSize = size / 2.0f;
 
             // Create grid lines parallel to X axis
-            for (int i = 0; i <= divisions; i++)
+            for (var i = 0; i <= divisions; i++)
             {
-                float z = -halfSize + i * step;
+                var z = -halfSize + i * step;
 
-                // Determine color
                 Vector3 color;
                 if (i == divisions / 2)
-                {
-                    color = new Vector3(0.4f, 0.6f, 1.0f); // Bright blue Z-axis
-                }
+                    color = new Vector3(0.4f, 0.6f, 1.0f);
                 else if (i % 10 == 0)
-                {
-                    color = new Vector3(0.5f, 0.5f, 0.5f); // Medium gray - brighter
-                }
+                    color = new Vector3(0.5f, 0.5f, 0.5f);
                 else
-                {
-                    color = new Vector3(0.3f, 0.3f, 0.3f); // Light gray regular lines
-                }
+                    color = new Vector3(0.3f, 0.3f, 0.3f);
 
-                // Line vertices: start and end
-                vertices.AddRange(new[] { -halfSize, 0.0f, z, color.X, color.Y, color.Z });
-                vertices.AddRange(new[] { halfSize, 0.0f, z, color.X, color.Y, color.Z });
+                vertices.AddRange([-halfSize, 0.0f, z, color.X, color.Y, color.Z]);
+                vertices.AddRange([halfSize, 0.0f, z, color.X, color.Y, color.Z]);
             }
 
             // Create grid lines parallel to Z axis
-            for (int i = 0; i <= divisions; i++)
+            for (var i = 0; i <= divisions; i++)
             {
-                float x = -halfSize + i * step;
+                var x = -halfSize + i * step;
 
-                // Determine color
                 Vector3 color;
                 if (i == divisions / 2)
-                {
-                    color = new Vector3(1.0f, 0.4f, 0.4f); // Bright red X-axis
-                }
+                    color = new Vector3(1.0f, 0.4f, 0.4f);
                 else if (i % 10 == 0)
-                {
-                    color = new Vector3(0.5f, 0.5f, 0.5f); // Medium gray - brighter
-                }
+                    color = new Vector3(0.5f, 0.5f, 0.5f);
                 else
-                {
-                    color = new Vector3(0.3f, 0.3f, 0.3f); // Light gray regular lines
-                }
+                    color = new Vector3(0.3f, 0.3f, 0.3f);
 
-                // Line vertices: start and end
-                vertices.AddRange(new[] { x, 0.0f, -halfSize, color.X, color.Y, color.Z });
-                vertices.AddRange(new[] { x, 0.0f, halfSize, color.X, color.Y, color.Z });
+                vertices.AddRange([x, 0.0f, -halfSize, color.X, color.Y, color.Z]);
+                vertices.AddRange([x, 0.0f, halfSize, color.X, color.Y, color.Z]);
             }
 
-            _lineCount = (divisions + 1) * 2 * 2; // 2 sets of lines, 2 vertices per line
-
-            _vao = _gl.GenVertexArray();
-            _gl.BindVertexArray(_vao);
-
-            _vbo = _gl.GenBuffer();
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-
-            unsafe
-            {
-                var vertArray = vertices.ToArray();
-                fixed (float* v = vertArray)
-                {
-                    _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertArray.Length * sizeof(float)), v, BufferUsageARB.StaticDraw);
-                }
-            }
-
-            unsafe
-            {
-                // Position attribute
-                _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), (void*)0);
-                _gl.EnableVertexAttribArray(0);
-
-                // Color attribute
-                _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-                _gl.EnableVertexAttribArray(1);
-            }
-
-            _gl.BindVertexArray(0);
+            _lineCount = (divisions + 1) * 2 * 2;
+            _vertexBuffer = new WgpuBuffer<float>(_wgpu, _device, vertices.ToArray(), BufferUsage.Vertex);
         }
 
-        private void CreateShader()
+        private void CreateShaderAndPipeline(TextureFormat swapChainFormat)
         {
-            _shader = new XeShader(_gl, "XNOEdit/Shaders/Grid.vert", "XNOEdit/Shaders/Grid.frag");
+            var gridWgsl = EmbeddedResources.ReadAllText("XNOEdit/Shaders/Grid.wgsl");
+            var shaderBytes = System.Text.Encoding.UTF8.GetBytes(gridWgsl + "\0");
+
+            fixed (byte* pShader = shaderBytes)
+            {
+                var wgslDesc = new ShaderModuleWGSLDescriptor
+                {
+                    Chain = new ChainedStruct { SType = SType.ShaderModuleWgslDescriptor },
+                    Code = pShader
+                };
+
+                var shaderDesc = new ShaderModuleDescriptor
+                {
+                    NextInChain = (ChainedStruct*)&wgslDesc
+                };
+
+                _shaderModule = _wgpu.DeviceCreateShaderModule(_device, &shaderDesc);
+            }
+
+            var bufferSize = 224ul;
+            var alignedSize = (bufferSize + 255) & ~255ul;
+
+            var bufferDesc = new BufferDescriptor
+            {
+                Size = alignedSize,
+                Usage = BufferUsage.Uniform | BufferUsage.CopyDst,
+                MappedAtCreation = false
+            };
+            _uniformBuffer = _wgpu.DeviceCreateBuffer(_device, &bufferDesc);
+
+            var layoutEntry = new BindGroupLayoutEntry
+            {
+                Binding = 0,
+                Visibility = ShaderStage.Vertex | ShaderStage.Fragment,
+                Buffer = new BufferBindingLayout
+                {
+                    Type = BufferBindingType.Uniform,
+                    MinBindingSize = 0
+                }
+            };
+
+            var layoutDesc = new BindGroupLayoutDescriptor
+            {
+                EntryCount = 1,
+                Entries = &layoutEntry
+            };
+            _bindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_device, &layoutDesc);
+
+            var bindEntry = new BindGroupEntry
+            {
+                Binding = 0,
+                Buffer = _uniformBuffer,
+                Offset = 0,
+                Size = 224
+            };
+
+            var bindGroupDesc = new BindGroupDescriptor
+            {
+                Layout = _bindGroupLayout,
+                EntryCount = 1,
+                Entries = &bindEntry
+            };
+            _bindGroup = _wgpu.DeviceCreateBindGroup(_device, &bindGroupDesc);
+
+            var layouts = _bindGroupLayout;
+            var pipelineLayoutDesc = new PipelineLayoutDescriptor
+            {
+                BindGroupLayoutCount = 1,
+                BindGroupLayouts = &layouts
+            };
+            var pipelineLayout = _wgpu.DeviceCreatePipelineLayout(_device, &pipelineLayoutDesc);
+
+            var vertexEntry = "vs_main\0"u8.ToArray();
+            var fragmentEntry = "fs_main\0"u8.ToArray();
+
+            VertexAttribute* vertexAttrib = stackalloc VertexAttribute[2];
+            vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 };
+            vertexAttrib[1] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };
+
+            var vbLayout = new VertexBufferLayout
+            {
+                ArrayStride = 24,
+                StepMode = VertexStepMode.Vertex,
+                AttributeCount = 2,
+                Attributes = vertexAttrib
+            };
+
+            var blendState = new BlendState
+            {
+                Color = new BlendComponent
+                {
+                    Operation = BlendOperation.Add,
+                    SrcFactor = BlendFactor.SrcAlpha,
+                    DstFactor = BlendFactor.OneMinusSrcAlpha
+                },
+                Alpha = new BlendComponent
+                {
+                    Operation = BlendOperation.Add,
+                    SrcFactor = BlendFactor.One,
+                    DstFactor = BlendFactor.OneMinusSrcAlpha
+                }
+            };
+
+            var colorTarget = new ColorTargetState
+            {
+                Format = swapChainFormat,
+                WriteMask = ColorWriteMask.All,
+                Blend = &blendState
+            };
+
+            fixed (byte* pVertexEntry = vertexEntry)
+            fixed (byte* pFragmentEntry = fragmentEntry)
+            {
+                var fragmentState = new FragmentState
+                {
+                    Module = _shaderModule,
+                    EntryPoint = pFragmentEntry,
+                    TargetCount = 1,
+                    Targets = &colorTarget
+                };
+
+                var depthStencil = new DepthStencilState
+                {
+                    Format = TextureFormat.Depth24Plus,
+                    DepthWriteEnabled = true,
+                    DepthCompare = CompareFunction.Less,
+                    StencilFront = new StencilFaceState
+                    {
+                        Compare = CompareFunction.Always,
+                        FailOp = StencilOperation.Keep,
+                        DepthFailOp = StencilOperation.Keep,
+                        PassOp = StencilOperation.Keep
+                    },
+                    StencilBack = new StencilFaceState
+                    {
+                        Compare = CompareFunction.Always,
+                        FailOp = StencilOperation.Keep,
+                        DepthFailOp = StencilOperation.Keep,
+                        PassOp = StencilOperation.Keep
+                    },
+                    StencilReadMask = 0xFFFFFFFF,
+                    StencilWriteMask = 0xFFFFFFFF
+                };
+
+                var pipelineDesc = new RenderPipelineDescriptor
+                {
+                    Layout = pipelineLayout,
+                    Vertex = new VertexState
+                    {
+                        Module = _shaderModule,
+                        EntryPoint = pVertexEntry,
+                        BufferCount = 1,
+                        Buffers = &vbLayout
+                    },
+                    Primitive = new PrimitiveState
+                    {
+                        Topology = PrimitiveTopology.LineList,
+                        FrontFace = FrontFace.Ccw,
+                        CullMode = CullMode.None
+                    },
+                    DepthStencil = &depthStencil,
+                    Multisample = new MultisampleState
+                    {
+                        Count = 1,
+                        Mask = ~0u,
+                        AlphaToCoverageEnabled = false
+                    },
+                    Fragment = &fragmentState
+                };
+
+                _pipeline = _wgpu.DeviceCreateRenderPipeline(_device, &pipelineDesc);
+            }
+
+            _wgpu.PipelineLayoutRelease(pipelineLayout);
         }
 
-        public unsafe void Draw(Matrix4x4 view, Matrix4x4 projection, Matrix4x4 model, Vector3 cameraPos, float fadeDistance)
+        public void Draw(
+            RenderPassEncoder* passEncoder,
+            Matrix4x4 view,
+            Matrix4x4 projection,
+            Matrix4x4 model,
+            Vector3 cameraPos,
+            float fadeDistance)
         {
-            // Enable blending for faded lines
-            _gl.Enable(EnableCap.Blend);
-            _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            var uniforms = new GridUniforms
+            {
+                Model = model,
+                View = view,
+                Projection = projection,
+                CameraPos = cameraPos,
+                FadeStart = fadeDistance * 0.6f,
+                FadeEnd = fadeDistance
+            };
 
-            _shader.Use();
-            _shader.SetUniform("uModel", model);
-            _shader.SetUniform("uView", view);
-            _shader.SetUniform("uProjection", projection);
-            _shader.SetUniform("uCameraPos", cameraPos);
-            _shader.SetUniform("uFadeStart", fadeDistance * 0.6f);
-            _shader.SetUniform("uFadeEnd", fadeDistance);
-
-            _gl.BindVertexArray(_vao);
-            _gl.DrawArrays(GLEnum.Lines, 0, (uint)_lineCount);
-            _gl.BindVertexArray(0);
+            _wgpu.QueueWriteBuffer(_queue, _uniformBuffer, 0, uniforms, (nuint)sizeof(GridUniforms));
+            _wgpu.RenderPassEncoderSetPipeline(passEncoder, _pipeline);
+            uint dynamicOffset = 0;
+            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _bindGroup, 0, &dynamicOffset);
+            _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
+            _wgpu.RenderPassEncoderDraw(passEncoder, (uint)_lineCount, 1, 0, 0);
         }
 
         public void Dispose()
         {
-            _shader?.Dispose();
-            if (_vao != 0)
-                _gl.DeleteVertexArray(_vao);
-            if (_vbo != 0)
-                _gl.DeleteBuffer(_vbo);
+            _vertexBuffer?.Dispose();
+
+            if (_bindGroup != null)
+                _wgpu.BindGroupRelease(_bindGroup);
+
+            if (_uniformBuffer != null)
+                _wgpu.BufferRelease(_uniformBuffer);
+
+            if (_bindGroupLayout != null)
+                _wgpu.BindGroupLayoutRelease(_bindGroupLayout);
+
+            if (_pipeline != null)
+                _wgpu.RenderPipelineRelease(_pipeline);
+
+            if (_shaderModule != null)
+                _wgpu.ShaderModuleRelease(_shaderModule);
         }
     }
 }
-

@@ -14,7 +14,7 @@ namespace XNOEdit.Panels
             _xno = xno;
         }
 
-        public void Render(Dictionary<string, uint> textures)
+        public void Render(Dictionary<string, IntPtr> textures)
         {
             ImGui.Begin($"{_xno.Name}", ImGuiWindowFlags.AlwaysAutoResize);
 
@@ -34,7 +34,7 @@ namespace XNOEdit.Panels
                             ImGui.Text($"Mag Filter: {texture.MagFilter}");
                             ImGui.Text($"Type: {texture.Type}");
 
-                            ImGui.Image((IntPtr)textures.First(x => x.Key == texture.Name).Value, new Vector2(150, 150));
+                            ImGui.Image(textures.First(x => x.Key == texture.Name).Value, new Vector2(150, 150));
                         }
                     }
 

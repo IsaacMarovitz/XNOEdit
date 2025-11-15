@@ -1,24 +1,31 @@
 using System.Numerics;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
-using Silk.NET.OpenGL;
+using Silk.NET.WebGPU;
 using XNOEdit.Shaders;
 
 namespace XNOEdit.Renderer
 {
-    public class Model : IDisposable
+    public unsafe class Model : IDisposable
     {
-        private readonly GL _gl;
+        private readonly WebGPU _wgpu;
+        private readonly Device* _device;
         private readonly List<ModelMesh> _meshes = [];
-        private readonly Dictionary<int, BufferObject<float>> _sharedVertexBuffers = new();
+        private readonly Dictionary<int, WgpuBuffer<float>> _sharedVertexBuffers = new();
         private readonly ShaderArchive _shaderArchive;
 
-        public Model(GL gl, ObjectChunk objectChunk, EffectListChunk effectListChunk, ShaderArchive shaderArchive)
+        public Model(
+            WebGPU wgpu,
+            Device* device,
+            ObjectChunk objectChunk,
+            EffectListChunk effectListChunk,
+            ShaderArchive shaderArchive)
         {
-            _gl = gl;
+            _wgpu = wgpu;
+            _device = device;
             _shaderArchive = shaderArchive;
 
-            LoadModel(objectChunk,  effectListChunk);
+            LoadModel(objectChunk, effectListChunk);
         }
 
         private void LoadModel(ObjectChunk objectChunk, EffectListChunk effectListChunk)
@@ -44,7 +51,6 @@ namespace XNOEdit.Renderer
                     vertices.Add(normal.Z);
 
                     // Color (BGRA)
-                    // Check if this a Marathon bug
                     if (vertex.VertexColourA != null)
                     {
                         vertices.Add(vertex.VertexColourA.Value.B / 255f);
@@ -61,7 +67,11 @@ namespace XNOEdit.Renderer
                     }
                 }
 
-                var vbo = new BufferObject<float>(_gl, vertices.ToArray(), BufferTargetARB.ArrayBuffer);
+                var vbo = new WgpuBuffer<float>(
+                    _wgpu,
+                    _device,
+                    vertices.ToArray(),
+                    BufferUsage.Vertex);
                 _sharedVertexBuffers[i] = vbo;
             }
 
@@ -72,21 +82,23 @@ namespace XNOEdit.Renderer
                     var vertexListIndex = meshSet.VertexListIndex;
                     var primitiveList = meshSet.GetPrimitiveList(objectChunk);
                     var technique = meshSet.GetTechnique(effectListChunk);
-                    var effect = technique.GetEffect(effectListChunk);
+                    var effectName = string.Empty;
+                    var techniqueName = string.Empty;
+
+                    if (technique != null)
+                    {
+                        var effect = technique.GetEffect(effectListChunk);
+
+                        effectName = effect.Name;
+                        techniqueName = technique.Name;
+                    }
 
                     if (primitiveList == null || !_sharedVertexBuffers.TryGetValue(vertexListIndex, out var buffer))
                     {
                         continue;
                     }
 
-                    var shaderFile = _shaderArchive.GetFile($"xenon/shader/std/{effect.Name}o");
-                    var shaderData = shaderFile.GetData();
-                    var containers = ShaderArchive.ExtractShaderContainers(shaderData);
-
-                    var recompiler = new ShaderRecompiler(EmbeddedResources.ReadAllText("XNOEdit/Shaders/shader_common.h"));
-                    var spirv = recompiler.Recompile(containers[0]);
-
-                    var mesh = new ModelMesh(_gl, buffer, primitiveList, effect.Name, technique.Name);
+                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, effectName, techniqueName);
                     _meshes.Add(mesh);
                 }
             }
@@ -94,16 +106,12 @@ namespace XNOEdit.Renderer
             Console.WriteLine($"Loaded {_sharedVertexBuffers.Count} vertex buffers, {_meshes.Count} meshes");
         }
 
-        public void Draw(XeShader xeShader)
+        public void Draw(RenderPassEncoder* passEncoder)
         {
-            xeShader.Use();
-
             foreach (var mesh in _meshes)
             {
-                mesh.Draw();
+                mesh.Draw(passEncoder);
             }
-
-            _gl.BindVertexArray(0);
         }
 
         public void Dispose()
@@ -121,29 +129,34 @@ namespace XNOEdit.Renderer
         }
     }
 
-    public class ModelMesh : IDisposable
+    public unsafe class ModelMesh : IDisposable
     {
-        private readonly GL _gl;
-        private uint _vaoHandle;
-        private BufferObject<ushort> _ebo;
+        private readonly WebGPU _wgpu;
+        private WgpuBuffer<ushort> _indexBuffer;
+        private WgpuBuffer<float> _vertexBuffer;
         private int _indexCount;
-
         private string _effect;
         private string _technique;
 
-        public ModelMesh(GL gl, BufferObject<float> sharedVbo, PrimitiveList primitiveList, string effect, string technique)
+        public ModelMesh(
+            WebGPU wgpu,
+            Device* device,
+            WgpuBuffer<float> sharedVbo,
+            PrimitiveList primitiveList,
+            string effect,
+            string technique)
         {
-            _gl = gl;
+            _wgpu = wgpu;
             _effect = effect;
             _technique = technique;
+            _vertexBuffer = sharedVbo;
 
-            LoadMesh(sharedVbo, primitiveList);
+            LoadMesh(device, primitiveList);
         }
 
-        private void LoadMesh(BufferObject<float> sharedVbo, PrimitiveList primitiveList)
+        private void LoadMesh(Device* device, PrimitiveList primitiveList)
         {
             var sourceIndices = primitiveList.IndexIndices.Select(x => (int)x).ToList();
-
             var tris = new List<int>();
 
             for (var i = 0; i + 2 < sourceIndices.Count; i++)
@@ -152,9 +165,7 @@ namespace XNOEdit.Renderer
 
                 // Skip degenerate triangles
                 if (a == b || b == c || c == a)
-                {
                     continue;
-                }
 
                 // Handle alternating winding order in strips
                 tris.AddRange(i % 2 == 0 ? new[] { a, b, c } : new[] { c, b, a });
@@ -169,49 +180,25 @@ namespace XNOEdit.Renderer
             var finalIndices = tris.Select(x => (ushort)x).ToArray();
             _indexCount = finalIndices.Length;
 
-            _vaoHandle = _gl.GenVertexArray();
-            _gl.BindVertexArray(_vaoHandle);
-
-            sharedVbo.Bind();
-
-            _ebo = new BufferObject<ushort>(_gl, finalIndices, BufferTargetARB.ElementArrayBuffer);
-            _ebo.Bind();
-
-            unsafe
-            {
-                // Position (location 0): 3 floats at offset 0
-                _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false,
-                    10 * sizeof(float), (void*)0);
-                _gl.EnableVertexAttribArray(0);
-
-                // Normal (location 1): 3 floats at offset 3
-                _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false,
-                    10 * sizeof(float), (void*)(3 * sizeof(float)));
-                _gl.EnableVertexAttribArray(1);
-
-                // Color (location 2): 4 floats at offset 6
-                _gl.VertexAttribPointer(2, 4, VertexAttribPointerType.Float, false,
-                    10 * sizeof(float), (void*)(6 * sizeof(float)));
-                _gl.EnableVertexAttribArray(2);
-            }
-
-            _gl.BindVertexArray(0);
+            _indexBuffer = new WgpuBuffer<ushort>(
+                _wgpu,
+                device,
+                finalIndices,
+                BufferUsage.Index);
         }
 
-        public unsafe void Draw()
+        public void Draw(RenderPassEncoder* passEncoder)
         {
             if (_indexCount == 0) return;
 
-            _gl.BindVertexArray(_vaoHandle);
-            _gl.DrawElements(GLEnum.Triangles, (uint)_indexCount, DrawElementsType.UnsignedShort, null);
+            _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
+            _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _indexBuffer.Handle, IndexFormat.Uint16, 0, _indexBuffer.Size);
+            _wgpu.RenderPassEncoderDrawIndexed(passEncoder, (uint)_indexCount, 1, 0, 0, 0);
         }
 
         public void Dispose()
         {
-            if (_vaoHandle != 0)
-                _gl.DeleteVertexArray(_vaoHandle);
-
-            _ebo?.Dispose();
+            _indexBuffer?.Dispose();
         }
     }
 }
