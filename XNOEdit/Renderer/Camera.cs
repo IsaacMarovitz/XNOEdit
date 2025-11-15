@@ -5,24 +5,21 @@ namespace XNOEdit.Renderer
 {
     public class Camera
     {
-        public Transform Transform { get; set; } = new Transform();
-
-        public float Fov { get; set; } = 60f;
+        public Vector3 Position { get; private set; }
         public float NearPlane { get; set; } = 0.1f;
         public float FarPlane { get; set; } = 10000.0f;
-        public float MoveSpeed { get; set; } = 500.0f;
-        public float LookSensitivity { get; set; } = 2f;
-        public float DollySpeed { get; set; } = 100.0f;
+
+        private static float Fov => 60f;
+        private static float MoveSpeed => 2.0f;
+        private static float DollySpeed => 0.5f;
+        private static float LookSensitivity => 2f;
 
         private float _yaw = -90f;
         private float _pitch = 0f;
         private Vector3 _front = new(0.0f, 0.0f, -1.0f);
-        private Vector3 _up = Vector3.UnitY;
+        private Vector3 _frontHorizontal = new(0.0f, 0.0f, -1.0f);
         private Vector3 _right = Vector3.UnitX;
-
-        public Vector3 Front => _front;
-        public Vector3 Up => _up;
-        public Vector3 Right => _right;
+        private float _modelRadius = 1.0f;
 
         public Camera()
         {
@@ -31,7 +28,7 @@ namespace XNOEdit.Renderer
 
         public Matrix4x4 GetViewMatrix()
         {
-            return Matrix4x4.CreateLookAt(Transform.Position, Transform.Position + _front, Vector3.UnitY);
+            return Matrix4x4.CreateLookAt(Position, Position + _front, Vector3.UnitY);
         }
 
         public Matrix4x4 GetProjectionMatrix(float aspectRatio)
@@ -44,27 +41,32 @@ namespace XNOEdit.Renderer
             );
         }
 
+        public void SetModelRadius(float radius)
+        {
+            _modelRadius = radius;
+        }
+
         public void ProcessKeyboard(IKeyboard keyboard, float deltaTime)
         {
-            var velocity = MoveSpeed * deltaTime;
+            var velocity = MoveSpeed * deltaTime * _modelRadius;
 
             if (keyboard.IsKeyPressed(Key.W))
-                Transform.Position += _front * velocity;
+                Position += _frontHorizontal * velocity;
 
             if (keyboard.IsKeyPressed(Key.S))
-                Transform.Position -= _front * velocity;
+                Position -= _frontHorizontal * velocity;
 
             if (keyboard.IsKeyPressed(Key.A))
-                Transform.Position -= _right * velocity;
+                Position -= _right * velocity;
 
             if (keyboard.IsKeyPressed(Key.D))
-                Transform.Position += _right * velocity;
+                Position += _right * velocity;
 
             if (keyboard.IsKeyPressed(Key.Q))
-                Transform.Position -= Vector3.UnitY * velocity;
+                Position -= Vector3.UnitY * velocity;
 
             if (keyboard.IsKeyPressed(Key.E))
-                Transform.Position += Vector3.UnitY * velocity;
+                Position += Vector3.UnitY * velocity;
         }
 
         public void ProcessMouseMove(float xOffset, float yOffset)
@@ -82,23 +84,23 @@ namespace XNOEdit.Renderer
 
         public void ProcessMouseScroll(float scrollY)
         {
-            Transform.Position += _front * scrollY * DollySpeed;
+            Position += _front * scrollY * DollySpeed * _modelRadius;
         }
 
-        public void LookAt(Vector3 target)
+        public void FrameTarget(Vector3 target, float distance)
         {
-            var direction = Vector3.Normalize(target - Transform.Position);
+            Position = target + new Vector3(distance * 0.7f, distance * 0.5f, distance * 0.7f);
+            LookAt(target);
+        }
+
+        private void LookAt(Vector3 target)
+        {
+            var direction = Vector3.Normalize(target - Position);
 
             _yaw = MathF.Atan2(direction.Z, direction.X) * 180f / MathF.PI;
             _pitch = MathF.Asin(direction.Y) * 180f / MathF.PI;
 
             UpdateVectors();
-        }
-
-        public void FrameTarget(Vector3 target, float distance)
-        {
-            Transform.Position = target + new Vector3(distance * 0.7f, distance * 0.5f, distance * 0.7f);
-            LookAt(target);
         }
 
         private void UpdateVectors()
@@ -108,8 +110,12 @@ namespace XNOEdit.Renderer
             _front.Z = MathF.Sin(_yaw * MathF.PI / 180f) * MathF.Cos(_pitch * MathF.PI / 180f);
             _front = Vector3.Normalize(_front);
 
+            _frontHorizontal.X = MathF.Cos(_yaw * MathF.PI / 180f);
+            _frontHorizontal.Y = 0f;
+            _frontHorizontal.Z = MathF.Sin(_yaw * MathF.PI / 180f);
+            _frontHorizontal = Vector3.Normalize(_frontHorizontal);
+
             _right = Vector3.Normalize(Vector3.Cross(_front, Vector3.UnitY));
-            _up = Vector3.Normalize(Vector3.Cross(_right, _front));
         }
     }
 }

@@ -46,26 +46,29 @@ namespace XNOEdit.Panels
                 var effectListChunk = _xno.GetChunk<EffectListChunk>();
                 if (ImGui.BeginTabItem("Effect List"))
                 {
-                    ImGui.SeparatorText("Effects");
+                    var uniqueEffects = effectListChunk.Effects
+                        .GroupBy(x => x.Name)
+                        .Select(g => g.FirstOrDefault());
 
-                    foreach (var effect in effectListChunk.Effects)
+                    foreach (var effect in uniqueEffects)
                     {
                         if (ImGui.CollapsingHeader(effect.Name))
                         {
-                            ImGui.Text($"Type: {effect.Type}");
+                            ImGui.Text("Techniques:");
+                            ImGui.Indent();
+
+                            foreach (var technique in effectListChunk.Techniques)
+                            {
+                                if (technique.GetEffect(effectListChunk).Name == effect.Name)
+                                {
+                                    ImGui.Text($"- {technique.Name}");
+                                }
+                            }
+
+                            ImGui.Unindent();
                         }
                     }
 
-                    ImGui.SeparatorText("Techniques");
-
-                    foreach (var technique in effectListChunk.Techniques)
-                    {
-                        if (ImGui.CollapsingHeader(technique.Name))
-                        {
-                            ImGui.Text($"Type: {technique.Type}");
-                            ImGui.Text($"Effect Index: {technique.EffectIndex}");
-                        }
-                    }
                     ImGui.EndTabItem();
                 }
 
@@ -74,6 +77,51 @@ namespace XNOEdit.Panels
                 var objectChunk = _xno.GetChunk<ObjectChunk>();
                 if (ImGui.BeginTabItem("Object"))
                 {
+                    var center = objectChunk.Centre;
+                    ImGui.InputFloat3("Center", ref center, "%.1f", ImGuiInputTextFlags.ReadOnly);
+
+                    if (objectChunk.BoundingBox.HasValue)
+                    {
+                        var boundingBox = objectChunk.BoundingBox.Value;
+                        ImGui.InputFloat3("Bounding Box", ref boundingBox, "%.1f", ImGuiInputTextFlags.ReadOnly);
+                    }
+
+                    var radius = objectChunk.Radius;
+                    ImGui.InputFloat("Radius", ref radius, 0f, 0f, "%.1f", ImGuiInputTextFlags.ReadOnly);
+
+                    ImGui.Text($"Texture Count: {objectChunk.TextureCount}");
+                    ImGui.Text($"Subobject Count: {objectChunk.SubObjects.Count}");
+
+                    ImGui.SeparatorText("Materials");
+                    for (var i = 0; i < objectChunk.Materials.Count; i++)
+                    {
+                        ImGui.PushID(i);
+                        if (ImGui.CollapsingHeader($"Material {i + 1}"))
+                        {
+                            var material = objectChunk.Materials[i];
+
+                            var ambient = new Vector4(material.Colour.Ambient.R, material.Colour.Ambient.G,
+                                material.Colour.Ambient.B, material.Colour.Ambient.A);
+
+                            var diffuse = new Vector4(material.Colour.Diffuse.R, material.Colour.Diffuse.G,
+                                material.Colour.Diffuse.B, material.Colour.Diffuse.A);
+
+                            var specular = new Vector4(material.Colour.Specular.R, material.Colour.Specular.G,
+                                material.Colour.Specular.B, material.Colour.Specular.A);
+
+                            var emissive = new Vector4(material.Colour.Emissive.R, material.Colour.Emissive.G,
+                                material.Colour.Emissive.B, material.Colour.Emissive.A);
+
+                            var power = material.Colour.Power;
+
+                            ImGui.InputFloat4("Ambient", ref ambient, "%.1f", ImGuiInputTextFlags.ReadOnly);
+                            ImGui.InputFloat4("Diffuse", ref diffuse, "%.1f", ImGuiInputTextFlags.ReadOnly);
+                            ImGui.InputFloat4("Specular", ref specular, "%.1f", ImGuiInputTextFlags.ReadOnly);
+                            ImGui.InputFloat4("Emissive", ref emissive, "%.1f", ImGuiInputTextFlags.ReadOnly);
+                            ImGui.InputFloat("Power", ref power, 0f, 0f, "%.1f", ImGuiInputTextFlags.ReadOnly);
+                        }
+                        ImGui.PopID();
+                    }
 
                     ImGui.EndTabItem();
                 }

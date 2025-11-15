@@ -327,7 +327,7 @@ namespace XNOEdit
             {
                 var gridModel = Matrix4x4.CreateTranslation(_modelCenter);
                 var fadeDistance = _modelRadius * 5.0f;
-                _grid.Draw(pass, view, projection, gridModel, _camera.Transform.Position, fadeDistance);
+                _grid.Draw(pass, view, projection, gridModel, _camera.Position, fadeDistance);
             }
 
             if (_model != null && _shader != null)
@@ -339,7 +339,7 @@ namespace XNOEdit
                     Projection = projection,
                     LightDir = _sunDirection.AsVector3(),
                     LightColor = _sunColor.AsVector3(),
-                    ViewPos = _camera.Transform.Position,
+                    ViewPos = _camera.Position,
                     VertColorStrength = _vertexColors ? 1.0f : 0.0f
                 };
                 _shader.UpdateUniforms(uniforms);
@@ -582,6 +582,7 @@ namespace XNOEdit
                     _modelCenter = objectChunk.Centre;
                     _modelRadius = objectChunk.Radius;
 
+                    _camera.SetModelRadius(_modelRadius);
                     _camera.NearPlane = Math.Max(_modelRadius * 0.01f, 0.1f);
                     _camera.FarPlane = Math.Max(_modelRadius * 10.0f, 1000.0f);
 
