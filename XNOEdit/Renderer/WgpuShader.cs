@@ -275,7 +275,7 @@ namespace XNOEdit.Renderer
 
         public void UpdateUniforms(BasicModelUniforms uniforms)
         {
-            _wgpu.QueueWriteBuffer(_queue, _uniformBuffer, 0, uniforms, (nuint)sizeof(BasicModelUniforms));
+            _wgpu.QueueWriteBuffer(_queue, _uniformBuffer, 0, in uniforms, (nuint)sizeof(BasicModelUniforms));
         }
 
         public void Dispose()

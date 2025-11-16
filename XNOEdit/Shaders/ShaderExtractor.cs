@@ -81,7 +81,7 @@ namespace XNOEdit.Shaders
         {
             var entry = _entries[entryIndex];
 
-            if (entry.GetType() == EntryType.Directory)
+            if (entry.GetEntryType() == EntryType.Directory)
             {
                 var dir = new DirectoryNode(entry.Name);
                 if (!string.IsNullOrEmpty(entry.Name))
@@ -110,7 +110,7 @@ namespace XNOEdit.Shaders
         {
             var entry = _entries[entryIndex];
 
-            if (entry.GetType() == EntryType.Directory)
+            if (entry.GetEntryType() == EntryType.Directory)
             {
                 throw new InvalidOperationException("Cannot extract a directory");
             }
@@ -238,7 +238,7 @@ namespace XNOEdit.Shaders
             public uint UncompressedSize;
             public string Name;
 
-            public EntryType GetType()
+            public EntryType GetEntryType()
             {
                 return (EntryType)((Flags & TypeMask) >> 24);
             }

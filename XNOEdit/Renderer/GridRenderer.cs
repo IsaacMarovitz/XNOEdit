@@ -290,7 +290,7 @@ namespace XNOEdit.Renderer
                 FadeEnd = fadeDistance
             };
 
-            _wgpu.QueueWriteBuffer(_queue, _uniformBuffer, 0, uniforms, (nuint)sizeof(GridUniforms));
+            _wgpu.QueueWriteBuffer(_queue, _uniformBuffer, 0, in uniforms, (nuint)sizeof(GridUniforms));
             _wgpu.RenderPassEncoderSetPipeline(passEncoder, _pipeline);
             uint dynamicOffset = 0;
             _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _bindGroup, 0, &dynamicOffset);
