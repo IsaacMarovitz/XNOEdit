@@ -44,6 +44,7 @@ namespace XNOEdit.Renderer
         private readonly ShaderModule* _fragmentModule;
         private readonly RenderPipeline* _pipeline;
         private readonly RenderPipeline* _pipelineCull;
+        private readonly RenderPipeline* _wireframePipeline;
         private BindGroupLayout* _uniformBindGroupLayout;
         private Buffer* _uniformBuffer;
         private BindGroup* _uniformBindGroup;
@@ -67,8 +68,9 @@ namespace XNOEdit.Renderer
 
             CreateUniformResources(device);
 
-            _pipeline = CreateRenderPipeline(device, swapChainFormat, vertexLayouts, CullMode.None);
-            _pipelineCull = CreateRenderPipeline(device, swapChainFormat, vertexLayouts, CullMode.Back);
+            _pipeline = CreateRenderPipeline(device, swapChainFormat, vertexLayouts, CullMode.None, PrimitiveTopology.TriangleList);
+            _pipelineCull = CreateRenderPipeline(device, swapChainFormat, vertexLayouts, CullMode.Back, PrimitiveTopology.TriangleList);
+            _wireframePipeline = CreateRenderPipeline(device, swapChainFormat, vertexLayouts, CullMode.None, PrimitiveTopology.LineList);
         }
 
         private ShaderModule* CreateShaderModule(Device* device, string source)
@@ -150,7 +152,8 @@ namespace XNOEdit.Renderer
             Device* device,
             TextureFormat swapChainFormat,
             VertexBufferLayout[] vertexLayouts,
-            CullMode cullMode)
+            CullMode cullMode,
+            PrimitiveTopology topology)
         {
             var bindGroupLayout = _uniformBindGroupLayout;
             var pipelineLayoutDesc = new PipelineLayoutDescriptor
@@ -232,7 +235,7 @@ namespace XNOEdit.Renderer
 
                 var primitiveState = new PrimitiveState
                 {
-                    Topology = PrimitiveTopology.TriangleList,
+                    Topology = topology,
                     FrontFace = FrontFace.CW,
                     CullMode = cullMode
                 };
@@ -258,9 +261,16 @@ namespace XNOEdit.Renderer
             }
         }
 
-        public RenderPipeline* GetPipeline(bool cullBackface)
+        public RenderPipeline* GetPipeline(bool cullBackface, bool wireframe)
         {
-            return cullBackface ? _pipelineCull : _pipeline;
+            if (wireframe)
+            {
+                return _wireframePipeline;
+            }
+            else
+            {
+                return cullBackface ? _pipelineCull : _pipeline;
+            }
         }
 
         public void UpdateUniforms(BasicModelUniforms uniforms)
@@ -281,6 +291,12 @@ namespace XNOEdit.Renderer
 
             if (_pipeline != null)
                 _wgpu.RenderPipelineRelease(_pipeline);
+
+            if (_pipelineCull != null)
+                _wgpu.RenderPipelineRelease(_pipelineCull);
+
+            if (_wireframePipeline != null)
+                _wgpu.RenderPipelineRelease(_wireframePipeline);
 
             if (_vertexModule != null)
                 _wgpu.ShaderModuleRelease(_vertexModule);

@@ -311,6 +311,7 @@ namespace XNOEdit
                     ImGui.MenuItem("Show Grid", "G", ref _showGrid);
                     ImGui.MenuItem("Vertex Colors", "V", ref _vertexColors);
                     ImGui.MenuItem("Backface Culling", "C", ref _backfaceCulling);
+                    ImGui.MenuItem("Wireframe", "F", ref _wireframeMode);
 
                     ImGui.Separator();
 
@@ -450,12 +451,12 @@ namespace XNOEdit
                 };
                 _shader.UpdateUniforms(uniforms);
 
-                var pipeline = _shader.GetPipeline(_backfaceCulling);
+                var pipeline = _shader.GetPipeline(_backfaceCulling, _wireframeMode);
                 _wgpu.RenderPassEncoderSetPipeline(pass, pipeline);
                 uint dynamicOffset = 0;
                 _wgpu.RenderPassEncoderSetBindGroup(pass, 0, _shader.UniformBindGroup, 0, &dynamicOffset);
 
-                _model.Draw(pass);
+                _model.Draw(pass, _wireframeMode);
             }
 
             _controller.Render(pass);
@@ -727,11 +728,10 @@ namespace XNOEdit
 
             switch (key)
             {
-                // TODO: Add wireframe support
-                // case Key.F:
-                //     _wireframeMode = !_wireframeMode;
-                //     alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
-                //     break;
+                case Key.F:
+                    _wireframeMode = !_wireframeMode;
+                    alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
+                    break;
                 case Key.G:
                     _showGrid = !_showGrid;
                     alert = $"Grid: {(_showGrid ? "ON" : "OFF")}";

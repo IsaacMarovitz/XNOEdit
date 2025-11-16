@@ -31,7 +31,7 @@ namespace XNOEdit.Renderer
         private void LoadModel(ObjectChunk objectChunk, EffectListChunk effectListChunk)
         {
             // Create shared vertex buffers for each unique VertexList
-            for (int i = 0; i < objectChunk.VertexLists.Count; i++)
+            for (var i = 0; i < objectChunk.VertexLists.Count; i++)
             {
                 var vertexList = objectChunk.VertexLists[i];
                 var vertices = new List<float>();
@@ -106,11 +106,11 @@ namespace XNOEdit.Renderer
             Console.WriteLine($"Loaded {_sharedVertexBuffers.Count} vertex buffers, {_meshes.Count} meshes");
         }
 
-        public void Draw(RenderPassEncoder* passEncoder)
+        public void Draw(RenderPassEncoder* passEncoder, bool wireframe)
         {
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(passEncoder);
+                mesh.Draw(passEncoder, wireframe);
             }
         }
 
@@ -133,8 +133,10 @@ namespace XNOEdit.Renderer
     {
         private readonly WebGPU _wgpu;
         private WgpuBuffer<ushort> _indexBuffer;
+        private WgpuBuffer<ushort> _wireframeIndexBuffer;
         private WgpuBuffer<float> _vertexBuffer;
         private int _indexCount;
+        private int _wireframeIndexCount;
         private string _effect;
         private string _technique;
 
@@ -185,20 +187,77 @@ namespace XNOEdit.Renderer
                 device,
                 finalIndices,
                 BufferUsage.Index);
+
+            // Generate wireframe indices (convert triangles to lines)
+            var wireframeIndices = GenerateWireframeIndices(finalIndices);
+            _wireframeIndexCount = wireframeIndices.Length;
+
+            _wireframeIndexBuffer = new WgpuBuffer<ushort>(
+                _wgpu,
+                device,
+                wireframeIndices,
+                BufferUsage.Index);
         }
 
-        public void Draw(RenderPassEncoder* passEncoder)
+        private ushort[] GenerateWireframeIndices(ushort[] triangleIndices)
         {
-            if (_indexCount == 0) return;
+            var lines = new HashSet<(ushort, ushort)>();
 
+            // Convert each triangle to 3 lines, avoiding duplicates
+            for (var i = 0; i < triangleIndices.Length; i += 3)
+            {
+                var v0 = triangleIndices[i];
+                var v1 = triangleIndices[i + 1];
+                var v2 = triangleIndices[i + 2];
+
+                // Add edges, ensuring consistent ordering to avoid duplicates
+                AddLine(lines, v0, v1);
+                AddLine(lines, v1, v2);
+                AddLine(lines, v2, v0);
+            }
+
+            // Flatten to array
+            var result = new List<ushort>(lines.Count * 2);
+            foreach (var (a, b) in lines)
+            {
+                result.Add(a);
+                result.Add(b);
+            }
+
+            return result.ToArray();
+        }
+
+        private void AddLine(HashSet<(ushort, ushort)> lines, ushort a, ushort b)
+        {
+            // Always store with smaller index first to avoid duplicate reversed edges
+            if (a < b)
+                lines.Add((a, b));
+            else
+                lines.Add((b, a));
+        }
+
+        public void Draw(RenderPassEncoder* passEncoder, bool wireframe = false)
+        {
             _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
-            _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _indexBuffer.Handle, IndexFormat.Uint16, 0, _indexBuffer.Size);
-            _wgpu.RenderPassEncoderDrawIndexed(passEncoder, (uint)_indexCount, 1, 0, 0, 0);
+
+            if (wireframe)
+            {
+                if (_wireframeIndexCount == 0) return;
+                _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _wireframeIndexBuffer.Handle, IndexFormat.Uint16, 0, _wireframeIndexBuffer.Size);
+                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, (uint)_wireframeIndexCount, 1, 0, 0, 0);
+            }
+            else
+            {
+                if (_indexCount == 0) return;
+                _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _indexBuffer.Handle, IndexFormat.Uint16, 0, _indexBuffer.Size);
+                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, (uint)_indexCount, 1, 0, 0, 0);
+            }
         }
 
         public void Dispose()
         {
             _indexBuffer?.Dispose();
+            _wireframeIndexBuffer?.Dispose();
         }
     }
 }
