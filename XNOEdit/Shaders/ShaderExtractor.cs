@@ -211,12 +211,6 @@ namespace XNOEdit.Shaders
             return Encoding.UTF8.GetString(bytes.ToArray());
         }
 
-        private static void DecompressZlib(Stream source, Stream destination)
-        {
-            var stream = new ZLibStream(source, CompressionMode.Decompress);
-            stream.CopyTo(destination);
-        }
-
         private static uint ReadBeUint32(BinaryReader source)
         {
             var little = source.ReadBytes(4);

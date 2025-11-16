@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.InteropServices;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
@@ -6,6 +7,18 @@ using XNOEdit.Shaders;
 
 namespace XNOEdit.Renderer
 {
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct BasicModelUniforms
+    {
+        public Matrix4x4 Model;
+        public Matrix4x4 View;
+        public Matrix4x4 Projection;
+        public Vector4 LightDir;
+        public Vector4 LightColor;
+        public Vector3 ViewPos;
+        public float VertColorStrength;
+    }
+
     public unsafe class Model : IDisposable
     {
         private readonly WebGPU _wgpu;

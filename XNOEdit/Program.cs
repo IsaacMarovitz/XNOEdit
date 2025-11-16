@@ -233,6 +233,7 @@ namespace XNOEdit
                     _device,
                     _queue,
                     basicModelWgsl,
+                    "Basic Model",
                     _surfaceFormat,
                     [vertexLayout]);
             }
@@ -444,8 +445,8 @@ namespace XNOEdit
                     Model = Matrix4x4.Identity,
                     View = view,
                     Projection = projection,
-                    LightDir = _sunDirection,
-                    LightColor = _sunColor,
+                    LightDir = _sunDirection.AsVector4(),
+                    LightColor = _sunColor.AsVector4(),
                     ViewPos = _camera.Position,
                     VertColorStrength = _vertexColors ? 1.0f : 0.0f
                 };

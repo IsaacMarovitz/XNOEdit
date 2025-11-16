@@ -5,7 +5,7 @@ using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     internal struct SkyboxUniforms
     {
         public Matrix4x4 View;
@@ -40,10 +40,10 @@ namespace XNOEdit.Renderer
         {
             var vertices = new[]
             {
-                -1.0f, -1.0f, 0.999f,
-                 1.0f, -1.0f, 0.999f,
-                -1.0f,  1.0f, 0.999f,
-                 1.0f,  1.0f, 0.999f
+                -1.0f, -1.0f, 0.0f,
+                 1.0f, -1.0f, 0.0f,
+                -1.0f,  1.0f, 0.0f,
+                 1.0f,  1.0f, 0.0f
             };
 
             _vertexBuffer = new WgpuBuffer<float>(_wgpu, _device, vertices, BufferUsage.Vertex);
@@ -159,7 +159,7 @@ namespace XNOEdit.Renderer
                 {
                     Format = TextureFormat.Depth24Plus,
                     DepthWriteEnabled = false,
-                    DepthCompare = CompareFunction.LessEqual,
+                    DepthCompare = CompareFunction.Always,
                     StencilFront = new StencilFaceState
                     {
                         Compare = CompareFunction.Always,

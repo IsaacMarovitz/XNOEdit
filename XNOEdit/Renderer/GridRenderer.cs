@@ -5,25 +5,14 @@ using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
-    [StructLayout(LayoutKind.Explicit, Size = 224)]
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     struct GridUniforms
     {
-        [FieldOffset(0)]
         public Matrix4x4 Model;
-
-        [FieldOffset(64)]
         public Matrix4x4 View;
-
-        [FieldOffset(128)]
         public Matrix4x4 Projection;
-
-        [FieldOffset(192)]
         public Vector3 CameraPos;
-
-        [FieldOffset(204)]
         public float FadeStart;
-
-        [FieldOffset(208)]
         public float FadeEnd;
     }
 
@@ -171,7 +160,7 @@ namespace XNOEdit.Renderer
             var vertexEntry = "vs_main\0"u8.ToArray();
             var fragmentEntry = "fs_main\0"u8.ToArray();
 
-            VertexAttribute* vertexAttrib = stackalloc VertexAttribute[2];
+            var vertexAttrib = stackalloc VertexAttribute[2];
             vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 };
             vertexAttrib[1] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };
 
