@@ -214,15 +214,15 @@ namespace XNOEdit.Renderer
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
-            Vector4 sunDirection,
-            Vector4 sunColor)
+            Vector3 sunDirection,
+            Vector3 sunColor)
         {
             var uniforms = new SkyboxUniforms
             {
                 View = view,
                 Projection = projection,
-                SunDirection = sunDirection,
-                SunColor = sunColor
+                SunDirection = sunDirection.AsVector4(),
+                SunColor = sunColor.AsVector4()
             };
 
             _wgpu.QueueWriteBuffer(_queue, _uniformBuffer, 0, uniforms, (nuint)sizeof(SkyboxUniforms));

@@ -31,13 +31,11 @@ namespace XNOEdit.Panels
                 ImGui.SetNextWindowPos(windowPos, ImGuiCond.Always, new  Vector2(1.0f, 1.0f));
                 ImGui.SetNextWindowSize(new Vector2(size.X + 18.0f, size.Y + 40.0f), ImGuiCond.Always);
 
-                if (ImGui.Begin("Alert", ImGuiWindowFlags.NoMove
-                                         | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse
-                                         | ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoNavFocus))
-                {
-                    ImGui.Text(currentMessage);
-                    ImGui.End();
-                }
+                ImGui.Begin("Alert", ImGuiWindowFlags.NoMove
+                                     | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse
+                                     | ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoNavFocus);
+                ImGui.Text(currentMessage);
+                ImGui.End();
             }
         }
     }

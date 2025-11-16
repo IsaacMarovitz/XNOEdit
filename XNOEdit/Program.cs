@@ -6,6 +6,7 @@ using Pfim;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.WebGPU;
+using Silk.NET.WebGPU.Extensions.WGPU;
 using Silk.NET.Windowing;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
@@ -45,11 +46,16 @@ namespace XNOEdit
         private static bool _vertexColors = true;
         private static bool _backfaceCulling;
         private static bool _mouseCaptured;
+        private static bool _xnoWindow = true;
+        private static bool _environmentWindow = true;
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
-        private static Vector4 _sunDirection = Vector4.Normalize(new Vector4(0.5f, 0.5f, 0.5f, 0.0f));
-        private static Vector4 _sunColor = Vector4.Normalize(new Vector4(1.0f, 0.95f, 0.8f, 0.0f));
+        private static Vector3 _sunDirection = Vector3.Normalize(new Vector3(0.5f, 0.5f, 0.5f));
+        private static Vector3 _sunColor = Vector3.Normalize(new Vector3(1.0f, 0.95f, 0.8f));
         private static Vector2 _lastMousePosition;
+
+        private static float _sunAzimuth;
+        private static float _sunAltitude;
 
         private static void Main()
         {
@@ -101,15 +107,33 @@ namespace XNOEdit
             CreateShaders();
             CreateDepthTexture();
 
-            _grid = new GridRenderer(_wgpu, _device, _queue, _surfaceFormat, 100.0f);
+            _grid = new GridRenderer(_wgpu, _device, _queue, _surfaceFormat);
             _skybox = new SkyboxRenderer(_wgpu, _device, _queue, _surfaceFormat);
+
+            _sunAltitude = MathF.Asin(_sunDirection.Y) * 180.0f / MathF.PI;
+            _sunAzimuth = MathF.Atan2(_sunDirection.Z, _sunDirection.X) * 180.0f / MathF.PI;
+
+            if (_sunAzimuth < 0)
+                _sunAzimuth += 360.0f;
+
+            ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         }
 
         private static void InitializeWgpu()
         {
             _wgpu = WebGPU.GetApi();
 
-            var instanceDesc = new InstanceDescriptor();
+            var extras = new InstanceExtras
+            {
+                Chain = new ChainedStruct { SType = (SType)NativeSType.STypeInstanceExtras },
+                Backends = InstanceBackend.Vulkan
+            };
+
+            var instanceDesc = new InstanceDescriptor
+            {
+                // NextInChain = (ChainedStruct*)&extras
+            };
+
             _instance = _wgpu.CreateInstance(&instanceDesc);
             _surface = _window.CreateWebGPUSurface(_wgpu, _instance);
 
@@ -134,22 +158,38 @@ namespace XNOEdit
 
             _adapter = adapter;
 
-            var deviceDesc = new DeviceDescriptor();
-            Device* device = null;
+            AdapterProperties adapterProps = default;
+            _wgpu.AdapterGetProperties(_adapter, &adapterProps);
+            Console.WriteLine($"Backend type: {adapterProps.BackendType}");
 
-            _wgpu.AdapterRequestDevice(
-                _adapter,
-                &deviceDesc,
-                new PfnRequestDeviceCallback((status, devicePtr, message, userdata) =>
-                {
-                    if (status == RequestDeviceStatus.Success)
+            NativeFeature[] feature = [NativeFeature.BufferBindingArray];
+
+            fixed (NativeFeature* pFeature = feature)
+            {
+                var deviceDesc = new DeviceDescriptor();
+                // var deviceDesc = new DeviceDescriptor
+                // {
+                //     RequiredFeatures = (FeatureName*)pFeature,
+                //     RequiredFeatureCount = (uint)feature.Length
+                // };
+
+                Device* device = null;
+
+                _wgpu.AdapterRequestDevice(
+                    _adapter,
+                    &deviceDesc,
+                    new PfnRequestDeviceCallback((status, devicePtr, message, userdata) =>
                     {
-                        device = devicePtr;
-                    }
-                }),
-                null);
+                        if (status == RequestDeviceStatus.Success)
+                        {
+                            device = devicePtr;
+                        }
+                    }),
+                    null);
 
-            _device = device;
+                _device = device;
+            }
+
             _queue = _wgpu.DeviceGetQueue(_device);
 
             // Configure surface
@@ -260,9 +300,70 @@ namespace XNOEdit
         {
             _controller.Update((float)deltaTime);
 
+            ImGui.DockSpaceOverViewport(0, ImGui.GetMainViewport(), ImGuiDockNodeFlags.PassthruCentralNode | ImGuiDockNodeFlags.NoDockingOverCentralNode);
+
+            if (ImGui.BeginMainMenuBar())
+            {
+                if (ImGui.BeginMenu("Render"))
+                {
+                    ImGui.PushItemFlag(ImGuiItemFlags.AutoClosePopups, false);
+
+                    ImGui.MenuItem("Show Grid", "G", ref _showGrid);
+                    ImGui.MenuItem("Vertex Colors", "V", ref _vertexColors);
+                    ImGui.MenuItem("Backface Culling", "C", ref _backfaceCulling);
+
+                    ImGui.Separator();
+
+                    if (ImGui.MenuItem("Reset Camera", "R"))
+                    {
+                        ResetCamera();
+                    }
+
+                    ImGui.PopItemFlag();
+                    ImGui.EndMenu();
+                }
+
+                if (ImGui.BeginMenu("Window"))
+                {
+                    ImGui.PushItemFlag(ImGuiItemFlags.AutoClosePopups, false);
+
+                    ImGui.MenuItem("XNO", null, ref _xnoWindow);
+                    ImGui.MenuItem("Environment", null, ref _environmentWindow);
+
+                    ImGui.PopItemFlag();
+                    ImGui.EndMenu();
+                }
+
+                ImGui.EndMainMenuBar();
+            }
+
+            if (_environmentWindow)
+            {
+                ImGui.Begin("Environment");
+                ImGui.SeparatorText("Sun");
+                ImGui.ColorEdit3("Color", ref _sunColor, ImGuiColorEditFlags.NoInputs);
+
+                var editedAzimuth = ImGui.SliderFloat("Azimuth", ref _sunAzimuth, 0.0f, 360.0f, "%.1f°");
+                var editedAltitude = ImGui.SliderFloat("Altitude", ref _sunAltitude, 0.0f, 90.0f, "%.1f°");
+
+                if (editedAzimuth || editedAltitude)
+                {
+                    var azimuthRad = _sunAzimuth * MathF.PI / 180.0f;
+                    var altitudeRad = _sunAltitude * MathF.PI / 180.0f;
+
+                    _sunDirection = new Vector3(
+                        (float)(Math.Cos(altitudeRad) * Math.Cos(azimuthRad)),
+                        (float)Math.Sin(altitudeRad),
+                        (float)(Math.Cos(altitudeRad) * Math.Sin(azimuthRad)));
+                }
+
+                ImGui.End();
+            }
+
             if (_xnoPanel != null)
             {
-                _xnoPanel.Render(Textures);
+                if (_xnoWindow)
+                    _xnoPanel.Render(Textures);
             }
             else
             {
@@ -270,6 +371,7 @@ namespace XNOEdit
                 ImGui.Text("Drag and drop a .xno file");
                 ImGui.End();
             }
+
             _alertPanel.Render(deltaTime);
 
             SurfaceTexture surfaceTexture;
@@ -341,8 +443,8 @@ namespace XNOEdit
                     Model = Matrix4x4.Identity,
                     View = view,
                     Projection = projection,
-                    LightDir = _sunDirection.AsVector3(),
-                    LightColor = _sunColor.AsVector3(),
+                    LightDir = _sunDirection,
+                    LightColor = _sunColor,
                     ViewPos = _camera.Position,
                     VertColorStrength = _vertexColors ? 1.0f : 0.0f
                 };
@@ -434,16 +536,22 @@ namespace XNOEdit
 
             if (_depthTextureView != null)
                 _wgpu.TextureViewRelease(_depthTextureView);
+
             if (_depthTexture != null)
                 _wgpu.TextureRelease(_depthTexture);
+
             if (_surface != null)
                 _wgpu.SurfaceRelease(_surface);
+
             if (_queue != null)
                 _wgpu.QueueRelease(_queue);
+
             if (_device != null)
                 _wgpu.DeviceRelease(_device);
+
             if (_adapter != null)
                 _wgpu.AdapterRelease(_adapter);
+
             if (_instance != null)
                 _wgpu.InstanceRelease(_instance);
         }
@@ -619,10 +727,11 @@ namespace XNOEdit
 
             switch (key)
             {
-                case Key.F:
-                    _wireframeMode = !_wireframeMode;
-                    alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
-                    break;
+                // TODO: Add wireframe support
+                // case Key.F:
+                //     _wireframeMode = !_wireframeMode;
+                //     alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
+                //     break;
                 case Key.G:
                     _showGrid = !_showGrid;
                     alert = $"Grid: {(_showGrid ? "ON" : "OFF")}";

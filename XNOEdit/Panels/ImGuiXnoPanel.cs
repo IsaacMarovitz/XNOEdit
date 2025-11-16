@@ -55,17 +55,14 @@ namespace XNOEdit.Panels
                         if (ImGui.CollapsingHeader(effect.Name))
                         {
                             ImGui.Text("Techniques:");
-                            ImGui.Indent();
 
                             foreach (var technique in effectListChunk.Techniques)
                             {
                                 if (technique.GetEffect(effectListChunk).Name == effect.Name)
                                 {
-                                    ImGui.Text($"- {technique.Name}");
+                                    ImGui.BulletText(technique.Name);
                                 }
                             }
-
-                            ImGui.Unindent();
                         }
                     }
 

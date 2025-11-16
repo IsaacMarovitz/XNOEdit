@@ -584,7 +584,7 @@ namespace XNOEdit.Renderer
                     if (clipMax.X <= clipMin.X || clipMax.Y <= clipMin.Y)
                         continue;
 
-                    _wgpu.RenderPassEncoderSetScissorRect(encoder, (uint)clipMin.X, (uint)clipMin.Y, (uint)(clipMax.X - clipMin.X), (uint)(clipMax.Y - clipMin.Y));
+                    _wgpu.RenderPassEncoderSetScissorRect(encoder, (uint)clipMin.X, (uint)clipMin.Y, (uint)Math.Clamp(clipMax.X - clipMin.X, 0, _view.FramebufferSize.X), (uint)Math.Clamp(clipMax.Y - clipMin.Y, 0, _view.FramebufferSize.Y));
                     _wgpu.RenderPassEncoderDrawIndexed(encoder, cmd.ElemCount, 1, (uint)(idxOffset + cmd.IdxOffset), (int)(vtxOffset + cmd.VtxOffset), 0);
                 }
 
