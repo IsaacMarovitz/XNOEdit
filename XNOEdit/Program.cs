@@ -586,6 +586,7 @@ namespace XNOEdit
 
                 foreach (var texturePtr in Textures.Values)
                 {
+                    _controller.UnbindImGuiTextureView((TextureView*)texturePtr);
                     _wgpu.TextureViewRelease((TextureView*)texturePtr);
                 }
 

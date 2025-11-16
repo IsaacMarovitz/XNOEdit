@@ -98,6 +98,16 @@ namespace XNOEdit.Renderer
             _viewsById[id] = (nint)bindGroup;
         }
 
+        public void UnbindImGuiTextureView(TextureView* view)
+        {
+            var id = (nint)view;
+
+            _viewsById.Remove(id, out var ptr);
+
+            if (ptr != IntPtr.Zero)
+                _wgpu.BindGroupRelease((BindGroup*)ptr);
+        }
+
         private void Init()
         {
             var context = ImGui.CreateContext();

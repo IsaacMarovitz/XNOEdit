@@ -16,7 +16,7 @@ namespace XNOEdit.Panels
 
         public void Render(Dictionary<string, IntPtr> textures)
         {
-            ImGui.Begin($"{_xno.Name}", ImGuiWindowFlags.AlwaysAutoResize);
+            ImGui.Begin($"{_xno.Name}###XnoPanel", ImGuiWindowFlags.AlwaysAutoResize);
 
             if (ImGui.BeginTabBar("Tab Bar", ImGuiTabBarFlags.AutoSelectNewTabs))
             {
