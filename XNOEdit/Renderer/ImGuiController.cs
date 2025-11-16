@@ -33,7 +33,7 @@ namespace XNOEdit.Renderer
 
         private BindGroup* _commonBindGroup;
 
-        private Buffer* _uniformsBuffer;
+        private WgpuBuffer<Uniforms> _uniformsBuffer;
 
         private WindowRenderBuffers _windowRenderBuffers;
 
@@ -362,20 +362,14 @@ namespace XNOEdit.Renderer
 
         private void InitUniformBuffers()
         {
-            BufferDescriptor bufferDescriptor = new()
-            {
-                Usage = BufferUsage.CopyDst | BufferUsage.Uniform,
-                Size = (ulong)Align(sizeof(Uniforms), 16)
-            };
-
-            _uniformsBuffer = _wgpu.DeviceCreateBuffer(_device, in bufferDescriptor);
+            _uniformsBuffer = WgpuBuffer<Uniforms>.CreateUniform(_wgpu, _device);
         }
 
         private void InitBindGroups()
         {
             var bindGroupEntries = stackalloc BindGroupEntry[2];
             bindGroupEntries[0].Binding = 0;
-            bindGroupEntries[0].Buffer = _uniformsBuffer;
+            bindGroupEntries[0].Buffer = _uniformsBuffer.Handle;
             bindGroupEntries[0].Offset = 0;
             bindGroupEntries[0].Size = (ulong)Align(sizeof(Uniforms), 16);
             bindGroupEntries[0].Sampler = null;
@@ -535,9 +529,8 @@ namespace XNOEdit.Renderer
                     idxDst += cmdList.IdxBuffer.Size;
                 }
 
-                // Mapping might be better?
-                _wgpu.QueueWriteBuffer(_queue, frameRenderBuffer.VertexBufferGpu, 0, frameRenderBuffer.VertexBufferMemory, (nuint)vertSize);
-                _wgpu.QueueWriteBuffer(_queue, frameRenderBuffer.IndexBufferGpu, 0, frameRenderBuffer.IndexBufferMemory, (nuint)indexSize);
+                frameRenderBuffer.VertexBufferGpu.UpdateData(_queue, frameRenderBuffer.VertexBufferMemory);
+                frameRenderBuffer.IndexBufferGpu.UpdateData(_queue, frameRenderBuffer.IndexBufferMemory);
             }
 
             var io = ImGui.GetIO();
@@ -553,13 +546,13 @@ namespace XNOEdit.Renderer
                 )
             };
 
-            _wgpu.QueueWriteBuffer(_queue, _uniformsBuffer, 0, &uniforms, (nuint)sizeof(Uniforms));
+            _uniformsBuffer.UpdateData(_queue, in uniforms);
             _wgpu.RenderPassEncoderSetPipeline(encoder, _renderPipeline);
 
             if (drawData.TotalVtxCount > 0)
             {
-                _wgpu.RenderPassEncoderSetVertexBuffer(encoder, 0, frameRenderBuffer.VertexBufferGpu, 0, frameRenderBuffer.VertexBufferSize);
-                _wgpu.RenderPassEncoderSetIndexBuffer(encoder, frameRenderBuffer.IndexBufferGpu, IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferSize);
+                _wgpu.RenderPassEncoderSetVertexBuffer(encoder, 0, frameRenderBuffer.VertexBufferGpu.Handle, 0, frameRenderBuffer.VertexBufferGpu.Size);
+                _wgpu.RenderPassEncoderSetIndexBuffer(encoder, frameRenderBuffer.IndexBufferGpu.Handle, IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferGpu.Size);
                 uint dynamicOffsets = 0;
                 _wgpu.RenderPassEncoderSetBindGroup(encoder, 0, _commonBindGroup, 0, in dynamicOffsets);
             }
@@ -605,45 +598,21 @@ namespace XNOEdit.Renderer
 
         private void CreateOrUpdateBuffers(ref FrameRenderBuffer frameRenderBuffer, ulong vertSize, ulong indexSize)
         {
-            if (frameRenderBuffer.VertexBufferGpu == null || frameRenderBuffer.VertexBufferSize < vertSize)
+            if (frameRenderBuffer.VertexBufferGpu == null || frameRenderBuffer.VertexBufferGpu.Size < vertSize)
             {
                 frameRenderBuffer.VertexBufferMemory?.Dispose();
+                frameRenderBuffer.VertexBufferGpu?.Dispose();
 
-                if (frameRenderBuffer.VertexBufferGpu != null)
-                {
-                    _wgpu.BufferDestroy(frameRenderBuffer.VertexBufferGpu);
-                    _wgpu.BufferRelease(frameRenderBuffer.VertexBufferGpu);
-                }
-
-                BufferDescriptor desc = new()
-                {
-                    Size = vertSize,
-                    Usage = BufferUsage.Vertex | BufferUsage.CopyDst,
-                };
-
-                frameRenderBuffer.VertexBufferGpu = _wgpu.DeviceCreateBuffer(_device, in desc);
-                frameRenderBuffer.VertexBufferSize = vertSize;
+                frameRenderBuffer.VertexBufferGpu = new WgpuBuffer<byte>(_wgpu, _device, BufferUsage.Vertex | BufferUsage.CopyDst, vertSize);
                 frameRenderBuffer.VertexBufferMemory = GlobalMemory.Allocate((int)vertSize);
             }
 
-            if (frameRenderBuffer.IndexBufferGpu == null || frameRenderBuffer.IndexBufferSize < indexSize)
+            if (frameRenderBuffer.IndexBufferGpu == null || frameRenderBuffer.IndexBufferGpu.Size < indexSize)
             {
                 frameRenderBuffer.IndexBufferMemory?.Dispose();
+                frameRenderBuffer.IndexBufferGpu?.Dispose();
 
-                if (frameRenderBuffer.IndexBufferGpu != null)
-                {
-                    _wgpu.BufferDestroy(frameRenderBuffer.IndexBufferGpu);
-                    _wgpu.BufferRelease(frameRenderBuffer.IndexBufferGpu);
-                }
-
-                BufferDescriptor desc = new()
-                {
-                    Size = indexSize,
-                    Usage = BufferUsage.Index | BufferUsage.CopyDst,
-                };
-
-                frameRenderBuffer.IndexBufferGpu = _wgpu.DeviceCreateBuffer(_device, in desc);
-                frameRenderBuffer.IndexBufferSize = indexSize;
+                frameRenderBuffer.IndexBufferGpu = new WgpuBuffer<byte>(_wgpu, _device, BufferUsage.Index | BufferUsage.CopyDst, indexSize);
                 frameRenderBuffer.IndexBufferMemory = GlobalMemory.Allocate((int)indexSize);
             }
         }
@@ -669,10 +638,8 @@ namespace XNOEdit.Renderer
             {
                 foreach (var renderBuffer in _windowRenderBuffers.FrameRenderBuffers)
                 {
-                    _wgpu.BufferDestroy(renderBuffer.VertexBufferGpu);
-                    _wgpu.BufferRelease(renderBuffer.VertexBufferGpu);
-                    _wgpu.BufferDestroy(renderBuffer.IndexBufferGpu);
-                    _wgpu.BufferRelease(renderBuffer.IndexBufferGpu);
+                    renderBuffer.VertexBufferGpu?.Dispose();
+                    renderBuffer.IndexBufferGpu?.Dispose();
                     renderBuffer.IndexBufferMemory?.Dispose();
                     renderBuffer.VertexBufferMemory?.Dispose();
                 }
@@ -685,8 +652,7 @@ namespace XNOEdit.Renderer
 
             _wgpu.BindGroupRelease(_commonBindGroup);
 
-            _wgpu.BufferDestroy(_uniformsBuffer);
-            _wgpu.BufferRelease(_uniformsBuffer);
+            _uniformsBuffer?.Dispose();
 
             _wgpu.RenderPipelineRelease(_renderPipeline);
 
@@ -717,10 +683,8 @@ namespace XNOEdit.Renderer
 
         private struct FrameRenderBuffer
         {
-            public ulong VertexBufferSize;
-            public ulong IndexBufferSize;
-            public Buffer* VertexBufferGpu;
-            public Buffer* IndexBufferGpu;
+            public WgpuBuffer<byte> VertexBufferGpu;
+            public WgpuBuffer<byte> IndexBufferGpu;
             public GlobalMemory VertexBufferMemory;
             public GlobalMemory IndexBufferMemory;
         };

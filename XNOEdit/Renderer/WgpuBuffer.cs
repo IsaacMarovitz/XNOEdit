@@ -4,7 +4,7 @@ using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
-    public unsafe class WgpuBuffer<T> : IDisposable where T : unmanaged
+    public unsafe class WgpuBuffer<T> : IDisposable where T : struct
     {
         private readonly WebGPU _wgpu;
         private readonly Buffer* _buffer;
@@ -48,13 +48,13 @@ namespace XNOEdit.Renderer
         /// <summary>
         /// Create an empty buffer (for uniform buffers that will be updated via QueueWriteBuffer)
         /// </summary>
-        public WgpuBuffer(WebGPU wgpu, Device* device, BufferUsage usage, int alignment = CopyBufferAlignment)
+        public WgpuBuffer(WebGPU wgpu, Device* device, BufferUsage usage, ulong size = 0, int alignment = CopyBufferAlignment)
         {
             _wgpu = wgpu;
             _usage = usage;
 
             // Calculate size and align
-            var dataSize = (ulong)sizeof(T);
+            var dataSize = size == 0 ? (ulong)sizeof(T) : size;
             _size = AlignUp(dataSize, alignment);
 
             var descriptor = new BufferDescriptor
@@ -133,6 +133,7 @@ namespace XNOEdit.Renderer
         {
             if (_buffer != null)
             {
+                _wgpu.BufferDestroy(_buffer);
                 _wgpu.BufferRelease(_buffer);
             }
         }

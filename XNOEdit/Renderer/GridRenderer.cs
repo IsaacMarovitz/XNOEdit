@@ -1,7 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
-using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
@@ -25,7 +24,7 @@ namespace XNOEdit.Renderer
         private RenderPipeline* _pipeline;
         private BindGroupLayout* _bindGroupLayout;
         private BindGroup* _bindGroup;
-        private Buffer* _uniformBuffer;
+        private WgpuBuffer<GridUniforms> _uniformBuffer;
         private WgpuBuffer<float> _vertexBuffer;
         private int _lineCount;
 
@@ -104,16 +103,7 @@ namespace XNOEdit.Renderer
                 _shaderModule = _wgpu.DeviceCreateShaderModule(_device, &shaderDesc);
             }
 
-            var bufferSize = 224ul;
-            var alignedSize = (bufferSize + 255) & ~255ul;
-
-            var bufferDesc = new BufferDescriptor
-            {
-                Size = alignedSize,
-                Usage = BufferUsage.Uniform | BufferUsage.CopyDst,
-                MappedAtCreation = false
-            };
-            _uniformBuffer = _wgpu.DeviceCreateBuffer(_device, &bufferDesc);
+            _uniformBuffer = WgpuBuffer<GridUniforms>.CreateUniform(_wgpu, _device);
 
             var layoutEntry = new BindGroupLayoutEntry
             {
@@ -136,9 +126,9 @@ namespace XNOEdit.Renderer
             var bindEntry = new BindGroupEntry
             {
                 Binding = 0,
-                Buffer = _uniformBuffer,
+                Buffer = _uniformBuffer.Handle,
                 Offset = 0,
-                Size = 224
+                Size = _uniformBuffer.Size
             };
 
             var bindGroupDesc = new BindGroupDescriptor
@@ -279,7 +269,7 @@ namespace XNOEdit.Renderer
                 FadeEnd = fadeDistance
             };
 
-            _wgpu.QueueWriteBuffer(_queue, _uniformBuffer, 0, in uniforms, (nuint)sizeof(GridUniforms));
+            _uniformBuffer.UpdateData(_queue, in uniforms);
             _wgpu.RenderPassEncoderSetPipeline(passEncoder, _pipeline);
             uint dynamicOffset = 0;
             _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _bindGroup, 0, &dynamicOffset);
@@ -290,12 +280,10 @@ namespace XNOEdit.Renderer
         public void Dispose()
         {
             _vertexBuffer?.Dispose();
+            _uniformBuffer?.Dispose();
 
             if (_bindGroup != null)
                 _wgpu.BindGroupRelease(_bindGroup);
-
-            if (_uniformBuffer != null)
-                _wgpu.BufferRelease(_uniformBuffer);
 
             if (_bindGroupLayout != null)
                 _wgpu.BindGroupLayoutRelease(_bindGroupLayout);
