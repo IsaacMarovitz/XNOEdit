@@ -6,7 +6,7 @@ using Silk.NET.Core.Native;
 using Silk.NET.Input;
 using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
-using Buffer = Silk.NET.WebGPU.Buffer;
+using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer
 {

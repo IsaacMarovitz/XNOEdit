@@ -11,7 +11,6 @@ using Silk.NET.Windowing;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Shaders;
-using VertexFormat = Silk.NET.WebGPU.VertexFormat;
 
 namespace XNOEdit
 {
@@ -36,9 +35,9 @@ namespace XNOEdit
         private static readonly Dictionary<string, IntPtr> Textures = [];
 
         private static Camera _camera;
-        private static WgpuShader _shader;
         private static ShaderArchive _shaderArchive;
         private static Model _model;
+        private static ModelRenderer _modelRenderer;
         private static GridRenderer _grid;
         private static SkyboxRenderer _skybox;
         private static bool _wireframeMode;
@@ -104,7 +103,6 @@ namespace XNOEdit
             _alertPanel = new ImGuiAlertPanel();
             _camera = new Camera();
 
-            CreateShaders();
             CreateDepthTexture();
 
             _grid = new GridRenderer(_wgpu, _device, _queue, _surfaceFormat);
@@ -205,38 +203,6 @@ namespace XNOEdit
             };
 
             _wgpu.SurfaceConfigure(_surface, &surfaceConfig);
-        }
-
-        private static void CreateShaders()
-        {
-            var basicModelWgsl = EmbeddedResources.ReadAllText("XNOEdit/Shaders/BasicModel.wgsl");
-
-            var vertexAttributes = new VertexAttribute[]
-            {
-                new() { Format = VertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 },
-                new() { Format = VertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 },
-                new() { Format = VertexFormat.Float32x4, Offset = 24, ShaderLocation = 2 }
-            };
-
-            fixed (VertexAttribute* pAttributes = vertexAttributes)
-            {
-                var vertexLayout = new VertexBufferLayout
-                {
-                    ArrayStride = 40,
-                    StepMode = VertexStepMode.Vertex,
-                    AttributeCount = 3,
-                    Attributes = pAttributes
-                };
-
-                _shader = new WgpuShader(
-                    _wgpu,
-                    _device,
-                    _queue,
-                    basicModelWgsl,
-                    "Basic Model",
-                    _surfaceFormat,
-                    [vertexLayout]);
-            }
         }
 
         private static void CreateDepthTexture()
@@ -438,26 +404,10 @@ namespace XNOEdit
                 _grid.Draw(pass, view, projection, gridModel, _camera.Position, fadeDistance);
             }
 
-            if (_model != null && _shader != null)
+            if (_model != null && _modelRenderer != null)
             {
-                var uniforms = new BasicModelUniforms
-                {
-                    Model = Matrix4x4.Identity,
-                    View = view,
-                    Projection = projection,
-                    LightDir = _sunDirection.AsVector4(),
-                    LightColor = _sunColor.AsVector4(),
-                    ViewPos = _camera.Position,
-                    VertColorStrength = _vertexColors ? 1.0f : 0.0f
-                };
-                _shader.UpdateUniforms(uniforms);
-
-                var pipeline = _shader.GetPipeline(_backfaceCulling, _wireframeMode);
-                _wgpu.RenderPassEncoderSetPipeline(pass, pipeline);
-                uint dynamicOffset = 0;
-                _wgpu.RenderPassEncoderSetBindGroup(pass, 0, _shader.UniformBindGroup, 0, &dynamicOffset);
-
-                _model.Draw(pass, _wireframeMode);
+                _modelRenderer.Draw(pass, view, projection, _sunDirection, _sunColor, _camera.Position,
+                    _vertexColors ? 1.0f : 0.0f, _wireframeMode, _backfaceCulling);
             }
 
             _controller.Render(pass);
@@ -525,7 +475,7 @@ namespace XNOEdit
         private static void OnClose()
         {
             _model?.Dispose();
-            _shader?.Dispose();
+            _modelRenderer?.Dispose();
             _grid?.Dispose();
             _skybox?.Dispose();
             _controller?.Dispose();
@@ -687,12 +637,14 @@ namespace XNOEdit
                 }
 
                 _model?.Dispose();
+                _modelRenderer?.Dispose();
                 var objectChunk = xno.GetChunk<ObjectChunk>();
                 var effectChunk = xno.GetChunk<EffectListChunk>();
 
                 if (objectChunk != null && effectChunk != null)
                 {
                     _model = new Model(_wgpu, _device, objectChunk, effectChunk, _shaderArchive);
+                    _modelRenderer = new ModelRenderer(_wgpu, _device, _queue, _surfaceFormat, _model);
 
                     _modelCenter = objectChunk.Centre;
                     _modelRadius = objectChunk.Radius;

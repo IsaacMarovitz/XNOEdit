@@ -2,17 +2,14 @@ using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
 using Buffer = Silk.NET.WebGPU.Buffer;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Renderer.Wgpu
 {
-    public unsafe class WgpuBuffer<T> : IDisposable where T : struct
+    public unsafe class WgpuBuffer<T> : IDisposable where T : unmanaged
     {
         private readonly WebGPU _wgpu;
-        private readonly Buffer* _buffer;
-        private readonly BufferUsage _usage;
-        private readonly ulong _size;
 
-        public Buffer* Handle => _buffer;
-        public ulong Size => _size;
+        public Buffer* Handle { get; }
+        public ulong Size { get; }
 
         private const int CopyBufferAlignment = 4;
         private const int UniformBufferAlignment = 256;
@@ -23,26 +20,25 @@ namespace XNOEdit.Renderer
         public WgpuBuffer(WebGPU wgpu, Device* device, Span<T> data, BufferUsage usage)
         {
             _wgpu = wgpu;
-            _usage = usage;
 
             // Calculate size and align to COPY_BUFFER_ALIGNMENT
             var dataSize = (ulong)(data.Length * sizeof(T));
-            _size = AlignUp(dataSize, CopyBufferAlignment);
+            Size = AlignUp(dataSize, CopyBufferAlignment);
 
             var descriptor = new BufferDescriptor
             {
-                Size = _size,
+                Size = Size,
                 Usage = usage,
                 MappedAtCreation = true
             };
 
-            _buffer = wgpu.DeviceCreateBuffer(device, &descriptor);
+            Handle = wgpu.DeviceCreateBuffer(device, &descriptor);
 
             // Write initial data
-            var mappedRange = wgpu.BufferGetMappedRange(_buffer, 0, (nuint)_size);
+            var mappedRange = wgpu.BufferGetMappedRange(Handle, 0, (nuint)Size);
             var dataBytes = MemoryMarshal.AsBytes(data);
             dataBytes.CopyTo(new Span<byte>(mappedRange, (int)dataSize));
-            wgpu.BufferUnmap(_buffer);
+            wgpu.BufferUnmap(Handle);
         }
 
         /// <summary>
@@ -51,20 +47,19 @@ namespace XNOEdit.Renderer
         public WgpuBuffer(WebGPU wgpu, Device* device, BufferUsage usage, ulong size = 0, int alignment = CopyBufferAlignment)
         {
             _wgpu = wgpu;
-            _usage = usage;
 
             // Calculate size and align
             var dataSize = size == 0 ? (ulong)sizeof(T) : size;
-            _size = AlignUp(dataSize, alignment);
+            Size = AlignUp(dataSize, alignment);
 
             var descriptor = new BufferDescriptor
             {
-                Size = _size,
+                Size = Size,
                 Usage = usage,
                 MappedAtCreation = false
             };
 
-            _buffer = wgpu.DeviceCreateBuffer(device, &descriptor);
+            Handle = wgpu.DeviceCreateBuffer(device, &descriptor);
         }
 
         /// <summary>
@@ -84,7 +79,7 @@ namespace XNOEdit.Renderer
             var dataBytes = MemoryMarshal.AsBytes(data);
             fixed (byte* pData = dataBytes)
             {
-                _wgpu.QueueWriteBuffer(queue, _buffer, offset, pData, (nuint)dataBytes.Length);
+                _wgpu.QueueWriteBuffer(queue, Handle, offset, pData, (nuint)dataBytes.Length);
             }
         }
 
@@ -92,7 +87,7 @@ namespace XNOEdit.Renderer
         {
             fixed (T* pData = &data)
             {
-                _wgpu.QueueWriteBuffer(queue, _buffer, offset, pData, (nuint)sizeof(T));
+                _wgpu.QueueWriteBuffer(queue, Handle, offset, pData, (nuint)sizeof(T));
             }
         }
 
@@ -101,7 +96,7 @@ namespace XNOEdit.Renderer
             return new BindGroupEntry
             {
                 Binding = binding,
-                Buffer = _buffer,
+                Buffer = Handle,
                 Offset = offset,
                 Size = size == 0 ? (ulong)sizeof(T) : size
             };
@@ -131,10 +126,10 @@ namespace XNOEdit.Renderer
 
         public void Dispose()
         {
-            if (_buffer != null)
+            if (Handle != null)
             {
-                _wgpu.BufferDestroy(_buffer);
-                _wgpu.BufferRelease(_buffer);
+                _wgpu.BufferDestroy(Handle);
+                _wgpu.BufferRelease(Handle);
             }
         }
     }

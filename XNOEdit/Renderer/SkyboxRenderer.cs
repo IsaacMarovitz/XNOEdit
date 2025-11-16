@@ -1,6 +1,8 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
+using XNOEdit.Renderer.Builders;
+using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer
 {
@@ -16,110 +18,26 @@ namespace XNOEdit.Renderer
     public unsafe class SkyboxRenderer : IDisposable
     {
         private readonly WebGPU _wgpu;
-        private readonly Device* _device;
-        private readonly Queue* _queue;
-        private ShaderModule* _shaderModule;
-        private RenderPipeline* _pipeline;
-        private BindGroupLayout* _bindGroupLayout;
-        private BindGroup* _bindGroup;
-        private WgpuBuffer<SkyboxUniforms> _uniformBuffer;
-        private WgpuBuffer<float> _vertexBuffer;
+        private readonly WgpuShader<SkyboxUniforms> _shader;
+        private readonly WgpuBuffer<float> _vertexBuffer;
 
         public SkyboxRenderer(WebGPU wgpu, Device* device, Queue* queue, TextureFormat swapChainFormat)
         {
             _wgpu = wgpu;
-            _device = device;
-            _queue = queue;
 
-            CreateQuad();
-            CreateShaderAndPipeline(swapChainFormat);
-        }
-
-        private void CreateQuad()
-        {
             var vertices = new[]
             {
                 -1.0f, -1.0f, 0.0f,
-                 1.0f, -1.0f, 0.0f,
+                1.0f,  -1.0f, 0.0f,
                 -1.0f,  1.0f, 0.0f,
-                 1.0f,  1.0f, 0.0f
+                1.0f,   1.0f, 0.0f
             };
+            _vertexBuffer = new WgpuBuffer<float>(wgpu, device, vertices, BufferUsage.Vertex);
 
-            _vertexBuffer = new WgpuBuffer<float>(_wgpu, _device, vertices, BufferUsage.Vertex);
-        }
-
-        private void CreateShaderAndPipeline(TextureFormat swapChainFormat)
-        {
-            var skyboxWgsl = EmbeddedResources.ReadAllText("XNOEdit/Shaders/Skybox.wgsl");
-            var shaderBytes = System.Text.Encoding.UTF8.GetBytes(skyboxWgsl + "\0");
-
-            fixed (byte* pShader = shaderBytes)
-            {
-                var wgslDesc = new ShaderModuleWGSLDescriptor
-                {
-                    Chain = new ChainedStruct { SType = SType.ShaderModuleWgslDescriptor },
-                    Code = pShader
-                };
-
-                var shaderDesc = new ShaderModuleDescriptor
-                {
-                    NextInChain = (ChainedStruct*)&wgslDesc
-                };
-
-                _shaderModule = _wgpu.DeviceCreateShaderModule(_device, &shaderDesc);
-            }
-
-            _uniformBuffer = WgpuBuffer<SkyboxUniforms>.CreateUniform(_wgpu, _device);
-
-            var layoutEntry = new BindGroupLayoutEntry
-            {
-                Binding = 0,
-                Visibility = ShaderStage.Vertex | ShaderStage.Fragment,
-                Buffer = new BufferBindingLayout
-                {
-                    Type = BufferBindingType.Uniform,
-                    MinBindingSize = 0
-                }
-            };
-
-            var layoutDesc = new BindGroupLayoutDescriptor
-            {
-                EntryCount = 1,
-                Entries = &layoutEntry
-            };
-            _bindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_device, &layoutDesc);
-
-            var bindEntry = new BindGroupEntry
-            {
-                Binding = 0,
-                Buffer = _uniformBuffer.Handle,
-                Offset = 0,
-                Size = _uniformBuffer.Size
-            };
-
-            var bindGroupDesc = new BindGroupDescriptor
-            {
-                Layout = _bindGroupLayout,
-                EntryCount = 1,
-                Entries = &bindEntry
-            };
-            _bindGroup = _wgpu.DeviceCreateBindGroup(_device, &bindGroupDesc);
-
-            var layouts = _bindGroupLayout;
-            var pipelineLayoutDesc = new PipelineLayoutDescriptor
-            {
-                BindGroupLayoutCount = 1,
-                BindGroupLayouts = &layouts
-            };
-            var pipelineLayout = _wgpu.DeviceCreatePipelineLayout(_device, &pipelineLayoutDesc);
-
-            var vertexEntry = "vs_main\0"u8.ToArray();
-            var fragmentEntry = "fs_main\0"u8.ToArray();
-
-            VertexAttribute* vertexAttrib = stackalloc VertexAttribute[1];
+            var vertexAttrib = stackalloc VertexAttribute[1];
             vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 };
 
-            var vbLayout = new VertexBufferLayout
+            var vertexLayout = new VertexBufferLayout
             {
                 ArrayStride = 12,
                 StepMode = VertexStepMode.Vertex,
@@ -127,77 +45,19 @@ namespace XNOEdit.Renderer
                 Attributes = vertexAttrib
             };
 
-            var colorTarget = new ColorTargetState
-            {
-                Format = swapChainFormat,
-                WriteMask = ColorWriteMask.All,
-                Blend = null
-            };
+            var pipelineBuilder = new RenderPipelineBuilder(wgpu, device, swapChainFormat)
+                .WithTopology(PrimitiveTopology.TriangleStrip)
+                .WithDepth(write: false, compare: CompareFunction.Always);
 
-            fixed (byte* pVertexEntry = vertexEntry)
-            fixed (byte* pFragmentEntry = fragmentEntry)
-            {
-                var fragmentState = new FragmentState
-                {
-                    Module = _shaderModule,
-                    EntryPoint = pFragmentEntry,
-                    TargetCount = 1,
-                    Targets = &colorTarget
-                };
-
-                var depthStencil = new DepthStencilState
-                {
-                    Format = TextureFormat.Depth24Plus,
-                    DepthWriteEnabled = false,
-                    DepthCompare = CompareFunction.Always,
-                    StencilFront = new StencilFaceState
-                    {
-                        Compare = CompareFunction.Always,
-                        FailOp = StencilOperation.Keep,
-                        DepthFailOp = StencilOperation.Keep,
-                        PassOp = StencilOperation.Keep
-                    },
-                    StencilBack = new StencilFaceState
-                    {
-                        Compare = CompareFunction.Always,
-                        FailOp = StencilOperation.Keep,
-                        DepthFailOp = StencilOperation.Keep,
-                        PassOp = StencilOperation.Keep
-                    },
-                    StencilReadMask = 0xFFFFFFFF,
-                    StencilWriteMask = 0xFFFFFFFF
-                };
-
-                var pipelineDesc = new RenderPipelineDescriptor
-                {
-                    Layout = pipelineLayout,
-                    Vertex = new VertexState
-                    {
-                        Module = _shaderModule,
-                        EntryPoint = pVertexEntry,
-                        BufferCount = 1,
-                        Buffers = &vbLayout
-                    },
-                    Primitive = new PrimitiveState
-                    {
-                        Topology = PrimitiveTopology.TriangleStrip,
-                        FrontFace = FrontFace.Ccw,
-                        CullMode = CullMode.None
-                    },
-                    DepthStencil = &depthStencil,
-                    Multisample = new MultisampleState
-                    {
-                        Count = 1,
-                        Mask = ~0u,
-                        AlphaToCoverageEnabled = false
-                    },
-                    Fragment = &fragmentState
-                };
-
-                _pipeline = _wgpu.DeviceCreateRenderPipeline(_device, &pipelineDesc);
-            }
-
-            _wgpu.PipelineLayoutRelease(pipelineLayout);
+            _shader = new WgpuShader<SkyboxUniforms>(
+                wgpu,
+                device,
+                queue,
+                EmbeddedResources.ReadAllText("XNOEdit/Shaders/Skybox.wgsl"),
+                "Skybox",
+                swapChainFormat,
+                [vertexLayout],
+                pipelineBuilder);
         }
 
         public void Draw(
@@ -215,10 +75,11 @@ namespace XNOEdit.Renderer
                 SunColor = sunColor.AsVector4()
             };
 
-            _uniformBuffer.UpdateData(_queue, in uniforms);
-            _wgpu.RenderPassEncoderSetPipeline(passEncoder, _pipeline);
+            _shader.UpdateUniforms(in uniforms);
+            _wgpu.RenderPassEncoderSetPipeline(passEncoder, _shader.GetPipeline());
+
             uint dynamicOffset = 0;
-            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _bindGroup, 0, &dynamicOffset);
+            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _shader.UniformBindGroup, 0, &dynamicOffset);
             _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
             _wgpu.RenderPassEncoderDraw(passEncoder, 4, 1, 0, 0);
         }
@@ -226,19 +87,7 @@ namespace XNOEdit.Renderer
         public void Dispose()
         {
             _vertexBuffer?.Dispose();
-            _uniformBuffer?.Dispose();
-
-            if (_bindGroup != null)
-                _wgpu.BindGroupRelease(_bindGroup);
-
-            if (_bindGroupLayout != null)
-                _wgpu.BindGroupLayoutRelease(_bindGroupLayout);
-
-            if (_pipeline != null)
-                _wgpu.RenderPipelineRelease(_pipeline);
-
-            if (_shaderModule != null)
-                _wgpu.ShaderModuleRelease(_shaderModule);
+            _shader?.Dispose();
         }
     }
 }

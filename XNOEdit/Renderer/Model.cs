@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
+using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Shaders;
 
 namespace XNOEdit.Renderer
