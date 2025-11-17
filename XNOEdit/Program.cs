@@ -117,9 +117,7 @@ namespace XNOEdit
         {
             _wgpu = WebGPU.GetApi();
             _device = new WgpuDevice(_wgpu, _window);
-
             _queue = _wgpu.DeviceGetQueue(_device);
-
         }
 
         private static void CreateDepthTexture()
@@ -490,10 +488,10 @@ namespace XNOEdit
                             var rgbaData = new byte[image.Width * image.Height * 4];
                             for (int i = 0, j = 0; i < imageData.Length; i += 3, j += 4)
                             {
-                                rgbaData[j] = imageData[i];     // R
+                                rgbaData[j] = imageData[i];         // R
                                 rgbaData[j + 1] = imageData[i + 1]; // G
                                 rgbaData[j + 2] = imageData[i + 2]; // B
-                                rgbaData[j + 3] = 255;          // A
+                                rgbaData[j + 3] = 255;              // A
                             }
                             imageData = rgbaData;
                         }
