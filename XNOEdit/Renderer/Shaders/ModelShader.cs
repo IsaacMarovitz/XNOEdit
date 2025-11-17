@@ -11,9 +11,9 @@ namespace XNOEdit.Renderer.Shaders
         public Matrix4x4 Model;
         public Matrix4x4 View;
         public Matrix4x4 Projection;
-        public Vector4 LightDir;
-        public Vector4 LightColor;
-        public Vector3 ViewPos;
+        public Vector4 SunDirection;
+        public Vector4 SunColor;
+        public Vector3 Position;
         public float VertColorStrength;
     }
 
@@ -22,13 +22,12 @@ namespace XNOEdit.Renderer.Shaders
         public ModelShader(
             WebGPU wgpu,
             WgpuDevice device,
-            string shaderSource,
-            string label)
+            string shaderSource)
             : base(
                 wgpu,
                 device,
                 shaderSource,
-                label,
+                "Model Shader",
                 pipelineVariants: new Dictionary<string, PipelineVariantDescriptor>
                 {
                     ["default"] = new()

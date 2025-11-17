@@ -9,6 +9,7 @@ using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
+using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Shaders;
 
@@ -310,19 +311,37 @@ namespace XNOEdit
 
             var pass = _wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
 
-            _skybox.Draw(_queue, pass, view, projection, _sunDirection, _sunColor);
+            _skybox.Draw(_queue, pass, view, projection,
+                new SkyboxParameters
+                {
+                    SunDirection =  _sunDirection,
+                    SunColor = _sunColor
+                });
 
             if (_showGrid)
             {
-                var gridModel = Matrix4x4.CreateTranslation(_modelCenter);
-                var fadeDistance = _modelRadius * 5.0f;
-                _grid.Draw(_queue, pass, view, projection, gridModel, _camera.Position, fadeDistance);
+                _grid.Draw(_queue, pass, view, projection,
+                    new GridParameters
+                    {
+                        Model = Matrix4x4.CreateTranslation(_modelCenter),
+                        Position = _camera.Position,
+                        FadeDistance = _modelRadius * 5.0f
+
+                    });
             }
 
             if (_model != null && _modelRenderer != null)
             {
-                _modelRenderer.Draw(_queue, pass, view, projection, _sunDirection, _sunColor, _camera.Position,
-                    _vertexColors ? 1.0f : 0.0f, _wireframeMode, _backfaceCulling);
+                _modelRenderer.Draw(_queue, pass, view, projection,
+                    new ModelParameters
+                    {
+                        SunDirection = _sunDirection,
+                        SunColor = _sunColor,
+                        Position =  _camera.Position,
+                        VertColorStrength = _vertexColors ? 1.0f : 0.0f,
+                        Wireframe = _wireframeMode,
+                        CullBackfaces =  _backfaceCulling
+                    });
             }
 
             _controller.Render(pass);

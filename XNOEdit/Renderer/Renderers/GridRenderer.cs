@@ -3,30 +3,34 @@ using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Renderer.Renderers
 {
-    public unsafe class GridRenderer : IDisposable
+    public struct GridParameters
     {
-        private readonly WebGPU _wgpu;
-        private readonly WgpuShader<GridUniforms> _shader;
+        public Matrix4x4 Model;
+        public Vector3 Position;
+        public float FadeDistance;
+    }
+
+    public unsafe class GridRenderer : WgpuRenderer<GridParameters>
+    {
         private readonly WgpuBuffer<float> _vertexBuffer;
         private readonly int _lineCount;
 
         public GridRenderer(WebGPU wgpu, WgpuDevice device, float size = 100.0f, int divisions = 100)
+            : base(wgpu, CreateShader(wgpu, device))
         {
-            _wgpu = wgpu;
-
             var vertices = CreateGridVertices(size, divisions);
             _lineCount = (divisions + 1) * 2 * 2;
             _vertexBuffer = new WgpuBuffer<float>(wgpu, device, vertices, BufferUsage.Vertex);
-
-            _shader = new GridShader(
-                wgpu,
-                device,
-                EmbeddedResources.ReadAllText("XNOEdit/Shaders/Grid.wgsl"));
         }
 
-        private float[] CreateGridVertices(float size, int divisions)
+        private static GridShader CreateShader(WebGPU wgpu, WgpuDevice device)
+        {
+            return new GridShader(wgpu, device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/Grid.wgsl"));
+        }
+
+        private static float[] CreateGridVertices(float size, int divisions)
         {
             var vertices = new List<float>();
             var step = size / divisions;
@@ -57,38 +61,37 @@ namespace XNOEdit.Renderer
             return vertices.ToArray();
         }
 
-        public void Draw(
+        public override void Draw(
             Queue* queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
-            Matrix4x4 model,
-            Vector3 cameraPos,
-            float fadeDistance)
+            GridParameters gridParameters)
         {
             var uniforms = new GridUniforms
             {
-                Model = model,
+                Model = gridParameters.Model,
                 View = view,
                 Projection = projection,
-                CameraPos = cameraPos,
-                FadeStart = fadeDistance * 0.6f,
-                FadeEnd = fadeDistance
+                CameraPos = gridParameters.Position,
+                FadeStart = gridParameters.FadeDistance * 0.6f,
+                FadeEnd = gridParameters.FadeDistance
             };
 
-            _shader.UpdateUniforms(queue, in uniforms);
-            _wgpu.RenderPassEncoderSetPipeline(passEncoder, _shader.GetPipeline());
+            ((GridShader)Shader).UpdateUniforms(queue, in uniforms);
+            Wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline());
 
             uint dynamicOffset = 0;
-            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _shader.BindGroup, 0, &dynamicOffset);
-            _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
-            _wgpu.RenderPassEncoderDraw(passEncoder, (uint)_lineCount, 1, 0, 0);
+            Wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, Shader.BindGroup, 0, &dynamicOffset);
+            Wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
+            Wgpu.RenderPassEncoderDraw(passEncoder, (uint)_lineCount, 1, 0, 0);
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             _vertexBuffer?.Dispose();
-            _shader?.Dispose();
+
+            base.Dispose();
         }
     }
 }
