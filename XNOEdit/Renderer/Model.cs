@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Runtime.InteropServices;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
@@ -8,18 +7,6 @@ using XNOEdit.Shaders;
 
 namespace XNOEdit.Renderer
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct BasicModelUniforms
-    {
-        public Matrix4x4 Model;
-        public Matrix4x4 View;
-        public Matrix4x4 Projection;
-        public Vector4 LightDir;
-        public Vector4 LightColor;
-        public Vector3 ViewPos;
-        public float VertColorStrength;
-    }
-
     public unsafe class Model : IDisposable
     {
         private readonly WebGPU _wgpu;
@@ -27,11 +14,13 @@ namespace XNOEdit.Renderer
         private readonly List<ModelMesh> _meshes = [];
         private readonly Dictionary<int, WgpuBuffer<float>> _sharedVertexBuffers = new();
         private readonly ShaderArchive _shaderArchive;
+        private readonly BasicModelUniforms _uniforms;
 
         public Model(
             WebGPU wgpu,
             Device* device,
             ObjectChunk objectChunk,
+            TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
             ShaderArchive shaderArchive)
         {
@@ -39,10 +28,10 @@ namespace XNOEdit.Renderer
             _device = device;
             _shaderArchive = shaderArchive;
 
-            LoadModel(objectChunk, effectListChunk);
+            LoadModel(objectChunk, textureListChunk, effectListChunk);
         }
 
-        private void LoadModel(ObjectChunk objectChunk, EffectListChunk effectListChunk)
+        private void LoadModel(ObjectChunk objectChunk, TextureListChunk textureListChunk, EffectListChunk effectListChunk)
         {
             // Create shared vertex buffers for each unique VertexList
             for (var i = 0; i < objectChunk.VertexLists.Count; i++)
@@ -91,6 +80,14 @@ namespace XNOEdit.Renderer
 
             foreach (var subObject in objectChunk.SubObjects)
             {
+                var textures = textureListChunk.Textures
+                    .Select((tex, i) => new { Tex = tex, Index = i })
+                    .Where(i => subObject.TextureIndices.Contains(i.Index))
+                    .Select(i => i.Tex)
+                    .ToList();
+
+                IntuitTextures(textures);
+
                 foreach (var meshSet in subObject.MeshSets)
                 {
                     var vertexListIndex = meshSet.VertexListIndex;
@@ -118,6 +115,71 @@ namespace XNOEdit.Renderer
             }
 
             Console.WriteLine($"Loaded {_sharedVertexBuffers.Count} vertex buffers, {_meshes.Count} meshes");
+        }
+
+        private static void IntuitTextures(List<TextureFile> textures)
+        {
+            // Adapted from Beatz
+            int FindDiffuseIndex(string lowerName, out string mainTag)
+            {
+                string[] diffuseTags = ["_dfxx", "_dfsp", "_dfpt", "_df"]; // Order matters, longer first
+                foreach (var tag in diffuseTags)
+                {
+                    var idx = lowerName.IndexOf(tag);
+                    if (idx >= 0)
+                    {
+                        mainTag = tag;
+                        return idx;
+                    }
+                }
+
+                mainTag = null;
+                return -1;
+            }
+
+            var diffuseTextures = textures.Where(t =>
+            {
+                var lower = t.Name.ToLowerInvariant();
+                return FindDiffuseIndex(lower, out _) >= 0;
+            }).ToList();
+
+            var mainTextureName = diffuseTextures.FirstOrDefault()?.Name;
+            var blendMapName = diffuseTextures.Count > 1 ? diffuseTextures.Last().Name : null;
+
+            var normalMapName = textures.FirstOrDefault(t =>
+            {
+                var lower = t.Name.ToLowerInvariant();
+                return lower.Contains("_ntxx") || lower.Contains("_nw") || lower.Contains("_nt");
+            })?.Name;
+
+            var lightMapName = textures.FirstOrDefault(t =>
+            {
+                var lower = t.Name.ToLowerInvariant();
+                return lower.Contains("_lm") || lower.Contains("_zlm");
+            })?.Name;
+
+            // Fallback main tex if no diffuse found
+            if (mainTextureName == null)
+            {
+                mainTextureName = textures.FirstOrDefault(t =>
+                    !t.Name.ToLowerInvariant().Contains("_lm") &&
+                    !t.Name.ToLowerInvariant().Contains("_zlm") &&
+                    !t.Name.ToLowerInvariant().Contains("_ntxx") &&
+                    !t.Name.ToLowerInvariant().Contains("_nw") &&
+                    !t.Name.ToLowerInvariant().Contains("_nt"))?.Name ?? textures.FirstOrDefault()?.Name;
+            }
+
+            if (mainTextureName != null)
+                Console.WriteLine($"Main Texture: {mainTextureName}");
+
+            if (blendMapName != null)
+                Console.WriteLine($"Blend Map: {blendMapName}");
+
+            if (normalMapName != null)
+                Console.WriteLine($"Normal Map: {normalMapName}");
+
+            if (lightMapName != null)
+                Console.WriteLine($"Light Map: {lightMapName}");
         }
 
         public void Draw(RenderPassEncoder* passEncoder, bool wireframe)

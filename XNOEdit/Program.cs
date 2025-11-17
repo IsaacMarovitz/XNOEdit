@@ -643,7 +643,7 @@ namespace XNOEdit
 
                 if (objectChunk != null && effectChunk != null)
                 {
-                    _model = new Model(_wgpu, _device, objectChunk, effectChunk, _shaderArchive);
+                    _model = new Model(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
                     _modelRenderer = new ModelRenderer(_wgpu, _device, _queue, _surfaceFormat, _model);
 
                     _modelCenter = objectChunk.Centre;

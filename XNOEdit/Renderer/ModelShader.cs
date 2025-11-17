@@ -1,10 +1,24 @@
+using System.Numerics;
+using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Builders;
 using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer
 {
-    public unsafe class ModelShader : WgpuShader<BasicModelUniforms>
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct BasicModelUniforms
+    {
+        public Matrix4x4 Model;
+        public Matrix4x4 View;
+        public Matrix4x4 Projection;
+        public Vector4 LightDir;
+        public Vector4 LightColor;
+        public Vector3 ViewPos;
+        public float VertColorStrength;
+    }
+
+    public unsafe class ModelShader : WgpuShader<BasicModelUniforms>, IDisposable
     {
         private readonly WebGPU _wgpu;
         private readonly RenderPipeline* _pipelineSolidNoCull;
@@ -55,13 +69,13 @@ namespace XNOEdit.Renderer
 
         public override void Dispose()
         {
-            if (_pipelineSolidNoCull != null && _pipelineSolidNoCull != Pipeline)
+            if (_pipelineSolidNoCull != null)
                 _wgpu.RenderPipelineRelease(_pipelineSolidNoCull);
 
-            if (_pipelineSolidCull != null && _pipelineSolidCull != Pipeline)
+            if (_pipelineSolidCull != null)
                 _wgpu.RenderPipelineRelease(_pipelineSolidCull);
 
-            if (_pipelineWireframe != null && _pipelineWireframe != Pipeline)
+            if (_pipelineWireframe != null)
                 _wgpu.RenderPipelineRelease(_pipelineWireframe);
 
             base.Dispose();

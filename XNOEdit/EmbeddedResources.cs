@@ -32,12 +32,10 @@ namespace XNOEdit
 
         public static Stream GetStream(Assembly assembly, string filename)
         {
-            // Assumes one namespace per assembly
-            var @namespace = assembly.GetTypes()[0].Namespace;
-            var manifestUri = @namespace + "." + filename.Replace('/', '.');
+            var assemblyName = assembly.GetName().Name;
+            var manifestUri = assemblyName + "." + filename.Replace('/', '.');
 
             var stream = assembly.GetManifestResourceStream(manifestUri);
-
             return stream!;
         }
 

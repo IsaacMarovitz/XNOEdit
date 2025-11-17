@@ -3,7 +3,7 @@ using Silk.NET.WebGPU;
 
 namespace XNOEdit.Renderer
 {
-    public unsafe class ModelRenderer
+    public unsafe class ModelRenderer : IDisposable
     {
         private readonly WebGPU _wgpu;
         private readonly ModelShader _shader;

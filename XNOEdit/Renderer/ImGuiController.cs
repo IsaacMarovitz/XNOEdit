@@ -276,7 +276,7 @@ namespace XNOEdit.Renderer
             _imageBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_device, in imageBgLayoutDesc);
         }
 
-        public void InitPipeline()
+        private void InitPipeline()
         {
             if (_renderPipeline != null)
                 _wgpu.RenderPipelineRelease(_renderPipeline);
