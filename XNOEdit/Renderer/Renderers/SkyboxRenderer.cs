@@ -41,6 +41,8 @@ namespace XNOEdit.Renderer.Renderers
             Matrix4x4 projection,
             SkyboxParameters skyboxParameters)
         {
+            base.Draw(queue, passEncoder, view, projection, skyboxParameters);
+
             var uniforms = new SkyboxUniforms
             {
                 View = view,
@@ -51,9 +53,6 @@ namespace XNOEdit.Renderer.Renderers
 
             ((SkyboxShader)Shader).UpdateUniforms(queue, in uniforms);
             Wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline());
-
-            uint dynamicOffset = 0;
-            Wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, Shader.BindGroup, 0, &dynamicOffset);
             Wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
             Wgpu.RenderPassEncoderDraw(passEncoder, 4, 1, 0, 0);
         }

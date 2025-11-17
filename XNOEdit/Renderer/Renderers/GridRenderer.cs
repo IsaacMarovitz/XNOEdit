@@ -68,6 +68,8 @@ namespace XNOEdit.Renderer.Renderers
             Matrix4x4 projection,
             GridParameters gridParameters)
         {
+            base.Draw(queue, passEncoder, view, projection, gridParameters);
+
             var uniforms = new GridUniforms
             {
                 Model = gridParameters.Model,
@@ -80,9 +82,6 @@ namespace XNOEdit.Renderer.Renderers
 
             ((GridShader)Shader).UpdateUniforms(queue, in uniforms);
             Wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline());
-
-            uint dynamicOffset = 0;
-            Wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, Shader.BindGroup, 0, &dynamicOffset);
             Wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
             Wgpu.RenderPassEncoderDraw(passEncoder, (uint)_lineCount, 1, 0, 0);
         }

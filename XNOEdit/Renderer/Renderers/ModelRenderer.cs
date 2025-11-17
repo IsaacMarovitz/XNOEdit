@@ -37,6 +37,8 @@ namespace XNOEdit.Renderer.Renderers
             Matrix4x4 projection,
             ModelParameters modelParameters)
         {
+            base.Draw(queue, passEncoder, view, projection, modelParameters);
+
             var uniforms = new BasicModelUniforms
             {
                 Model = Matrix4x4.Identity,
@@ -52,9 +54,6 @@ namespace XNOEdit.Renderer.Renderers
 
             var pipeline = ((ModelShader)Shader).GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
             Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
-
-            uint dynamicOffset = 0;
-            Wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, Shader.BindGroup, 0, &dynamicOffset);
 
             _model.Draw(passEncoder, modelParameters.Wireframe);
         }

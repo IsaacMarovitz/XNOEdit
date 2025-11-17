@@ -14,12 +14,16 @@ namespace XNOEdit.Renderer.Wgpu
             Shader = shader;
         }
 
-        public abstract void Draw(
+        public virtual void Draw(
             Queue* queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
-            TParameters parameters);
+            TParameters parameters)
+        {
+            uint dynamicOffset = 0;
+            Wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, Shader.BindGroup, 0, &dynamicOffset);
+        }
 
         public virtual void Dispose()
         {
