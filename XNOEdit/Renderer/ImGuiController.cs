@@ -18,7 +18,6 @@ namespace XNOEdit.Renderer
         private readonly Queue* _queue;
         private readonly IView _view;
         private readonly IInputContext _inputContext;
-        private readonly TextureFormat? _depthFormat;
         private readonly uint _framesInFlight;
 
         private ShaderModule* _shaderModule;
@@ -46,14 +45,12 @@ namespace XNOEdit.Renderer
             WgpuDevice device,
             IView view,
             IInputContext inputContext,
-            uint framesInFlight,
-            TextureFormat? depthFormat)
+            uint framesInFlight)
         {
             _wgpu = wgpu;
             _device = device;
             _view = view;
             _inputContext = inputContext;
-            _depthFormat = depthFormat;
             _framesInFlight = framesInFlight;
             _queue = _wgpu.DeviceGetQueue(_device);
 
@@ -328,12 +325,8 @@ namespace XNOEdit.Renderer
                 .WithTopology(PrimitiveTopology.TriangleList)
                 .WithCulling(CullMode.None)
                 .WithVertexLayout(vbLayout)
-                .WithShader(_shaderModule);
-
-            if (_depthFormat != null)
-            {
-                pipelineBuilder = pipelineBuilder.WithDepth(_depthFormat.Value, false, CompareFunction.Always);
-            }
+                .WithShader(_shaderModule)
+                .WithDepth(false, CompareFunction.Always);
 
             _renderPipeline = pipelineBuilder;
         }

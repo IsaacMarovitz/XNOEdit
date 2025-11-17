@@ -19,12 +19,13 @@ namespace XNOEdit.Renderer.Builders
         private readonly List<IntPtr> _bindGroupLayouts = [];
 
         private bool _hasDepth;
-        private TextureFormat _depthFormat = TextureFormat.Depth24Plus;
         private bool _depthWrite = true;
         private CompareFunction _depthCompare = CompareFunction.Less;
 
         private bool _hasBlend;
         private BlendState _blendState;
+
+        private const TextureFormat DepthTextureFormat = TextureFormat.Depth24Plus;
 
         public RenderPipelineBuilder(WebGPU wgpu, WgpuDevice device)
         {
@@ -79,12 +80,10 @@ namespace XNOEdit.Renderer.Builders
         }
 
         public RenderPipelineBuilder WithDepth(
-            TextureFormat format = TextureFormat.Depth24Plus,
             bool write = true,
             CompareFunction compare = CompareFunction.Less)
         {
             _hasDepth = true;
-            _depthFormat = format;
             _depthWrite = write;
             _depthCompare = compare;
             return this;
@@ -201,7 +200,7 @@ namespace XNOEdit.Renderer.Builders
                 {
                     depthStencil = new DepthStencilState
                     {
-                        Format = _depthFormat,
+                        Format = DepthTextureFormat,
                         DepthWriteEnabled = _depthWrite,
                         DepthCompare = _depthCompare,
                         StencilFront = new StencilFaceState

@@ -38,6 +38,8 @@ namespace XNOEdit
         private static RenderSettings _settings = new();
         private static readonly UIManager UIManager = new();
 
+        private const TextureFormat DepthTextureFormat = TextureFormat.Depth24Plus;
+
         private static void Main()
         {
             var options = WindowOptions.Default with
@@ -88,7 +90,7 @@ namespace XNOEdit
             UIManager.OnLoad(
                 _wgpu,
                 _device,
-                new ImGuiController(_wgpu, _device, _window, _input, 2, TextureFormat.Depth24Plus),
+                new ImGuiController(_wgpu, _device, _window, _input, 2),
                 _settings);
 
             UIManager.ResetCameraAction +=  ResetCamera;
@@ -111,7 +113,7 @@ namespace XNOEdit
                 MipLevelCount = 1,
                 SampleCount = 1,
                 Dimension = TextureDimension.Dimension2D,
-                Format = TextureFormat.Depth24Plus,
+                Format = DepthTextureFormat,
                 Usage = TextureUsage.RenderAttachment
             };
 
@@ -119,7 +121,7 @@ namespace XNOEdit
 
             var depthViewDesc = new TextureViewDescriptor
             {
-                Format = TextureFormat.Depth24Plus,
+                Format = DepthTextureFormat,
                 Dimension = TextureViewDimension.Dimension2D,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,

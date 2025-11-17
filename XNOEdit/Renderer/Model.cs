@@ -15,7 +15,6 @@ namespace XNOEdit.Renderer
         private readonly List<ModelMesh> _meshes = [];
         private readonly Dictionary<int, WgpuBuffer<float>> _sharedVertexBuffers = new();
         private readonly ShaderArchive _shaderArchive;
-        private readonly BasicModelUniforms _uniforms;
 
         public Model(
             WebGPU wgpu,

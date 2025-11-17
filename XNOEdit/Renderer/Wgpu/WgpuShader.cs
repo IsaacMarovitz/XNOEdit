@@ -67,7 +67,7 @@ namespace XNOEdit.Renderer.Wgpu
                 .WithVertexLayouts(_vertexLayouts)
                 .WithTopology(descriptor.Topology)
                 .WithCulling(descriptor.CullMode, descriptor.FrontFace)
-                .WithDepth(TextureFormat.Depth24Plus, descriptor.DepthWrite, descriptor.DepthCompare);
+                .WithDepth(descriptor.DepthWrite, descriptor.DepthCompare);
 
             if (descriptor.AlphaBlend)
                 builder.WithAlphaBlend();
