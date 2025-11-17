@@ -111,10 +111,10 @@ namespace XNOEdit.Panels
 
                             var power = material.Colour.Power;
 
-                            ImGui.InputFloat4("Ambient", ref ambient, "%.1f", ImGuiInputTextFlags.ReadOnly);
-                            ImGui.InputFloat4("Diffuse", ref diffuse, "%.1f", ImGuiInputTextFlags.ReadOnly);
-                            ImGui.InputFloat4("Specular", ref specular, "%.1f", ImGuiInputTextFlags.ReadOnly);
-                            ImGui.InputFloat4("Emissive", ref emissive, "%.1f", ImGuiInputTextFlags.ReadOnly);
+                            ImGui.ColorEdit4("Ambient", ref ambient, ImGuiColorEditFlags.NoInputs);
+                            ImGui.ColorEdit4("Diffuse", ref diffuse, ImGuiColorEditFlags.NoInputs);
+                            ImGui.ColorEdit4("Specular", ref specular, ImGuiColorEditFlags.NoInputs);
+                            ImGui.ColorEdit4("Emissive", ref emissive, ImGuiColorEditFlags.NoInputs);
                             ImGui.InputFloat("Power", ref power, 0f, 0f, "%.1f", ImGuiInputTextFlags.ReadOnly);
                         }
                         ImGui.PopID();

@@ -45,8 +45,7 @@ namespace XNOEdit.Renderer.Wgpu
                 Pipeline = pipelineBuilder
                     .WithShader(ShaderModule)
                     .WithBindGroupLayout(BindGroupLayout)
-                    .WithVertexLayouts(vertexLayouts)
-                    .Build();
+                    .WithVertexLayouts(vertexLayouts);
             }
             else
             {
@@ -55,8 +54,7 @@ namespace XNOEdit.Renderer.Wgpu
                     .WithBindGroupLayout(BindGroupLayout)
                     .WithVertexLayouts(vertexLayouts)
                     .WithDepth()
-                    .WithAlphaBlend()
-                    .Build();
+                    .WithAlphaBlend();
             }
         }
 

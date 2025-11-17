@@ -11,8 +11,6 @@ namespace XNOEdit.Panels
 
         public void TriggerAlert(string message)
         {
-            Console.WriteLine($"[ALERT]: {message}");
-
             _timer = 0;
             _currentMessage = message;
         }

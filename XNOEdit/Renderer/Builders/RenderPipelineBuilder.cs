@@ -33,6 +33,8 @@ namespace XNOEdit.Renderer.Builders
             _colorFormat = colorFormat;
         }
 
+        public static implicit operator RenderPipeline*(RenderPipelineBuilder b) => b.Build();
+
         public RenderPipelineBuilder WithShader(ShaderModule* module)
         {
             _shaderModule = module;

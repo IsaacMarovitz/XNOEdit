@@ -32,18 +32,15 @@ namespace XNOEdit.Renderer
 
             _pipelineSolidNoCull = baseBuilder
                 .WithTopology(PrimitiveTopology.TriangleList)
-                .WithCulling(CullMode.None, FrontFace.CW)
-                .Build();
+                .WithCulling(CullMode.None, FrontFace.CW);
 
             _pipelineSolidCull = baseBuilder
                 .WithTopology(PrimitiveTopology.TriangleList)
-                .WithCulling(CullMode.Back, FrontFace.CW)
-                .Build();
+                .WithCulling(CullMode.Back, FrontFace.CW);
 
             _pipelineWireframe = baseBuilder
                 .WithTopology(PrimitiveTopology.LineList)
-                .WithCulling(CullMode.None)
-                .Build();
+                .WithCulling(CullMode.None);
 
             Pipeline = _pipelineSolidNoCull;
         }
