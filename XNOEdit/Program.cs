@@ -2,12 +2,10 @@
 using ImGuiNET;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
-using Pfim;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
-using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Wgpu;
@@ -25,11 +23,7 @@ namespace XNOEdit
         private static TextureView* _depthTextureView;
 
         private static IKeyboard _primaryKeyboard;
-        private static ImGuiController _controller;
-        private static ImGuiXnoPanel _xnoPanel;
-        private static ImGuiAlertPanel _alertPanel;
         private static IInputContext _input;
-        private static readonly Dictionary<string, IntPtr> Textures = [];
 
         private static Camera _camera;
         private static ShaderArchive _shaderArchive;
@@ -37,21 +31,12 @@ namespace XNOEdit
         private static ModelRenderer _modelRenderer;
         private static GridRenderer _grid;
         private static SkyboxRenderer _skybox;
-        private static bool _wireframeMode;
-        private static bool _showGrid = true;
-        private static bool _vertexColors = true;
-        private static bool _backfaceCulling;
         private static bool _mouseCaptured;
-        private static bool _xnoWindow = true;
-        private static bool _environmentWindow = true;
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
-        private static Vector3 _sunDirection = Vector3.Normalize(new Vector3(0.5f, 0.5f, 0.5f));
-        private static Vector3 _sunColor = Vector3.Normalize(new Vector3(1.0f, 0.95f, 0.8f));
         private static Vector2 _lastMousePosition;
-
-        private static float _sunAzimuth;
-        private static float _sunAltitude;
+        private static RenderSettings _settings = new();
+        private static readonly UIManager UIManager = new();
 
         private static void Main()
         {
@@ -95,23 +80,18 @@ namespace XNOEdit
             }
 
             InitializeWgpu();
-
-            _controller = new ImGuiController(_wgpu, _device, _window, _input, 2, TextureFormat.Depth24Plus);
-            _alertPanel = new ImGuiAlertPanel();
-            _camera = new Camera();
-
             CreateDepthTexture();
 
+            _camera = new Camera();
             _grid = new GridRenderer(_wgpu, _device);
             _skybox = new SkyboxRenderer(_wgpu, _device);
+            UIManager.OnLoad(
+                _wgpu,
+                _device,
+                new ImGuiController(_wgpu, _device, _window, _input, 2, TextureFormat.Depth24Plus),
+                _settings);
 
-            _sunAltitude = MathF.Asin(_sunDirection.Y) * 180.0f / MathF.PI;
-            _sunAzimuth = MathF.Atan2(_sunDirection.Z, _sunDirection.X) * 180.0f / MathF.PI;
-
-            if (_sunAzimuth < 0)
-                _sunAzimuth += 360.0f;
-
-            ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
+            UIManager.ResetCameraAction +=  ResetCamera;
         }
 
         private static void InitializeWgpu()
@@ -181,83 +161,6 @@ namespace XNOEdit
 
         private static void OnRender(double deltaTime)
         {
-            _controller.Update((float)deltaTime);
-
-            ImGui.DockSpaceOverViewport(0, ImGui.GetMainViewport(), ImGuiDockNodeFlags.PassthruCentralNode | ImGuiDockNodeFlags.NoDockingOverCentralNode);
-
-            if (ImGui.BeginMainMenuBar())
-            {
-                if (ImGui.BeginMenu("Render"))
-                {
-                    ImGui.PushItemFlag(ImGuiItemFlags.AutoClosePopups, false);
-
-                    ImGui.MenuItem("Show Grid", "G", ref _showGrid);
-                    ImGui.MenuItem("Vertex Colors", "V", ref _vertexColors);
-                    ImGui.MenuItem("Backface Culling", "C", ref _backfaceCulling);
-                    ImGui.MenuItem("Wireframe", "F", ref _wireframeMode);
-
-                    ImGui.Separator();
-
-                    if (ImGui.MenuItem("Reset Camera", "R"))
-                    {
-                        ResetCamera();
-                    }
-
-                    ImGui.PopItemFlag();
-                    ImGui.EndMenu();
-                }
-
-                if (ImGui.BeginMenu("Window"))
-                {
-                    ImGui.PushItemFlag(ImGuiItemFlags.AutoClosePopups, false);
-
-                    ImGui.MenuItem("XNO", null, ref _xnoWindow);
-                    ImGui.MenuItem("Environment", null, ref _environmentWindow);
-
-                    ImGui.PopItemFlag();
-                    ImGui.EndMenu();
-                }
-
-                ImGui.EndMainMenuBar();
-            }
-
-            if (_environmentWindow)
-            {
-                ImGui.Begin("Environment");
-                ImGui.SeparatorText("Sun");
-                ImGui.ColorEdit3("Color", ref _sunColor, ImGuiColorEditFlags.NoInputs);
-
-                var editedAzimuth = ImGui.SliderFloat("Azimuth", ref _sunAzimuth, 0.0f, 360.0f, "%.1f°");
-                var editedAltitude = ImGui.SliderFloat("Altitude", ref _sunAltitude, 0.0f, 90.0f, "%.1f°");
-
-                if (editedAzimuth || editedAltitude)
-                {
-                    var azimuthRad = _sunAzimuth * MathF.PI / 180.0f;
-                    var altitudeRad = _sunAltitude * MathF.PI / 180.0f;
-
-                    _sunDirection = new Vector3(
-                        (float)(Math.Cos(altitudeRad) * Math.Cos(azimuthRad)),
-                        (float)Math.Sin(altitudeRad),
-                        (float)(Math.Cos(altitudeRad) * Math.Sin(azimuthRad)));
-                }
-
-                ImGui.End();
-            }
-
-            if (_xnoPanel != null)
-            {
-                if (_xnoWindow)
-                    _xnoPanel.Render(Textures);
-            }
-            else
-            {
-                ImGui.Begin("Help", ImGuiWindowFlags.AlwaysAutoResize);
-                ImGui.Text("Drag and drop a .xno file");
-                ImGui.End();
-            }
-
-            _alertPanel.Render(deltaTime);
-
             SurfaceTexture surfaceTexture;
             _wgpu.SurfaceGetCurrentTexture(_device.GetSurface(), &surfaceTexture);
 
@@ -291,7 +194,7 @@ namespace XNOEdit
                 View = backbuffer,
                 LoadOp = LoadOp.Clear,
                 StoreOp = StoreOp.Store,
-                ClearValue = new Color { R = 0.53, G = 0.81, B = 0.92, A = 1.0 }
+                ClearValue = new Color { R = 1.0, G = 0.0, B = 1.0, A = 1.0 }
             };
 
             var depthAttachment = new RenderPassDepthStencilAttachment
@@ -314,11 +217,11 @@ namespace XNOEdit
             _skybox.Draw(_queue, pass, view, projection,
                 new SkyboxParameters
                 {
-                    SunDirection =  _sunDirection,
-                    SunColor = _sunColor
+                    SunDirection =  _settings.SunDirection,
+                    SunColor = _settings.SunColor
                 });
 
-            if (_showGrid)
+            if (_settings.ShowGrid)
             {
                 _grid.Draw(_queue, pass, view, projection,
                     new GridParameters
@@ -335,16 +238,16 @@ namespace XNOEdit
                 _modelRenderer.Draw(_queue, pass, view, projection,
                     new ModelParameters
                     {
-                        SunDirection = _sunDirection,
-                        SunColor = _sunColor,
+                        SunDirection = _settings.SunDirection,
+                        SunColor = _settings.SunColor,
                         Position =  _camera.Position,
-                        VertColorStrength = _vertexColors ? 1.0f : 0.0f,
-                        Wireframe = _wireframeMode,
-                        CullBackfaces =  _backfaceCulling
+                        VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
+                        Wireframe = _settings.WireframeMode,
+                        CullBackfaces =  _settings.BackfaceCulling
                     });
             }
 
-            _controller.Render(pass);
+            UIManager.OnRender(deltaTime, ref _settings, pass);
 
             _wgpu.RenderPassEncoderEnd(pass);
 
@@ -412,13 +315,8 @@ namespace XNOEdit
             _modelRenderer?.Dispose();
             _grid?.Dispose();
             _skybox?.Dispose();
-            _controller?.Dispose();
             _input?.Dispose();
-
-            foreach (var texturePtr in Textures.Values)
-            {
-                _wgpu.TextureViewRelease((TextureView*)texturePtr);
-            }
+            UIManager?.Dispose();
 
             if (_depthTextureView != null)
                 _wgpu.TextureViewRelease(_depthTextureView);
@@ -455,118 +353,20 @@ namespace XNOEdit
             try
             {
                 var xno = new NinjaNext(file);
-                _xnoPanel = new ImGuiXnoPanel(xno);
 
-                _window.Title = $"XNOEdit - {xno.Name}";
-
-                foreach (var texturePtr in Textures.Values)
-                {
-                    _controller.UnbindImGuiTextureView((TextureView*)texturePtr);
-                    _wgpu.TextureViewRelease((TextureView*)texturePtr);
-                }
-
-                Textures.Clear();
-
-                var textureListChunk = xno.GetChunk<TextureListChunk>();
-                if (textureListChunk != null)
-                {
-                    Console.WriteLine($"Loading {textureListChunk.Textures.Count} textures...");
-                    foreach (var texture in textureListChunk.Textures)
-                    {
-                        var folderPath = Path.GetDirectoryName(file);
-                        var texturePath = Path.Combine(folderPath, texture.Name);
-
-                        if (!File.Exists(texturePath))
-                        {
-                            Console.WriteLine($"  Warning: Texture not found: {texture.Name}");
-                            continue;
-                        }
-
-                        using var image = Pfimage.FromFile(texturePath);
-
-                        var textureDesc = new TextureDescriptor
-                        {
-                            Size = new Extent3D
-                            {
-                                Width = (uint)image.Width,
-                                Height = (uint)image.Height,
-                                DepthOrArrayLayers = 1
-                            },
-                            MipLevelCount = 1,
-                            SampleCount = 1,
-                            Dimension = TextureDimension.Dimension2D,
-                            Format = TextureFormat.Bgra8Unorm,
-                            Usage = TextureUsage.TextureBinding | TextureUsage.CopyDst
-                        };
-
-                        var wgpuTexture = _wgpu.DeviceCreateTexture(_device, &textureDesc);
-
-                        var imageData = image.Data;
-                        if (image.Format == ImageFormat.Rgb24)
-                        {
-                            var rgbaData = new byte[image.Width * image.Height * 4];
-                            for (int i = 0, j = 0; i < imageData.Length; i += 3, j += 4)
-                            {
-                                rgbaData[j] = imageData[i];         // R
-                                rgbaData[j + 1] = imageData[i + 1]; // G
-                                rgbaData[j + 2] = imageData[i + 2]; // B
-                                rgbaData[j + 3] = 255;              // A
-                            }
-                            imageData = rgbaData;
-                        }
-
-                        fixed (byte* pData = imageData)
-                        {
-                            var imageCopyTexture = new ImageCopyTexture
-                            {
-                                Texture = wgpuTexture,
-                                MipLevel = 0,
-                                Origin = new Origin3D { X = 0, Y = 0, Z = 0 },
-                                Aspect = TextureAspect.All
-                            };
-
-                            var textureDataLayout = new TextureDataLayout
-                            {
-                                Offset = 0,
-                                BytesPerRow = (uint)(image.Width * 4),
-                                RowsPerImage = (uint)image.Height
-                            };
-
-                            var writeSize = new Extent3D
-                            {
-                                Width = (uint)image.Width,
-                                Height = (uint)image.Height,
-                                DepthOrArrayLayers = 1
-                            };
-
-                            _wgpu.QueueWriteTexture(_queue, &imageCopyTexture, pData, (nuint)(image.Width * image.Height * 4), &textureDataLayout, &writeSize);
-                        }
-
-                        var viewDesc = new TextureViewDescriptor
-                        {
-                            Format = TextureFormat.Bgra8Unorm,
-                            Dimension = TextureViewDimension.Dimension2D,
-                            BaseMipLevel = 0,
-                            MipLevelCount = 1,
-                            BaseArrayLayer = 0,
-                            ArrayLayerCount = 1,
-                            Aspect = TextureAspect.All
-                        };
-
-                        var textureView = _wgpu.TextureCreateView(wgpuTexture, &viewDesc);
-                        _controller.BindImGuiTextureView(textureView);
-
-                        Textures.Add(texture.Name, (IntPtr)textureView);
-                    }
-                }
-
-                _model?.Dispose();
-                _modelRenderer?.Dispose();
                 var objectChunk = xno.GetChunk<ObjectChunk>();
                 var effectChunk = xno.GetChunk<EffectListChunk>();
+                var textureListChunk = xno.GetChunk<TextureListChunk>();
 
                 if (objectChunk != null && effectChunk != null)
                 {
+                    UIManager.ReadXno(xno, file, _queue);
+
+                    _window.Title = $"XNOEdit - {xno.Name}";
+
+                    _model?.Dispose();
+                    _modelRenderer?.Dispose();
+
                     _model = new Model(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
                     _modelRenderer = new ModelRenderer(_wgpu, _device, _model);
 
@@ -607,20 +407,20 @@ namespace XNOEdit
             switch (key)
             {
                 case Key.F:
-                    _wireframeMode = !_wireframeMode;
-                    alert = $"Wireframe Mode: {(_wireframeMode ? "ON" : "OFF")}";
+                    _settings.WireframeMode = !_settings.WireframeMode;
+                    alert = $"Wireframe Mode: {(_settings.WireframeMode ? "ON" : "OFF")}";
                     break;
                 case Key.G:
-                    _showGrid = !_showGrid;
-                    alert = $"Grid: {(_showGrid ? "ON" : "OFF")}";
+                    _settings.ShowGrid = !_settings.ShowGrid;
+                    alert = $"Grid: {(_settings.ShowGrid ? "ON" : "OFF")}";
                     break;
                 case Key.C:
-                    _backfaceCulling = !_backfaceCulling;
-                    alert = $"Backface Culling: {(_backfaceCulling ? "ON" : "OFF")}";
+                    _settings.BackfaceCulling = !_settings.BackfaceCulling;
+                    alert = $"Backface Culling: {(_settings.BackfaceCulling ? "ON" : "OFF")}";
                     break;
                 case Key.V:
-                    _vertexColors = !_vertexColors;
-                    alert = $"Vertex Colors: {(_vertexColors ? "ON" : "OFF")}";
+                    _settings.VertexColors = !_settings.VertexColors;
+                    alert = $"Vertex Colors: {(_settings.VertexColors ? "ON" : "OFF")}";
                     break;
                 case Key.R:
                     ResetCamera();
@@ -628,8 +428,7 @@ namespace XNOEdit
                     break;
             }
 
-            if (alert != string.Empty)
-                _alertPanel.TriggerAlert(alert);
+            UIManager.TriggerAlert(alert);
         }
     }
 }
