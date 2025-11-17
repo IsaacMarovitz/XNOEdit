@@ -21,16 +21,14 @@ namespace XNOEdit.Renderer.Shaders
     {
         public ModelShader(
             WebGPU wgpu,
-            Device* device,
+            WgpuDevice device,
             string shaderSource,
-            string label,
-            TextureFormat colorFormat)
+            string label)
             : base(
                 wgpu,
                 device,
                 shaderSource,
                 label,
-                colorFormat,
                 pipelineVariants: new Dictionary<string, PipelineVariantDescriptor>
                 {
                     ["default"] = new()

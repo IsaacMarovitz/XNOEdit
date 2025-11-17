@@ -1,6 +1,7 @@
 using System.Numerics;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Shaders;
+using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer
 {
@@ -10,11 +11,7 @@ namespace XNOEdit.Renderer
         private readonly ModelShader _shader;
         private readonly Model _model;
 
-        public ModelRenderer(
-            WebGPU wgpu,
-            Device* device,
-            TextureFormat swapChainFormat,
-            Model model)
+        public ModelRenderer(WebGPU wgpu, WgpuDevice device, Model model)
         {
             _wgpu = wgpu;
             _model = model;
@@ -23,8 +20,7 @@ namespace XNOEdit.Renderer
                 wgpu,
                 device,
                 EmbeddedResources.ReadAllText("XNOEdit/Shaders/BasicModel.wgsl"),
-                "Basic Model",
-                swapChainFormat);
+                "Basic Model");
         }
 
         public void Draw(

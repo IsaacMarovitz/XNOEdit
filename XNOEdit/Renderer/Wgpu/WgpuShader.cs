@@ -8,7 +8,7 @@ namespace XNOEdit.Renderer.Wgpu
     public abstract unsafe class WgpuShader : IDisposable
     {
         protected readonly WebGPU Wgpu;
-        protected readonly Device* Device;
+        protected readonly WgpuDevice Device;
         private readonly ShaderModule* _shaderModule;
         private readonly BindGroupLayout* _bindGroupLayout;
         private readonly BindGroup* _bindGroup;
@@ -23,10 +23,9 @@ namespace XNOEdit.Renderer.Wgpu
 
         protected WgpuShader(
             WebGPU wgpu,
-            Device* device,
+            WgpuDevice device,
             string shaderSource,
             string label,
-            TextureFormat colorFormat,
             Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
         {
             Wgpu = wgpu;
@@ -43,7 +42,7 @@ namespace XNOEdit.Renderer.Wgpu
 
             foreach (var (name, descriptor) in pipelineVariants)
             {
-                var pipeline = CreatePipeline(colorFormat, descriptor);
+                var pipeline = CreatePipeline(descriptor);
                 _pipelines[name] = (IntPtr)pipeline;
             }
         }
@@ -60,9 +59,9 @@ namespace XNOEdit.Renderer.Wgpu
             throw new KeyNotFoundException($"Pipeline variant '{variant}' not found");
         }
 
-        private RenderPipeline* CreatePipeline(TextureFormat colorFormat, PipelineVariantDescriptor descriptor)
+        private RenderPipeline* CreatePipeline(PipelineVariantDescriptor descriptor)
         {
-            var builder = new RenderPipelineBuilder(Wgpu, Device, colorFormat)
+            var builder = new RenderPipelineBuilder(Wgpu, Device)
                 .WithShader(_shaderModule)
                 .WithBindGroupLayout(_bindGroupLayout)
                 .WithVertexLayouts(_vertexLayouts)
@@ -153,12 +152,11 @@ namespace XNOEdit.Renderer.Wgpu
 
         protected WgpuShader(
             WebGPU wgpu,
-            Device* device,
+            WgpuDevice device,
             string shaderSource,
             string label,
-            TextureFormat colorFormat,
             Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
-            : base(wgpu, device, shaderSource, label, colorFormat, pipelineVariants)
+            : base(wgpu, device, shaderSource, label, pipelineVariants)
         {
         }
 

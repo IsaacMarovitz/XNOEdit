@@ -18,15 +18,13 @@ namespace XNOEdit.Renderer.Shaders
     {
         public SkyboxShader(
             WebGPU wgpu,
-            Device* device,
-            string shaderSource,
-            TextureFormat colorFormat)
+            WgpuDevice device,
+            string shaderSource)
             : base(
                 wgpu,
                 device,
                 shaderSource,
                 "Skybox Shader",
-                colorFormat,
                 pipelineVariants: new Dictionary<string, PipelineVariantDescriptor>
                 {
                     ["default"] = new()

@@ -14,11 +14,10 @@ namespace XNOEdit.Renderer
     public unsafe class ImGuiController : IDisposable
     {
         private readonly WebGPU _wgpu;
-        private readonly Device* _device;
+        private readonly WgpuDevice _device;
         private readonly Queue* _queue;
         private readonly IView _view;
         private readonly IInputContext _inputContext;
-        private readonly TextureFormat _swapChainFormat;
         private readonly TextureFormat? _depthFormat;
         private readonly uint _framesInFlight;
 
@@ -44,18 +43,16 @@ namespace XNOEdit.Renderer
 
         public ImGuiController(
             WebGPU wgpu,
-            Device* device,
+            WgpuDevice device,
             IView view,
             IInputContext inputContext,
             uint framesInFlight,
-            TextureFormat swapChainFormat,
             TextureFormat? depthFormat)
         {
             _wgpu = wgpu;
             _device = device;
             _view = view;
             _inputContext = inputContext;
-            _swapChainFormat = swapChainFormat;
             _depthFormat = depthFormat;
             _framesInFlight = framesInFlight;
             _queue = _wgpu.DeviceGetQueue(_device);
@@ -312,7 +309,7 @@ namespace XNOEdit.Renderer
                 Attributes = vertexAttrib
             };
 
-            var pipelineBuilder = new RenderPipelineBuilder(_wgpu, _device, _swapChainFormat)
+            var pipelineBuilder = new RenderPipelineBuilder(_wgpu, _device)
                 .WithBindGroupLayout(_commonBindGroupLayout)
                 .WithBindGroupLayout(_imageBindGroupLayout)
                 .WithCustomBlend(new BlendState

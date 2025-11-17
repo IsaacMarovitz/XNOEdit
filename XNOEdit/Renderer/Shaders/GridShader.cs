@@ -20,15 +20,13 @@ namespace XNOEdit.Renderer.Shaders
     {
         public GridShader(
             WebGPU wgpu,
-            Device* device,
-            string shaderSource,
-            TextureFormat colorFormat)
+            WgpuDevice device,
+            string shaderSource)
             : base(
                 wgpu,
                 device,
                 shaderSource,
                 "Grid Shader",
-                colorFormat,
                 pipelineVariants: new Dictionary<string, PipelineVariantDescriptor>
                 {
                     ["default"] = new()

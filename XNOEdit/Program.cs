@@ -6,10 +6,10 @@ using Pfim;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.WebGPU;
-using Silk.NET.WebGPU.Extensions.WGPU;
 using Silk.NET.Windowing;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
+using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Shaders;
 
 namespace XNOEdit
@@ -18,12 +18,8 @@ namespace XNOEdit
     {
         private static IWindow _window;
         private static WebGPU _wgpu;
-        private static Instance* _instance;
-        private static Adapter* _adapter;
-        private static Device* _device;
+        private static WgpuDevice _device;
         private static Queue* _queue;
-        private static Surface* _surface;
-        private static TextureFormat _surfaceFormat = TextureFormat.Bgra8Unorm;
         private static Texture* _depthTexture;
         private static TextureView* _depthTextureView;
 
@@ -99,14 +95,14 @@ namespace XNOEdit
 
             InitializeWgpu();
 
-            _controller = new ImGuiController(_wgpu, _device, _window, _input, 2, _surfaceFormat, TextureFormat.Depth24Plus);
+            _controller = new ImGuiController(_wgpu, _device, _window, _input, 2, TextureFormat.Depth24Plus);
             _alertPanel = new ImGuiAlertPanel();
             _camera = new Camera();
 
             CreateDepthTexture();
 
-            _grid = new GridRenderer(_wgpu, _device, _surfaceFormat);
-            _skybox = new SkyboxRenderer(_wgpu, _device, _surfaceFormat);
+            _grid = new GridRenderer(_wgpu, _device);
+            _skybox = new SkyboxRenderer(_wgpu, _device);
 
             _sunAltitude = MathF.Asin(_sunDirection.Y) * 180.0f / MathF.PI;
             _sunAzimuth = MathF.Atan2(_sunDirection.Z, _sunDirection.X) * 180.0f / MathF.PI;
@@ -120,89 +116,10 @@ namespace XNOEdit
         private static void InitializeWgpu()
         {
             _wgpu = WebGPU.GetApi();
-
-            var extras = new InstanceExtras
-            {
-                Chain = new ChainedStruct { SType = (SType)NativeSType.STypeInstanceExtras },
-                Backends = InstanceBackend.Vulkan
-            };
-
-            var instanceDesc = new InstanceDescriptor
-            {
-                // NextInChain = (ChainedStruct*)&extras
-            };
-
-            _instance = _wgpu.CreateInstance(&instanceDesc);
-            _surface = _window.CreateWebGPUSurface(_wgpu, _instance);
-
-            var adapterOptions = new RequestAdapterOptions
-            {
-                PowerPreference = PowerPreference.HighPerformance,
-                CompatibleSurface = _surface
-            };
-
-            Adapter* adapter = null;
-            _wgpu.InstanceRequestAdapter(
-                _instance,
-                &adapterOptions,
-                new PfnRequestAdapterCallback((status, adapterPtr, message, userdata) =>
-                {
-                    if (status == RequestAdapterStatus.Success)
-                    {
-                        adapter = adapterPtr;
-                    }
-                }),
-                null);
-
-            _adapter = adapter;
-
-            AdapterProperties adapterProps = default;
-            _wgpu.AdapterGetProperties(_adapter, &adapterProps);
-            Console.WriteLine($"Backend type: {adapterProps.BackendType}");
-
-            NativeFeature[] feature = [NativeFeature.BufferBindingArray];
-
-            fixed (NativeFeature* pFeature = feature)
-            {
-                var deviceDesc = new DeviceDescriptor();
-                // var deviceDesc = new DeviceDescriptor
-                // {
-                //     RequiredFeatures = (FeatureName*)pFeature,
-                //     RequiredFeatureCount = (uint)feature.Length
-                // };
-
-                Device* device = null;
-
-                _wgpu.AdapterRequestDevice(
-                    _adapter,
-                    &deviceDesc,
-                    new PfnRequestDeviceCallback((status, devicePtr, message, userdata) =>
-                    {
-                        if (status == RequestDeviceStatus.Success)
-                        {
-                            device = devicePtr;
-                        }
-                    }),
-                    null);
-
-                _device = device;
-            }
+            _device = new WgpuDevice(_wgpu, _window);
 
             _queue = _wgpu.DeviceGetQueue(_device);
 
-            // Configure surface
-            var surfaceConfig = new SurfaceConfiguration
-            {
-                Device = _device,
-                Format = _surfaceFormat,
-                Usage = TextureUsage.RenderAttachment,
-                Width = (uint)_window.FramebufferSize.X,
-                Height = (uint)_window.FramebufferSize.Y,
-                PresentMode = PresentMode.Fifo,
-                AlphaMode = CompositeAlphaMode.Auto
-            };
-
-            _wgpu.SurfaceConfigure(_surface, &surfaceConfig);
         }
 
         private static void CreateDepthTexture()
@@ -343,7 +260,7 @@ namespace XNOEdit
             _alertPanel.Render(deltaTime);
 
             SurfaceTexture surfaceTexture;
-            _wgpu.SurfaceGetCurrentTexture(_surface, &surfaceTexture);
+            _wgpu.SurfaceGetCurrentTexture(_device.GetSurface(), &surfaceTexture);
 
             if (surfaceTexture.Status != SurfaceGetCurrentTextureStatus.Success)
             {
@@ -352,7 +269,7 @@ namespace XNOEdit
 
             var textureViewDesc = new TextureViewDescriptor
             {
-                Format = _surfaceFormat,
+                Format = _device.GetSurfaceFormat(),
                 Dimension = TextureViewDimension.Dimension2D,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,
@@ -417,7 +334,7 @@ namespace XNOEdit
             var commandBuffer = _wgpu.CommandEncoderFinish(encoder, null);
             _wgpu.QueueSubmit(_queue, 1, &commandBuffer);
 
-            _wgpu.SurfacePresent(_surface);
+            _wgpu.SurfacePresent(_device.GetSurface());
             _wgpu.TextureViewRelease(backbuffer);
             _wgpu.CommandBufferRelease(commandBuffer);
             _wgpu.CommandEncoderRelease(encoder);
@@ -429,7 +346,7 @@ namespace XNOEdit
             var surfaceConfig = new SurfaceConfiguration
             {
                 Device = _device,
-                Format = _surfaceFormat,
+                Format = _device.GetSurfaceFormat(),
                 Usage = TextureUsage.RenderAttachment,
                 Width = (uint)size.X,
                 Height = (uint)size.Y,
@@ -437,7 +354,7 @@ namespace XNOEdit
                 AlphaMode = CompositeAlphaMode.Auto
             };
 
-            _wgpu.SurfaceConfigure(_surface, &surfaceConfig);
+            _wgpu.SurfaceConfigure(_device.GetSurface(), &surfaceConfig);
 
             if (_depthTextureView != null)
                 _wgpu.TextureViewRelease(_depthTextureView);
@@ -492,20 +409,10 @@ namespace XNOEdit
             if (_depthTexture != null)
                 _wgpu.TextureRelease(_depthTexture);
 
-            if (_surface != null)
-                _wgpu.SurfaceRelease(_surface);
-
             if (_queue != null)
                 _wgpu.QueueRelease(_queue);
 
-            if (_device != null)
-                _wgpu.DeviceRelease(_device);
-
-            if (_adapter != null)
-                _wgpu.AdapterRelease(_adapter);
-
-            if (_instance != null)
-                _wgpu.InstanceRelease(_instance);
+            _device?.Dispose();
         }
 
         private static void OnFileDrop(string[] files)
@@ -644,7 +551,7 @@ namespace XNOEdit
                 if (objectChunk != null && effectChunk != null)
                 {
                     _model = new Model(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
-                    _modelRenderer = new ModelRenderer(_wgpu, _device, _surfaceFormat, _model);
+                    _modelRenderer = new ModelRenderer(_wgpu, _device, _model);
 
                     _modelCenter = objectChunk.Centre;
                     _modelRadius = objectChunk.Radius;
@@ -655,7 +562,7 @@ namespace XNOEdit
 
                     _grid?.Dispose();
                     var gridSize = _modelRadius * 4.0f;
-                    _grid = new GridRenderer(_wgpu, _device, _surfaceFormat, gridSize);
+                    _grid = new GridRenderer(_wgpu, _device, gridSize);
 
                     ResetCamera();
                 }

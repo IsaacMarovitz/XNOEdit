@@ -1,17 +1,17 @@
 using Silk.NET.Core.Native;
 using Silk.NET.WebGPU;
+using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer.Builders
 {
     public unsafe class RenderPipelineBuilder
     {
         private readonly WebGPU _wgpu;
-        private readonly Device* _device;
+        private readonly WgpuDevice _device;
 
         private ShaderModule* _shaderModule;
         private string _vertexEntry = "vs_main";
         private string _fragmentEntry = "fs_main";
-        private readonly TextureFormat _colorFormat;
         private PrimitiveTopology _topology = PrimitiveTopology.TriangleList;
         private CullMode _cullMode = CullMode.None;
         private FrontFace _frontFace = FrontFace.Ccw;
@@ -26,11 +26,10 @@ namespace XNOEdit.Renderer.Builders
         private bool _hasBlend;
         private BlendState _blendState;
 
-        public RenderPipelineBuilder(WebGPU wgpu, Device* device, TextureFormat colorFormat)
+        public RenderPipelineBuilder(WebGPU wgpu, WgpuDevice device)
         {
             _wgpu = wgpu;
             _device = device;
-            _colorFormat = colorFormat;
         }
 
         public static implicit operator RenderPipeline*(RenderPipelineBuilder b) => b.Build();
@@ -178,7 +177,7 @@ namespace XNOEdit.Renderer.Builders
 
                 var colorTarget = new ColorTargetState
                 {
-                    Format = _colorFormat,
+                    Format = _device.GetSurfaceFormat(),
                     WriteMask = ColorWriteMask.All,
                     Blend = null
                 };

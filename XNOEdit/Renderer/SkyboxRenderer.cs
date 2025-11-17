@@ -11,7 +11,7 @@ namespace XNOEdit.Renderer
         private readonly WgpuShader<SkyboxUniforms> _shader;
         private readonly WgpuBuffer<float> _vertexBuffer;
 
-        public SkyboxRenderer(WebGPU wgpu, Device* device, TextureFormat swapChainFormat)
+        public SkyboxRenderer(WebGPU wgpu, WgpuDevice device)
         {
             _wgpu = wgpu;
 
@@ -27,8 +27,7 @@ namespace XNOEdit.Renderer
             _shader = new SkyboxShader(
                 wgpu,
                 device,
-                EmbeddedResources.ReadAllText("XNOEdit/Shaders/Skybox.wgsl"),
-                swapChainFormat);
+                EmbeddedResources.ReadAllText("XNOEdit/Shaders/Skybox.wgsl"));
         }
 
         public void Draw(

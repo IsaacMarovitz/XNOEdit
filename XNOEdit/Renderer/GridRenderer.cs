@@ -12,7 +12,7 @@ namespace XNOEdit.Renderer
         private readonly WgpuBuffer<float> _vertexBuffer;
         private readonly int _lineCount;
 
-        public GridRenderer(WebGPU wgpu, Device* device, TextureFormat swapChainFormat, float size = 100.0f, int divisions = 100)
+        public GridRenderer(WebGPU wgpu, WgpuDevice device, float size = 100.0f, int divisions = 100)
         {
             _wgpu = wgpu;
 
@@ -23,8 +23,7 @@ namespace XNOEdit.Renderer
             _shader = new GridShader(
                 wgpu,
                 device,
-                EmbeddedResources.ReadAllText("XNOEdit/Shaders/Grid.wgsl"),
-                swapChainFormat);
+                EmbeddedResources.ReadAllText("XNOEdit/Shaders/Grid.wgsl"));
         }
 
         private float[] CreateGridVertices(float size, int divisions)
