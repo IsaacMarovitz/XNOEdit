@@ -6,6 +6,7 @@ using Silk.NET.Core.Native;
 using Silk.NET.Input;
 using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
+using XNOEdit.Renderer.Builders;
 using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer
@@ -41,7 +42,14 @@ namespace XNOEdit.Renderer
         private readonly List<char> _pressedChars = [];
         private readonly Dictionary<Key, bool> _keyEvents = [];
 
-        public ImGuiController(WebGPU wgpu, Device* device, IView view, IInputContext inputContext, uint framesInFlight, TextureFormat swapChainFormat, TextureFormat? depthFormat)
+        public ImGuiController(
+            WebGPU wgpu,
+            Device* device,
+            IView view,
+            IInputContext inputContext,
+            uint framesInFlight,
+            TextureFormat swapChainFormat,
+            TextureFormat? depthFormat)
         {
             _wgpu = wgpu;
             _device = device;
@@ -224,18 +232,33 @@ namespace XNOEdit.Renderer
         private void InitBindGroupLayouts()
         {
             var commonBgLayoutEntries = stackalloc BindGroupLayoutEntry[2];
-            commonBgLayoutEntries[0].Binding = 0;
-            commonBgLayoutEntries[0].Visibility = ShaderStage.Vertex | ShaderStage.Fragment;
-            commonBgLayoutEntries[0].Buffer.Type = BufferBindingType.Uniform;
-            commonBgLayoutEntries[1].Binding = 1;
-            commonBgLayoutEntries[1].Visibility = ShaderStage.Fragment;
-            commonBgLayoutEntries[1].Sampler.Type = SamplerBindingType.Filtering;
+
+            commonBgLayoutEntries[0] = new BindGroupLayoutEntry
+            {
+                Binding = 0,
+                Visibility = ShaderStage.Vertex | ShaderStage.Fragment,
+                Buffer = new BufferBindingLayout { Type = BufferBindingType.Uniform },
+            };
+
+            commonBgLayoutEntries[1] = new BindGroupLayoutEntry
+            {
+                Binding = 1,
+                Visibility = ShaderStage.Fragment,
+                Sampler = new SamplerBindingLayout { Type = SamplerBindingType.Filtering },
+            };
 
             var imageBgLayoutEntries = stackalloc BindGroupLayoutEntry[1];
-            imageBgLayoutEntries[0].Binding = 0;
-            imageBgLayoutEntries[0].Visibility = ShaderStage.Fragment;
-            imageBgLayoutEntries[0].Texture.SampleType = TextureSampleType.Float;
-            imageBgLayoutEntries[0].Texture.ViewDimension = TextureViewDimension.Dimension2D;
+
+            imageBgLayoutEntries[0] = new BindGroupLayoutEntry
+            {
+                Binding = 0,
+                Visibility = ShaderStage.Fragment,
+                Texture = new TextureBindingLayout
+                {
+                    SampleType = TextureSampleType.Float,
+                    ViewDimension = TextureViewDimension.Dimension2D
+                },
+            };
 
             BindGroupLayoutDescriptor commonBgLayoutDesc = new()
             {
@@ -253,28 +276,33 @@ namespace XNOEdit.Renderer
             _imageBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_device, in imageBgLayoutDesc);
         }
 
-        private void InitPipeline()
+        public void InitPipeline()
         {
-            var bgLayouts = stackalloc BindGroupLayout*[2];
-            bgLayouts[0] = _commonBindGroupLayout;
-            bgLayouts[1] = _imageBindGroupLayout;
-
-            PipelineLayoutDescriptor layoutDesc = new() { BindGroupLayoutCount = 2, BindGroupLayouts = bgLayouts };
-            var layout = _wgpu.DeviceCreatePipelineLayout(_device, in layoutDesc);
-
-            var vertexEntry = SilkMarshal.StringToPtr("vs_main");
-            var fragmentEntry = SilkMarshal.StringToPtr("fs_main");
+            if (_renderPipeline != null)
+                _wgpu.RenderPipelineRelease(_renderPipeline);
 
             var vertexAttrib = stackalloc VertexAttribute[3];
-            vertexAttrib[0].Format = VertexFormat.Float32x2;
-            vertexAttrib[0].Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.pos));
-            vertexAttrib[0].ShaderLocation = 0;
-            vertexAttrib[1].Format = VertexFormat.Float32x2;
-            vertexAttrib[1].Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.uv));
-            vertexAttrib[1].ShaderLocation = 1;
-            vertexAttrib[2].Format = VertexFormat.Unorm8x4;
-            vertexAttrib[2].Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.col));
-            vertexAttrib[2].ShaderLocation = 2;
+
+            vertexAttrib[0] = new VertexAttribute
+            {
+                Format = VertexFormat.Float32x3,
+                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.pos)),
+                ShaderLocation = 0
+            };
+
+            vertexAttrib[1] = new VertexAttribute
+            {
+                Format = VertexFormat.Float32x3,
+                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.uv)),
+                ShaderLocation = 1
+            };
+
+            vertexAttrib[2] = new VertexAttribute
+            {
+                Format = VertexFormat.Unorm8x4,
+                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.col)),
+                ShaderLocation = 2
+            };
 
             VertexBufferLayout vbLayout = new()
             {
@@ -284,80 +312,33 @@ namespace XNOEdit.Renderer
                 Attributes = vertexAttrib
             };
 
-            BlendState blendState = new();
-            blendState.Alpha.Operation = BlendOperation.Add;
-            blendState.Alpha.SrcFactor = BlendFactor.One;
-            blendState.Alpha.DstFactor = BlendFactor.OneMinusSrcAlpha;
-            blendState.Color.Operation = BlendOperation.Add;
-            blendState.Color.SrcFactor = BlendFactor.SrcAlpha;
-            blendState.Color.DstFactor = BlendFactor.OneMinusSrcAlpha;
-
-            ColorTargetState colorTargetState = new()
-            {
-                Blend = &blendState,
-                Format = _swapChainFormat,
-                WriteMask = ColorWriteMask.All
-            };
-
-            FragmentState fragmentState = new()
-            {
-                Module = _shaderModule,
-                EntryPoint = (byte*)fragmentEntry,
-                TargetCount = 1,
-                Targets = &colorTargetState
-            };
-
-            RenderPipelineDescriptor renderPipelineDescriptor = new()
-            {
-                Vertex = new VertexState
+            var pipelineBuilder = new RenderPipelineBuilder(_wgpu, _device, _swapChainFormat)
+                .WithBindGroupLayout(_commonBindGroupLayout)
+                .WithBindGroupLayout(_imageBindGroupLayout)
+                .WithCustomBlend(new BlendState
                 {
-                    Module = _shaderModule,
-                    EntryPoint = (byte*)vertexEntry,
-                    Buffers = &vbLayout,
-                    BufferCount = 1
-                },
-                Primitive = new PrimitiveState
-                {
-                    Topology = PrimitiveTopology.TriangleList,
-                    StripIndexFormat = IndexFormat.Undefined,
-                    FrontFace = FrontFace.Ccw,
-                    CullMode = CullMode.None
-                },
-                Multisample = new MultisampleState
-                {
-                    Count = 1,
-                    Mask = ~0u,
-                    AlphaToCoverageEnabled = false
-                },
-                Fragment = &fragmentState,
-                Layout = layout
-            };
+                    Color = new BlendComponent
+                    {
+                        Operation = BlendOperation.Add, SrcFactor = BlendFactor.SrcAlpha,
+                        DstFactor = BlendFactor.OneMinusSrcAlpha
+                    },
+                    Alpha = new BlendComponent
+                    {
+                        Operation = BlendOperation.Add, SrcFactor = BlendFactor.One,
+                        DstFactor = BlendFactor.OneMinusSrcAlpha
+                    }
+                })
+                .WithTopology(PrimitiveTopology.TriangleList)
+                .WithCulling(CullMode.None)
+                .WithVertexLayout(vbLayout)
+                .WithShader(_shaderModule);
 
             if (_depthFormat != null)
             {
-                DepthStencilState depthStencilState = new()
-                {
-                    Format = (TextureFormat)_depthFormat,
-                    DepthWriteEnabled = false,
-                    DepthCompare = CompareFunction.Always,
-                    StencilFront = new()
-                    {
-                        Compare = CompareFunction.Always
-                    },
-                    StencilBack = new()
-                    {
-                        Compare = CompareFunction.Always
-                    }
-                };
-
-                renderPipelineDescriptor.DepthStencil = &depthStencilState;
+                pipelineBuilder = pipelineBuilder.WithDepth(_depthFormat.Value, false, CompareFunction.Always);
             }
 
-            _renderPipeline = _wgpu.DeviceCreateRenderPipeline(_device, in renderPipelineDescriptor);
-
-            SilkMarshal.Free(vertexEntry);
-            SilkMarshal.Free(fragmentEntry);
-            _wgpu.PipelineLayoutRelease(layout);
+            _renderPipeline = pipelineBuilder;
         }
 
         private void InitUniformBuffers()
@@ -368,16 +349,24 @@ namespace XNOEdit.Renderer
         private void InitBindGroups()
         {
             var bindGroupEntries = stackalloc BindGroupEntry[2];
-            bindGroupEntries[0].Binding = 0;
-            bindGroupEntries[0].Buffer = _uniformsBuffer.Handle;
-            bindGroupEntries[0].Offset = 0;
-            bindGroupEntries[0].Size = (ulong)Align(sizeof(Uniforms), 16);
-            bindGroupEntries[0].Sampler = null;
-            bindGroupEntries[1].Binding = 1;
-            bindGroupEntries[1].Buffer = null;
-            bindGroupEntries[1].Offset = 0;
-            bindGroupEntries[1].Size = 0;
-            bindGroupEntries[1].Sampler = _fontSampler;
+
+            bindGroupEntries[0] = new BindGroupEntry
+            {
+                Binding = 0,
+                Buffer = _uniformsBuffer.Handle,
+                Offset = 0,
+                Size = (ulong)Align(sizeof(Uniforms), 16),
+                Sampler = null
+            };
+
+            bindGroupEntries[1] = new BindGroupEntry
+            {
+                Binding = 1,
+                Buffer = null,
+                Offset = 0,
+                Size = 0,
+                Sampler = _fontSampler
+            };
 
             BindGroupDescriptor bgCommonDesc = new()
             {
