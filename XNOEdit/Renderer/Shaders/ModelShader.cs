@@ -22,14 +22,12 @@ namespace XNOEdit.Renderer.Shaders
         public ModelShader(
             WebGPU wgpu,
             Device* device,
-            Queue* queue,
             string shaderSource,
             string label,
             TextureFormat colorFormat)
             : base(
                 wgpu,
                 device,
-                queue,
                 shaderSource,
                 label,
                 colorFormat,

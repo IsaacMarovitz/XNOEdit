@@ -12,7 +12,7 @@ namespace XNOEdit.Renderer
         private readonly WgpuBuffer<float> _vertexBuffer;
         private readonly int _lineCount;
 
-        public GridRenderer(WebGPU wgpu, Device* device, Queue* queue, TextureFormat swapChainFormat, float size = 100.0f, int divisions = 100)
+        public GridRenderer(WebGPU wgpu, Device* device, TextureFormat swapChainFormat, float size = 100.0f, int divisions = 100)
         {
             _wgpu = wgpu;
 
@@ -23,7 +23,6 @@ namespace XNOEdit.Renderer
             _shader = new GridShader(
                 wgpu,
                 device,
-                queue,
                 EmbeddedResources.ReadAllText("XNOEdit/Shaders/Grid.wgsl"),
                 swapChainFormat);
         }
@@ -60,6 +59,7 @@ namespace XNOEdit.Renderer
         }
 
         public void Draw(
+            Queue* queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
@@ -77,7 +77,7 @@ namespace XNOEdit.Renderer
                 FadeEnd = fadeDistance
             };
 
-            _shader.UpdateUniforms(in uniforms);
+            _shader.UpdateUniforms(queue, in uniforms);
             _wgpu.RenderPassEncoderSetPipeline(passEncoder, _shader.GetPipeline());
 
             uint dynamicOffset = 0;

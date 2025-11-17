@@ -105,8 +105,8 @@ namespace XNOEdit
 
             CreateDepthTexture();
 
-            _grid = new GridRenderer(_wgpu, _device, _queue, _surfaceFormat);
-            _skybox = new SkyboxRenderer(_wgpu, _device, _queue, _surfaceFormat);
+            _grid = new GridRenderer(_wgpu, _device, _surfaceFormat);
+            _skybox = new SkyboxRenderer(_wgpu, _device, _surfaceFormat);
 
             _sunAltitude = MathF.Asin(_sunDirection.Y) * 180.0f / MathF.PI;
             _sunAzimuth = MathF.Atan2(_sunDirection.Z, _sunDirection.X) * 180.0f / MathF.PI;
@@ -395,18 +395,18 @@ namespace XNOEdit
 
             var pass = _wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
 
-            _skybox.Draw(pass, view, projection, _sunDirection, _sunColor);
+            _skybox.Draw(_queue, pass, view, projection, _sunDirection, _sunColor);
 
             if (_showGrid)
             {
                 var gridModel = Matrix4x4.CreateTranslation(_modelCenter);
                 var fadeDistance = _modelRadius * 5.0f;
-                _grid.Draw(pass, view, projection, gridModel, _camera.Position, fadeDistance);
+                _grid.Draw(_queue, pass, view, projection, gridModel, _camera.Position, fadeDistance);
             }
 
             if (_model != null && _modelRenderer != null)
             {
-                _modelRenderer.Draw(pass, view, projection, _sunDirection, _sunColor, _camera.Position,
+                _modelRenderer.Draw(_queue, pass, view, projection, _sunDirection, _sunColor, _camera.Position,
                     _vertexColors ? 1.0f : 0.0f, _wireframeMode, _backfaceCulling);
             }
 
@@ -644,7 +644,7 @@ namespace XNOEdit
                 if (objectChunk != null && effectChunk != null)
                 {
                     _model = new Model(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
-                    _modelRenderer = new ModelRenderer(_wgpu, _device, _queue, _surfaceFormat, _model);
+                    _modelRenderer = new ModelRenderer(_wgpu, _device, _surfaceFormat, _model);
 
                     _modelCenter = objectChunk.Centre;
                     _modelRadius = objectChunk.Radius;
@@ -655,7 +655,7 @@ namespace XNOEdit
 
                     _grid?.Dispose();
                     var gridSize = _modelRadius * 4.0f;
-                    _grid = new GridRenderer(_wgpu, _device, _queue, _surfaceFormat, gridSize);
+                    _grid = new GridRenderer(_wgpu, _device, _surfaceFormat, gridSize);
 
                     ResetCamera();
                 }

@@ -11,7 +11,7 @@ namespace XNOEdit.Renderer
         private readonly WgpuShader<SkyboxUniforms> _shader;
         private readonly WgpuBuffer<float> _vertexBuffer;
 
-        public SkyboxRenderer(WebGPU wgpu, Device* device, Queue* queue, TextureFormat swapChainFormat)
+        public SkyboxRenderer(WebGPU wgpu, Device* device, TextureFormat swapChainFormat)
         {
             _wgpu = wgpu;
 
@@ -27,12 +27,12 @@ namespace XNOEdit.Renderer
             _shader = new SkyboxShader(
                 wgpu,
                 device,
-                queue,
                 EmbeddedResources.ReadAllText("XNOEdit/Shaders/Skybox.wgsl"),
                 swapChainFormat);
         }
 
         public void Draw(
+            Queue* queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
@@ -47,7 +47,7 @@ namespace XNOEdit.Renderer
                 SunColor = sunColor.AsVector4()
             };
 
-            _shader.UpdateUniforms(in uniforms);
+            _shader.UpdateUniforms(queue, in uniforms);
             _wgpu.RenderPassEncoderSetPipeline(passEncoder, _shader.GetPipeline());
 
             uint dynamicOffset = 0;

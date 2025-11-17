@@ -19,13 +19,11 @@ namespace XNOEdit.Renderer.Shaders
         public SkyboxShader(
             WebGPU wgpu,
             Device* device,
-            Queue* queue,
             string shaderSource,
             TextureFormat colorFormat)
             : base(
                 wgpu,
                 device,
-                queue,
                 shaderSource,
                 "Skybox Shader",
                 colorFormat,

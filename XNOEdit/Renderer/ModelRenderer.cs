@@ -13,7 +13,6 @@ namespace XNOEdit.Renderer
         public ModelRenderer(
             WebGPU wgpu,
             Device* device,
-            Queue* queue,
             TextureFormat swapChainFormat,
             Model model)
         {
@@ -23,13 +22,13 @@ namespace XNOEdit.Renderer
             _shader = new ModelShader(
                 wgpu,
                 device,
-                queue,
                 EmbeddedResources.ReadAllText("XNOEdit/Shaders/BasicModel.wgsl"),
                 "Basic Model",
                 swapChainFormat);
         }
 
         public void Draw(
+            Queue* queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
@@ -51,7 +50,7 @@ namespace XNOEdit.Renderer
                 VertColorStrength = vertColorStrength
             };
 
-            _shader.UpdateUniforms(in uniforms);
+            _shader.UpdateUniforms(queue, in uniforms);
 
             var pipeline = _shader.GetPipeline(cullBackfaces, wireframe);
             _wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);

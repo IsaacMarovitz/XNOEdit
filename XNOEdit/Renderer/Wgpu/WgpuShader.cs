@@ -9,7 +9,6 @@ namespace XNOEdit.Renderer.Wgpu
     {
         protected readonly WebGPU Wgpu;
         protected readonly Device* Device;
-        protected readonly Queue* Queue;
         private readonly ShaderModule* _shaderModule;
         private readonly BindGroupLayout* _bindGroupLayout;
         private readonly BindGroup* _bindGroup;
@@ -25,7 +24,6 @@ namespace XNOEdit.Renderer.Wgpu
         protected WgpuShader(
             WebGPU wgpu,
             Device* device,
-            Queue* queue,
             string shaderSource,
             string label,
             TextureFormat colorFormat,
@@ -33,7 +31,6 @@ namespace XNOEdit.Renderer.Wgpu
         {
             Wgpu = wgpu;
             Device = device;
-            Queue = queue;
             _resources = [];
             _pipelines = new Dictionary<string, IntPtr>();
 
@@ -157,12 +154,11 @@ namespace XNOEdit.Renderer.Wgpu
         protected WgpuShader(
             WebGPU wgpu,
             Device* device,
-            Queue* queue,
             string shaderSource,
             string label,
             TextureFormat colorFormat,
             Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
-            : base(wgpu, device, queue, shaderSource, label, colorFormat, pipelineVariants)
+            : base(wgpu, device, shaderSource, label, colorFormat, pipelineVariants)
         {
         }
 
@@ -185,9 +181,9 @@ namespace XNOEdit.Renderer.Wgpu
             return ((IntPtr)layout, (IntPtr)bindGroup);
         }
 
-        public void UpdateUniforms(in TUniforms uniforms)
+        public void UpdateUniforms(Queue* queue, in TUniforms uniforms)
         {
-            _uniformBuffer.UpdateData(Queue, in uniforms);
+            _uniformBuffer.UpdateData(queue, in uniforms);
         }
     }
 }

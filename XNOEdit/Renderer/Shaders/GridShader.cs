@@ -21,13 +21,11 @@ namespace XNOEdit.Renderer.Shaders
         public GridShader(
             WebGPU wgpu,
             Device* device,
-            Queue* queue,
             string shaderSource,
             TextureFormat colorFormat)
             : base(
                 wgpu,
                 device,
-                queue,
                 shaderSource,
                 "Grid Shader",
                 colorFormat,
