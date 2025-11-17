@@ -1,83 +1,82 @@
+using System.Runtime.InteropServices;
 using Silk.NET.Core.Native;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Builders;
 
 namespace XNOEdit.Renderer.Wgpu
 {
-    public unsafe class WgpuShader<TUniforms> : IDisposable where TUniforms : unmanaged
+    public abstract unsafe class WgpuShader : IDisposable
     {
-        private readonly WebGPU _wgpu;
-        private readonly Queue* _queue;
-        private readonly WgpuBuffer<TUniforms> _uniformBuffer;
+        protected readonly WebGPU Wgpu;
+        protected readonly Device* Device;
+        protected readonly Queue* Queue;
+        private readonly ShaderModule* _shaderModule;
+        private readonly BindGroupLayout* _bindGroupLayout;
         private readonly BindGroup* _bindGroup;
+        private readonly Dictionary<string, IntPtr> _pipelines;
+        private readonly VertexBufferLayout[] _vertexLayouts;
+        protected GCHandle Attributes;
 
-        protected readonly ShaderModule* ShaderModule;
-        protected readonly BindGroupLayout* BindGroupLayout;
-        protected RenderPipeline* Pipeline;
+        private readonly List<IDisposable> _resources;
+        private bool _disposed;
 
-        public BindGroup* UniformBindGroup => _bindGroup;
-        public RenderPipeline* GetPipeline() => Pipeline;
+        public BindGroup* BindGroup => _bindGroup;
 
-        public WgpuShader(
+        protected WgpuShader(
             WebGPU wgpu,
             Device* device,
             Queue* queue,
             string shaderSource,
             string label,
             TextureFormat colorFormat,
-            VertexBufferLayout[] vertexLayouts,
-            RenderPipelineBuilder pipelineBuilder = null)
+            Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
         {
-            _wgpu = wgpu;
-            _queue = queue;
+            Wgpu = wgpu;
+            Device = device;
+            Queue = queue;
+            _resources = [];
+            _pipelines = new Dictionary<string, IntPtr>();
 
-            ShaderModule = CreateShaderModule(wgpu, device, shaderSource, label);
+            _shaderModule = CreateShaderModule(wgpu, device, shaderSource, label);
+            _vertexLayouts = CreateVertexLayouts();
 
-            _uniformBuffer = WgpuBuffer<TUniforms>.CreateUniform(wgpu, device);
+            var (bindGroupLayout, bindGroup) = CreateBindGroupResources();
+            _bindGroupLayout = (BindGroupLayout*)bindGroupLayout;
+            _bindGroup = (BindGroup*)bindGroup;
 
-            var bindGroupBuilder = new BindGroupBuilder(wgpu, device);
-            bindGroupBuilder.AddUniformBuffer(0, _uniformBuffer);
-            BindGroupLayout = bindGroupBuilder.BuildLayout();
-            _bindGroup = bindGroupBuilder.BuildBindGroup();
-
-            if (pipelineBuilder != null)
+            foreach (var (name, descriptor) in pipelineVariants)
             {
-                Pipeline = pipelineBuilder
-                    .WithShader(ShaderModule)
-                    .WithBindGroupLayout(BindGroupLayout)
-                    .WithVertexLayouts(vertexLayouts);
-            }
-            else
-            {
-                Pipeline = new RenderPipelineBuilder(wgpu, device, colorFormat)
-                    .WithShader(ShaderModule)
-                    .WithBindGroupLayout(BindGroupLayout)
-                    .WithVertexLayouts(vertexLayouts)
-                    .WithDepth()
-                    .WithAlphaBlend();
+                var pipeline = CreatePipeline(colorFormat, descriptor);
+                _pipelines[name] = (IntPtr)pipeline;
             }
         }
 
-        public void UpdateUniforms(in TUniforms uniforms)
+        protected abstract VertexBufferLayout[] CreateVertexLayouts();
+
+        protected abstract (IntPtr, IntPtr) CreateBindGroupResources();
+
+        public RenderPipeline* GetPipeline(string variant = "default")
         {
-            _uniformBuffer.UpdateData(_queue, in uniforms);
+            if (_pipelines.TryGetValue(variant, out var pipeline))
+                return (RenderPipeline*)pipeline;
+
+            throw new KeyNotFoundException($"Pipeline variant '{variant}' not found");
         }
 
-        public virtual void Dispose()
+        private RenderPipeline* CreatePipeline(TextureFormat colorFormat, PipelineVariantDescriptor descriptor)
         {
-            _uniformBuffer?.Dispose();
+            var builder = new RenderPipelineBuilder(Wgpu, Device, colorFormat)
+                .WithShader(_shaderModule)
+                .WithBindGroupLayout(_bindGroupLayout)
+                .WithVertexLayouts(_vertexLayouts)
+                .WithTopology(descriptor.Topology)
+                .WithCulling(descriptor.CullMode, descriptor.FrontFace)
+                .WithDepth(TextureFormat.Depth24Plus, descriptor.DepthWrite, descriptor.DepthCompare);
 
-            if (_bindGroup != null)
-                _wgpu.BindGroupRelease(_bindGroup);
+            if (descriptor.AlphaBlend)
+                builder.WithAlphaBlend();
 
-            if (BindGroupLayout != null)
-                _wgpu.BindGroupLayoutRelease(BindGroupLayout);
-
-            if (Pipeline != null)
-                _wgpu.RenderPipelineRelease(Pipeline);
-
-            if (ShaderModule != null)
-                _wgpu.ShaderModuleRelease(ShaderModule);
+            return builder;
         }
 
         private static ShaderModule* CreateShaderModule(
@@ -93,10 +92,7 @@ namespace XNOEdit.Renderer.Wgpu
             {
                 var wgslDescriptor = new ShaderModuleWGSLDescriptor
                 {
-                    Chain = new ChainedStruct
-                    {
-                        SType = SType.ShaderModuleWgslDescriptor
-                    },
+                    Chain = new ChainedStruct { SType = SType.ShaderModuleWgslDescriptor },
                     Code = (byte*)src
                 };
 
@@ -111,10 +107,87 @@ namespace XNOEdit.Renderer.Wgpu
             finally
             {
                 SilkMarshal.Free(src);
-
                 if (shaderName != 0)
                     SilkMarshal.Free(shaderName);
             }
+        }
+
+        protected void RegisterResource(IDisposable resource)
+        {
+            if (resource != null)
+                _resources.Add(resource);
+        }
+
+        public virtual void Dispose()
+        {
+            if (_disposed) return;
+
+            foreach (var resource in _resources)
+            {
+                try { resource?.Dispose(); }
+                catch { /* Swallow */ }
+            }
+
+            foreach (var pipeline in _pipelines.Values)
+            {
+                if (pipeline != IntPtr.Zero)
+                    Wgpu.RenderPipelineRelease((RenderPipeline*)pipeline);
+            }
+
+            if (Attributes.IsAllocated)
+                Attributes.Free();
+
+            if (_bindGroup != null)
+                Wgpu.BindGroupRelease(_bindGroup);
+
+            if (_bindGroupLayout != null)
+                Wgpu.BindGroupLayoutRelease(_bindGroupLayout);
+
+            if (_shaderModule != null)
+                Wgpu.ShaderModuleRelease(_shaderModule);
+
+            _disposed = true;
+        }
+    }
+
+    public unsafe class WgpuShader<TUniforms> : WgpuShader where TUniforms : unmanaged
+    {
+        private WgpuBuffer<TUniforms> _uniformBuffer;
+
+        protected WgpuShader(
+            WebGPU wgpu,
+            Device* device,
+            Queue* queue,
+            string shaderSource,
+            string label,
+            TextureFormat colorFormat,
+            Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
+            : base(wgpu, device, queue, shaderSource, label, colorFormat, pipelineVariants)
+        {
+        }
+
+        protected override VertexBufferLayout[] CreateVertexLayouts()
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override (IntPtr, IntPtr) CreateBindGroupResources()
+        {
+            _uniformBuffer = WgpuBuffer<TUniforms>.CreateUniform(Wgpu, Device);
+            RegisterResource(_uniformBuffer);
+
+            var bindGroupBuilder = new BindGroupBuilder(Wgpu, Device);
+            bindGroupBuilder.AddUniformBuffer(0, _uniformBuffer);
+
+            var layout = bindGroupBuilder.BuildLayout();
+            var bindGroup = bindGroupBuilder.BuildBindGroup();
+
+            return ((IntPtr)layout, (IntPtr)bindGroup);
+        }
+
+        public void UpdateUniforms(in TUniforms uniforms)
+        {
+            _uniformBuffer.UpdateData(Queue, in uniforms);
         }
     }
 }

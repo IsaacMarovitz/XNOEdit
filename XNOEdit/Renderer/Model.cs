@@ -2,6 +2,7 @@ using System.Numerics;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
+using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Shaders;
 

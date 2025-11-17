@@ -1,5 +1,6 @@
 using System.Numerics;
 using Silk.NET.WebGPU;
+using XNOEdit.Renderer.Shaders;
 
 namespace XNOEdit.Renderer
 {
@@ -19,27 +20,13 @@ namespace XNOEdit.Renderer
             _wgpu = wgpu;
             _model = model;
 
-            var vertexAttrib = stackalloc VertexAttribute[3];
-            vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0,  ShaderLocation = 0 };  // Position
-            vertexAttrib[1] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };  // Normal
-            vertexAttrib[2] = new VertexAttribute { Format = VertexFormat.Float32x4, Offset = 24, ShaderLocation = 2 };  // Color
-
-            var vertexLayout = new VertexBufferLayout
-            {
-                ArrayStride = 40,
-                StepMode = VertexStepMode.Vertex,
-                AttributeCount = 3,
-                Attributes = vertexAttrib
-            };
-
             _shader = new ModelShader(
                 wgpu,
                 device,
                 queue,
                 EmbeddedResources.ReadAllText("XNOEdit/Shaders/BasicModel.wgsl"),
                 "Basic Model",
-                swapChainFormat,
-                [vertexLayout]);
+                swapChainFormat);
         }
 
         public void Draw(
@@ -70,7 +57,7 @@ namespace XNOEdit.Renderer
             _wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
 
             uint dynamicOffset = 0;
-            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _shader.UniformBindGroup, 0, &dynamicOffset);
+            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _shader.BindGroup, 0, &dynamicOffset);
 
             _model.Draw(passEncoder, wireframe);
         }

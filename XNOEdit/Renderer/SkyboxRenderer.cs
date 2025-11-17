@@ -1,20 +1,10 @@
 using System.Numerics;
-using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Builders;
+using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    internal struct SkyboxUniforms
-    {
-        public Matrix4x4 View;
-        public Matrix4x4 Projection;
-        public Vector4 SunDirection;
-        public Vector4 SunColor;
-    }
-
     public unsafe class SkyboxRenderer : IDisposable
     {
         private readonly WebGPU _wgpu;
@@ -34,30 +24,12 @@ namespace XNOEdit.Renderer
             };
             _vertexBuffer = new WgpuBuffer<float>(wgpu, device, vertices, BufferUsage.Vertex);
 
-            var vertexAttrib = stackalloc VertexAttribute[1];
-            vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 };
-
-            var vertexLayout = new VertexBufferLayout
-            {
-                ArrayStride = 12,
-                StepMode = VertexStepMode.Vertex,
-                AttributeCount = 1,
-                Attributes = vertexAttrib
-            };
-
-            var pipelineBuilder = new RenderPipelineBuilder(wgpu, device, swapChainFormat)
-                .WithTopology(PrimitiveTopology.TriangleStrip)
-                .WithDepth(write: false, compare: CompareFunction.Always);
-
-            _shader = new WgpuShader<SkyboxUniforms>(
+            _shader = new SkyboxShader(
                 wgpu,
                 device,
                 queue,
                 EmbeddedResources.ReadAllText("XNOEdit/Shaders/Skybox.wgsl"),
-                "Skybox",
-                swapChainFormat,
-                [vertexLayout],
-                pipelineBuilder);
+                swapChainFormat);
         }
 
         public void Draw(
@@ -79,7 +51,7 @@ namespace XNOEdit.Renderer
             _wgpu.RenderPassEncoderSetPipeline(passEncoder, _shader.GetPipeline());
 
             uint dynamicOffset = 0;
-            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _shader.UniformBindGroup, 0, &dynamicOffset);
+            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, _shader.BindGroup, 0, &dynamicOffset);
             _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
             _wgpu.RenderPassEncoderDraw(passEncoder, 4, 1, 0, 0);
         }
