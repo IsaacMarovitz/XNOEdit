@@ -63,10 +63,11 @@ namespace XNOEdit.Renderer.Shaders
 
         protected override VertexBufferLayout[] CreateVertexLayouts()
         {
-            var vertexAttrib = new VertexAttribute[3];
+            var vertexAttrib = new VertexAttribute[4];
             vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0,  ShaderLocation = 0 };  // Position
             vertexAttrib[1] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };  // Normal
             vertexAttrib[2] = new VertexAttribute { Format = VertexFormat.Float32x4, Offset = 24, ShaderLocation = 2 };  // Color
+            vertexAttrib[3] = new VertexAttribute { Format = VertexFormat.Float32x2, Offset = 36, ShaderLocation = 3 };  // UV
 
             Attributes = GCHandle.Alloc(vertexAttrib, GCHandleType.Pinned);
 
@@ -74,7 +75,7 @@ namespace XNOEdit.Renderer.Shaders
             [
                 new VertexBufferLayout
                 {
-                    ArrayStride = 40,
+                    ArrayStride = 48,
                     StepMode = VertexStepMode.Vertex,
                     AttributeCount = (uint)vertexAttrib.Length,
                     Attributes = (VertexAttribute*)Attributes.AddrOfPinnedObject()

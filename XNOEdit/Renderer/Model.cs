@@ -67,6 +67,18 @@ namespace XNOEdit.Renderer
                         vertices.Add(1.0f);
                         vertices.Add(1.0f);
                     }
+
+                    // UV
+                    if (vertex.TextureCoordinates.Count >= 1)
+                    {
+                        vertices.Add(vertex.TextureCoordinates[0].X);
+                        vertices.Add(vertex.TextureCoordinates[0].Y);
+                    }
+                    else
+                    {
+                        vertices.Add(1.0f);
+                        vertices.Add(1.0f);
+                    }
                 }
 
                 var vbo = new WgpuBuffer<float>(

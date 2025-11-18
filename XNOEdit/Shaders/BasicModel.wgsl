@@ -18,6 +18,7 @@ struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) color: vec4<f32>,
+    @location(3) uv: vec2<f32>
 }
 
 // Vertex output / Fragment input
@@ -26,6 +27,7 @@ struct VertexOutput {
     @location(0) fragPos: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) color: vec4<f32>,
+    @location(3) uv: vec2<f32>
 }
 
 @vertex
@@ -41,8 +43,9 @@ fn vs_main(in: VertexInput) -> VertexOutput {
         uniforms.model[1].xyz,
         uniforms.model[2].xyz
     );
-    out.normal = normalMatrix * in.normal;
 
+    out.normal = normalMatrix * in.normal;
+    out.uv = in.uv;
     out.color = mix(vec4<f32>(1.0), in.color, uniforms.vertColorStrength);
     out.position = uniforms.projection * uniforms.view * worldPos;
 
