@@ -1,11 +1,10 @@
 ﻿using System.Numerics;
-using ImGuiNET;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
-using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
+using XNOEdit.Managers;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Wgpu;
@@ -22,22 +21,18 @@ namespace XNOEdit
         private static Texture* _depthTexture;
         private static TextureView* _depthTextureView;
 
-        private static IKeyboard _primaryKeyboard;
-        private static IInputContext _input;
-
         private static Camera _camera;
         private static ShaderArchive _shaderArchive;
         private static Model _model;
         private static ModelRenderer _modelRenderer;
         private static GridRenderer _grid;
         private static SkyboxRenderer _skybox;
-        private static bool _mouseCaptured;
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
-        private static Vector2 _lastMousePosition;
         private static RenderSettings _settings = new();
         private static TextureManager _textureManager;
         private static readonly UIManager UIManager = new();
+        private static readonly InputManager InputManager = new();
 
         private const TextureFormat DepthTextureFormat = TextureFormat.Depth24Plus;
 
@@ -65,23 +60,6 @@ namespace XNOEdit
 
         private static void OnLoad()
         {
-            _input = _window.CreateInput();
-            _primaryKeyboard = _input.Keyboards.FirstOrDefault();
-
-            if (_primaryKeyboard != null)
-            {
-                _primaryKeyboard.KeyDown += KeyDown;
-            }
-
-            foreach (var mouse in _input.Mice)
-            {
-                mouse.Cursor.CursorMode = CursorMode.Normal;
-                mouse.MouseMove += OnMouseMove;
-                mouse.Scroll += OnMouseWheel;
-                mouse.MouseDown += OnMouseDown;
-                mouse.MouseUp += OnMouseUp;
-            }
-
             InitializeWgpu();
             CreateDepthTexture();
 
@@ -89,7 +67,13 @@ namespace XNOEdit
             _grid = new GridRenderer(_wgpu, _device);
             _skybox = new SkyboxRenderer(_wgpu, _device);
 
-            UIManager.OnLoad(new ImGuiController(_wgpu, _device, _window, _input, 2));
+            InputManager.OnLoad(_window, _settings);
+            InputManager.ResetCameraAction += ResetCamera;
+            InputManager.SettingsChangedAction += OnRenderSettingsChanged;
+            InputManager.MouseMoveAction += _camera.OnMouseMove;
+            InputManager.MouseScrollAction += _camera.OnMouseScroll;
+
+            UIManager.OnLoad(new ImGuiController(_wgpu, _device, _window, InputManager.Input, 2));
             UIManager.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
 
@@ -133,32 +117,15 @@ namespace XNOEdit
             _depthTextureView = _wgpu.TextureCreateView(_depthTexture, &depthViewDesc);
         }
 
-        private static void OnMouseDown(IMouse mouse, MouseButton button)
+        private static void OnRenderSettingsChanged(RenderSettings settings, string alert)
         {
-            if (button != MouseButton.Left || ImGui.GetIO().WantCaptureMouse)
-            {
-                return;
-            }
-
-            _mouseCaptured = true;
-            mouse.Cursor.CursorMode = CursorMode.Raw;
-            _lastMousePosition = default;
-        }
-
-        private static void OnMouseUp(IMouse mouse, MouseButton button)
-        {
-            if (button != MouseButton.Left || ImGui.GetIO().WantCaptureMouse)
-            {
-                return;
-            }
-
-            _mouseCaptured = false;
-            mouse.Cursor.CursorMode = CursorMode.Normal;
+            _settings = settings;
+            UIManager.TriggerAlert(alert);
         }
 
         private static void OnUpdate(double deltaTime)
         {
-            _camera.ProcessKeyboard(_primaryKeyboard, (float)deltaTime);
+            _camera.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime);
         }
 
         private static void OnRender(double deltaTime)
@@ -231,7 +198,6 @@ namespace XNOEdit
                         Model = Matrix4x4.CreateTranslation(_modelCenter),
                         Position = _camera.Position,
                         FadeDistance = _modelRadius * 5.0f
-
                     });
             }
 
@@ -286,40 +252,15 @@ namespace XNOEdit
             CreateDepthTexture();
         }
 
-        private static void OnMouseMove(IMouse mouse, Vector2 position)
-        {
-            if (!_mouseCaptured) return;
-
-            var lookSensitivity = 0.1f;
-            if (_lastMousePosition == default)
-            {
-                _lastMousePosition = position;
-            }
-            else
-            {
-                var xOffset = (position.X - _lastMousePosition.X) * lookSensitivity;
-                var yOffset = (position.Y - _lastMousePosition.Y) * lookSensitivity;
-                _lastMousePosition = position;
-
-                _camera.ProcessMouseMove(xOffset, yOffset);
-            }
-        }
-
-        private static void OnMouseWheel(IMouse mouse, ScrollWheel scrollWheel)
-        {
-            if (!ImGui.GetIO().WantCaptureMouse)
-                _camera.ProcessMouseScroll(scrollWheel.Y);
-        }
-
         private static void OnClose()
         {
             _model?.Dispose();
             _modelRenderer?.Dispose();
             _grid?.Dispose();
             _skybox?.Dispose();
-            _input?.Dispose();
             _textureManager?.Dispose();
             UIManager?.Dispose();
+            InputManager?.Dispose();
 
             if (_depthTextureView != null)
                 _wgpu.TextureViewRelease(_depthTextureView);
@@ -400,40 +341,6 @@ namespace XNOEdit
         {
             var distance = Math.Max(_modelRadius * 2.5f, 10.0f);
             _camera.FrameTarget(_modelCenter, distance);
-        }
-
-        private static void KeyDown(IKeyboard keyboard, Key key, int keyCode)
-        {
-            if (key == Key.Escape)
-                _window.Close();
-
-            var alert = string.Empty;
-
-            switch (key)
-            {
-                case Key.F:
-                    _settings.WireframeMode = !_settings.WireframeMode;
-                    alert = $"Wireframe Mode: {(_settings.WireframeMode ? "ON" : "OFF")}";
-                    break;
-                case Key.G:
-                    _settings.ShowGrid = !_settings.ShowGrid;
-                    alert = $"Grid: {(_settings.ShowGrid ? "ON" : "OFF")}";
-                    break;
-                case Key.C:
-                    _settings.BackfaceCulling = !_settings.BackfaceCulling;
-                    alert = $"Backface Culling: {(_settings.BackfaceCulling ? "ON" : "OFF")}";
-                    break;
-                case Key.V:
-                    _settings.VertexColors = !_settings.VertexColors;
-                    alert = $"Vertex Colors: {(_settings.VertexColors ? "ON" : "OFF")}";
-                    break;
-                case Key.R:
-                    ResetCamera();
-                    alert = "Camera Reset";
-                    break;
-            }
-
-            UIManager.TriggerAlert(alert);
         }
     }
 }

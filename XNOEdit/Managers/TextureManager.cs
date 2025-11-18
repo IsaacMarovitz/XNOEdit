@@ -4,7 +4,7 @@ using Silk.NET.WebGPU;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Wgpu;
 
-namespace XNOEdit
+namespace XNOEdit.Managers
 {
     public unsafe class TextureManager : IDisposable
     {

@@ -69,7 +69,7 @@ namespace XNOEdit.Renderer
                 Position += Vector3.UnitY * velocity;
         }
 
-        public void ProcessMouseMove(float xOffset, float yOffset)
+        public void OnMouseMove(float xOffset, float yOffset)
         {
             xOffset *= LookSensitivity;
             yOffset *= LookSensitivity;
@@ -82,7 +82,7 @@ namespace XNOEdit.Renderer
             UpdateVectors();
         }
 
-        public void ProcessMouseScroll(float scrollY)
+        public void OnMouseScroll(float scrollY)
         {
             Position += _front * scrollY * DollySpeed * _modelRadius;
         }

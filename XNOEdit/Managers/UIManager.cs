@@ -5,11 +5,12 @@ using Silk.NET.WebGPU;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
 
-namespace XNOEdit
+namespace XNOEdit.Managers
 {
     public class UIManager : IDisposable
     {
         public event Action ResetCameraAction;
+
         public ImGuiController Controller { get; private set; }
         private ImGuiXnoPanel _xnoPanel;
         private ImGuiAlertPanel _alertPanel;
