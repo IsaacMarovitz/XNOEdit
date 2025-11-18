@@ -36,6 +36,7 @@ namespace XNOEdit
         private static float _modelRadius = 1.0f;
         private static Vector2 _lastMousePosition;
         private static RenderSettings _settings = new();
+        private static TextureManager _textureManager;
         private static readonly UIManager UIManager = new();
 
         private const TextureFormat DepthTextureFormat = TextureFormat.Depth24Plus;
@@ -87,13 +88,12 @@ namespace XNOEdit
             _camera = new Camera();
             _grid = new GridRenderer(_wgpu, _device);
             _skybox = new SkyboxRenderer(_wgpu, _device);
-            UIManager.OnLoad(
-                _wgpu,
-                _device,
-                new ImGuiController(_wgpu, _device, _window, _input, 2),
-                _settings);
 
-            UIManager.ResetCameraAction +=  ResetCamera;
+            UIManager.OnLoad(new ImGuiController(_wgpu, _device, _window, _input, 2));
+            UIManager.InitSunAngles(_settings);
+            UIManager.ResetCameraAction += ResetCamera;
+
+            _textureManager = new TextureManager(_wgpu, _device, _queue, UIManager.Controller);
         }
 
         private static void InitializeWgpu()
@@ -249,7 +249,7 @@ namespace XNOEdit
                     });
             }
 
-            UIManager.OnRender(deltaTime, ref _settings, pass);
+            UIManager.OnRender(deltaTime, ref _settings, pass, _textureManager.Textures);
 
             _wgpu.RenderPassEncoderEnd(pass);
 
@@ -318,6 +318,7 @@ namespace XNOEdit
             _grid?.Dispose();
             _skybox?.Dispose();
             _input?.Dispose();
+            _textureManager?.Dispose();
             UIManager?.Dispose();
 
             if (_depthTextureView != null)
@@ -362,13 +363,15 @@ namespace XNOEdit
 
                 if (objectChunk != null && effectChunk != null)
                 {
-                    UIManager.ReadXno(xno, file, _queue);
+                    UIManager.InitXnoPanel(xno);
 
                     _window.Title = $"XNOEdit - {xno.Name}";
 
                     _model?.Dispose();
                     _modelRenderer?.Dispose();
+                    _textureManager.ClearTextures();
 
+                    _textureManager.LoadTextures(Path.GetDirectoryName(file), textureListChunk);
                     _model = new Model(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
                     _modelRenderer = new ModelRenderer(_wgpu, _device, _model);
 

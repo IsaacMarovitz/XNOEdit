@@ -14,7 +14,7 @@ namespace XNOEdit.Panels
             _xno = xno;
         }
 
-        public void Render(Dictionary<string, IntPtr> textures)
+        public void Render(IReadOnlyDictionary<string, IntPtr> textures)
         {
             ImGui.Begin($"{_xno.Name}###XnoPanel", ImGuiWindowFlags.AlwaysAutoResize);
 
