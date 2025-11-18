@@ -78,7 +78,7 @@ namespace XNOEdit.Renderer.Shaders
                 MipmapFilter = MipmapFilterMode.Linear,
                 LodMinClamp = 0.0f,
                 LodMaxClamp = 32.0f,
-                MaxAnisotropy = 1
+                MaxAnisotropy = 16
             };
 
             _sampler = Wgpu.DeviceCreateSampler(Device, &samplerDesc);

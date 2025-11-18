@@ -50,6 +50,12 @@ namespace XNOEdit.Managers
         {
             using var image = Pfimage.FromFile(path);
 
+            var mipLevelCount = image.MipMaps != null && image.MipMaps.Length > 0
+                ? (uint)(image.MipMaps.Length + 1)
+                : 1u;
+
+            Console.WriteLine($"  Loading {name}: {image.Width}x{image.Height}, {mipLevelCount} mip levels, format: {image.Format}");
+
             var textureDesc = new TextureDescriptor
             {
                 Size = new Extent3D
@@ -58,7 +64,7 @@ namespace XNOEdit.Managers
                     Height = (uint)image.Height,
                     DepthOrArrayLayers = 1
                 },
-                MipLevelCount = 1,
+                MipLevelCount = mipLevelCount,
                 SampleCount = 1,
                 Dimension = TextureDimension.Dimension2D,
                 Format = TextureFormat.Bgra8Unorm,
@@ -67,43 +73,51 @@ namespace XNOEdit.Managers
 
             var wgpuTexture = _wgpu.DeviceCreateTexture(_device, &textureDesc);
 
-            var imageData = ConvertToRgba(image);
-            UploadTextureData(wgpuTexture, imageData, image.Width, image.Height);
+            UploadMipLevel(wgpuTexture, image.Data, 0, image.Data.Length,
+                          image.Width, image.Height, image.Stride, 0, image.Format);
 
-            var textureView = CreateTextureView(wgpuTexture);
+            if (image.MipMaps != null && image.MipMaps.Length > 0)
+            {
+                for (int i = 0; i < image.MipMaps.Length; i++)
+                {
+                    var mipMap = image.MipMaps[i];
 
+                    UploadMipLevel(wgpuTexture, image.Data, mipMap.DataOffset, mipMap.DataLen,
+                                  mipMap.Width, mipMap.Height, mipMap.Stride, (uint)(i + 1), image.Format);
+                }
+            }
+
+            var viewDesc = new TextureViewDescriptor
+            {
+                Format = TextureFormat.Bgra8Unorm,
+                Dimension = TextureViewDimension.Dimension2D,
+                BaseMipLevel = 0,
+                MipLevelCount = mipLevelCount,
+                BaseArrayLayer = 0,
+                ArrayLayerCount = 1,
+                Aspect = TextureAspect.All
+            };
+
+            var textureView = _wgpu.TextureCreateView(wgpuTexture, &viewDesc);
             _controller.BindImGuiTextureView(textureView);
+
             _textures.Add(name, (IntPtr)textureView);
         }
 
-        private static byte[] ConvertToRgba(IImage image)
+        private void UploadMipLevel(Texture* texture, byte[] sourceData, int dataOffset, int dataLen,
+                                    int width, int height, int stride, uint mipLevel, ImageFormat format)
         {
-            var imageData = image.Data;
+            var mipData = new byte[dataLen];
+            Array.Copy(sourceData, dataOffset, mipData, 0, dataLen);
 
-            if (image.Format == ImageFormat.Rgb24)
-            {
-                var rgbaData = new byte[image.Width * image.Height * 4];
-                for (int i = 0, j = 0; i < imageData.Length; i += 3, j += 4)
-                {
-                    rgbaData[j] = imageData[i];         // R
-                    rgbaData[j + 1] = imageData[i + 1]; // G
-                    rgbaData[j + 2] = imageData[i + 2]; // B
-                    rgbaData[j + 3] = 255;              // A
-                }
-                return rgbaData;
-            }
+            var imageData = ConvertToRgba(mipData, width, height, stride, format);
 
-            return imageData;
-        }
-
-        private void UploadTextureData(Texture* texture, byte[] data, int width, int height)
-        {
-            fixed (byte* pData = data)
+            fixed (byte* pData = imageData)
             {
                 var imageCopyTexture = new ImageCopyTexture
                 {
                     Texture = texture,
-                    MipLevel = 0,
+                    MipLevel = mipLevel,
                     Origin = new Origin3D { X = 0, Y = 0, Z = 0 },
                     Aspect = TextureAspect.All
                 };
@@ -127,31 +141,81 @@ namespace XNOEdit.Managers
             }
         }
 
-        private TextureView* CreateTextureView(Texture* texture)
+        private static byte[] ConvertToRgba(byte[] data, int width, int height, int stride, ImageFormat format)
         {
-            var viewDesc = new TextureViewDescriptor
-            {
-                Format = TextureFormat.Bgra8Unorm,
-                Dimension = TextureViewDimension.Dimension2D,
-                BaseMipLevel = 0,
-                MipLevelCount = 1,
-                BaseArrayLayer = 0,
-                ArrayLayerCount = 1,
-                Aspect = TextureAspect.All
-            };
+            var bytesPerPixel = GetBytesPerPixel(format);
+            var rgbaData = new byte[width * height * 4];
 
-            return _wgpu.TextureCreateView(texture, &viewDesc);
+            // Handle stride (row padding)
+            for (int y = 0; y < height; y++)
+            {
+                int srcRowStart = y * stride;
+                int dstRowStart = y * width * 4;
+
+                for (int x = 0; x < width; x++)
+                {
+                    int srcIdx = srcRowStart + x * bytesPerPixel;
+                    int dstIdx = dstRowStart + x * 4;
+
+                    switch (format)
+                    {
+                        case ImageFormat.Rgb24:
+                            rgbaData[dstIdx + 0] = data[srcIdx + 0]; // R
+                            rgbaData[dstIdx + 1] = data[srcIdx + 1]; // G
+                            rgbaData[dstIdx + 2] = data[srcIdx + 2]; // B
+                            rgbaData[dstIdx + 3] = 255;              // A
+                            break;
+
+                        case ImageFormat.Rgba32:
+                            rgbaData[dstIdx + 0] = data[srcIdx + 0]; // R
+                            rgbaData[dstIdx + 1] = data[srcIdx + 1]; // G
+                            rgbaData[dstIdx + 2] = data[srcIdx + 2]; // B
+                            rgbaData[dstIdx + 3] = data[srcIdx + 3]; // A
+                            break;
+
+                        case ImageFormat.Rgb8:
+                            // 8-bit indexed color - copy as grayscale
+                            var gray = data[srcIdx];
+                            rgbaData[dstIdx + 0] = gray;
+                            rgbaData[dstIdx + 1] = gray;
+                            rgbaData[dstIdx + 2] = gray;
+                            rgbaData[dstIdx + 3] = 255;
+                            break;
+
+                        default:
+                            // For other formats, assume it's already in RGBA order
+                            if (bytesPerPixel >= 4)
+                            {
+                                rgbaData[dstIdx + 0] = data[srcIdx + 0];
+                                rgbaData[dstIdx + 1] = data[srcIdx + 1];
+                                rgbaData[dstIdx + 2] = data[srcIdx + 2];
+                                rgbaData[dstIdx + 3] = data[srcIdx + 3];
+                            }
+                            break;
+                    }
+                }
+            }
+
+            return rgbaData;
+        }
+
+        private static int GetBytesPerPixel(ImageFormat format)
+        {
+            return format switch
+            {
+                ImageFormat.Rgb8 => 1,
+                ImageFormat.Rgb24 => 3,
+                _ => 4
+            };
         }
 
         public void ClearTextures()
         {
             foreach (var texturePtr in _textures.Values)
             {
-                var textureView = (TextureView*)texturePtr;
-                _controller.UnbindImGuiTextureView(textureView);
-                _wgpu.TextureViewRelease(textureView);
+                _controller.UnbindImGuiTextureView((TextureView*)texturePtr);
+                _wgpu.TextureViewRelease((TextureView*)texturePtr);
             }
-
             _textures.Clear();
         }
 
