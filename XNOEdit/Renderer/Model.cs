@@ -78,10 +78,13 @@ namespace XNOEdit.Renderer
                     }
 
                     // UV
-                    if (vertex.TextureCoordinates.Count >= 1)
+                    if (vertex.TextureCoordinates != null)
                     {
-                        vertices.Add(vertex.TextureCoordinates[0].X);
-                        vertices.Add(vertex.TextureCoordinates[0].Y);
+                        if (vertex.TextureCoordinates.Count >= 1)
+                        {
+                            vertices.Add(vertex.TextureCoordinates[0].X);
+                            vertices.Add(vertex.TextureCoordinates[0].Y);
+                        }
                     }
                     else
                     {
@@ -130,7 +133,7 @@ namespace XNOEdit.Renderer
                         continue;
                     }
 
-                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, effectName, techniqueName, textureSet);
+                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, effectName, techniqueName, textureSet, material.Colour);
                     _meshes.Add(mesh);
                 }
             }
@@ -211,11 +214,17 @@ namespace XNOEdit.Renderer
             };
         }
 
-        public void Draw(RenderPassEncoder* passEncoder, bool wireframe, IReadOnlyDictionary<string, IntPtr> textures, ModelShader shader)
+        public void Draw(
+            Queue* queue,
+            RenderPassEncoder* passEncoder,
+            bool wireframe,
+            IReadOnlyDictionary<string, IntPtr> textures,
+            ModelShader shader,
+            BasicModelUniforms uniforms)
         {
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(passEncoder, wireframe, textures, shader);
+                mesh.Draw(queue, passEncoder, wireframe, textures, shader, uniforms);
             }
         }
 
@@ -245,6 +254,7 @@ namespace XNOEdit.Renderer
         private string _effect;
         private string _technique;
         private TextureSet _textureSet;
+        private MaterialColour _materialColour;
 
         public ModelMesh(
             WebGPU wgpu,
@@ -253,13 +263,15 @@ namespace XNOEdit.Renderer
             PrimitiveList primitiveList,
             string effect,
             string technique,
-            TextureSet textureSet)
+            TextureSet textureSet,
+            MaterialColour materialColour)
         {
             _wgpu = wgpu;
             _effect = effect;
             _technique = technique;
             _vertexBuffer = sharedVbo;
             _textureSet = textureSet;
+            _materialColour = materialColour;
 
             LoadMesh(device, primitiveList);
         }
@@ -345,11 +357,22 @@ namespace XNOEdit.Renderer
         }
 
         public void Draw(
+            Queue* queue,
             RenderPassEncoder* passEncoder,
             bool wireframe,
             IReadOnlyDictionary<string, IntPtr> textures,
-            ModelShader shader)
+            ModelShader shader,
+            BasicModelUniforms uniforms)
         {
+            uniforms.AmbientColor = new Vector4(_materialColour.Ambient.B, _materialColour.Ambient.G, _materialColour.Ambient.R, _materialColour.Ambient.A);
+            uniforms.DiffuseColor = new Vector4(_materialColour.Diffuse.B, _materialColour.Diffuse.G, _materialColour.Diffuse.R, _materialColour.Diffuse.A);
+            uniforms.SpecularColor = new Vector4(_materialColour.Specular.B, _materialColour.Specular.G, _materialColour.Specular.R, _materialColour.Specular.A);
+            uniforms.EmissiveColor = new Vector4(_materialColour.Emissive.B, _materialColour.Emissive.G, _materialColour.Emissive.R, _materialColour.Emissive.A);
+
+            uniforms.SpecularPower = _materialColour.Power;
+
+            shader.UpdateUniforms(queue, in uniforms);
+
             _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
 
             TextureView* mainTexture = null;

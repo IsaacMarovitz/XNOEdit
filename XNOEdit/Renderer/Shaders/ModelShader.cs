@@ -5,16 +5,23 @@ using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer.Shaders
 {
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, Pack = 16)]
     public struct BasicModelUniforms
     {
         public Matrix4x4 Model;
         public Matrix4x4 View;
         public Matrix4x4 Projection;
+
+        public Vector4 AmbientColor;
+        public Vector4 DiffuseColor;
+        public Vector4 SpecularColor;
+        public Vector4 EmissiveColor;
+
         public Vector4 SunDirection;
         public Vector4 SunColor;
         public Vector3 Position;
         public float VertColorStrength;
+        public float SpecularPower;
     }
 
     public unsafe class ModelShader : WgpuShader<BasicModelUniforms>

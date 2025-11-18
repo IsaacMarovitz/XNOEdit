@@ -71,6 +71,7 @@ namespace XNOEdit.Renderer.Wgpu
                 wgpu,
                 device,
                 BufferUsage.Uniform | BufferUsage.CopyDst,
+                (ulong)sizeof(T),
                 UniformBufferAlignment);
         }
 

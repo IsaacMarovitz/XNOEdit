@@ -45,6 +45,7 @@ namespace XNOEdit.Renderer.Renderers
                 Model = Matrix4x4.Identity,
                 View = view,
                 Projection = projection,
+
                 SunDirection = modelParameters.SunDirection.AsVector4(),
                 SunColor = modelParameters.SunColor.AsVector4(),
                 Position = modelParameters.Position,
@@ -53,12 +54,10 @@ namespace XNOEdit.Renderer.Renderers
 
             var modelShader = (ModelShader)Shader;
 
-            modelShader.UpdateUniforms(queue, in uniforms);
-
             var pipeline = modelShader.GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
             Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
 
-            _model.Draw(passEncoder, modelParameters.Wireframe, modelParameters.Textures, modelShader);
+            _model.Draw(queue, passEncoder, modelParameters.Wireframe, modelParameters.Textures, modelShader, uniforms);
         }
 
         public override void Dispose()
