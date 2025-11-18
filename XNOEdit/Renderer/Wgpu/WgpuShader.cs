@@ -10,16 +10,18 @@ namespace XNOEdit.Renderer.Wgpu
         protected readonly WebGPU Wgpu;
         protected readonly WgpuDevice Device;
         private readonly ShaderModule* _shaderModule;
-        private readonly BindGroupLayout* _bindGroupLayout;
-        private readonly BindGroup* _bindGroup;
+
+        protected readonly List<IntPtr> _bindGroupLayouts = new();
+        protected readonly List<IntPtr> _bindGroups = new();
+
+        public int BindGroupCount => _bindGroups.Count;
+
         private readonly Dictionary<string, IntPtr> _pipelines;
         private readonly VertexBufferLayout[] _vertexLayouts;
         protected GCHandle Attributes;
 
         private readonly List<IDisposable> _resources;
         private bool _disposed;
-
-        public BindGroup* BindGroup => _bindGroup;
 
         protected WgpuShader(
             WebGPU wgpu,
@@ -36,10 +38,10 @@ namespace XNOEdit.Renderer.Wgpu
             _shaderModule = CreateShaderModule(wgpu, device, shaderSource, label);
             _vertexLayouts = CreateVertexLayouts();
 
-            var (bindGroupLayout, bindGroup) = CreateBindGroupResources();
-            _bindGroupLayout = (BindGroupLayout*)bindGroupLayout;
-            _bindGroup = (BindGroup*)bindGroup;
+            // Let derived classes set up their bind groups
+            SetupBindGroups();
 
+            // Create pipelines with all registered layouts
             foreach (var (name, descriptor) in pipelineVariants)
             {
                 var pipeline = CreatePipeline(descriptor);
@@ -49,7 +51,40 @@ namespace XNOEdit.Renderer.Wgpu
 
         protected abstract VertexBufferLayout[] CreateVertexLayouts();
 
-        protected abstract (IntPtr, IntPtr) CreateBindGroupResources();
+        /// <summary>
+        /// Derived classes override this to create their bind group layouts and bind groups.
+        /// Call RegisterBindGroup() for each group in order (0, 1, 2, etc.)
+        /// </summary>
+        protected abstract void SetupBindGroups();
+
+        /// <summary>
+        /// Register a bind group layout and its corresponding bind group.
+        /// Must be called in order: group 0, then 1, then 2, etc.
+        /// </summary>
+        protected void RegisterBindGroup(BindGroupLayout* layout, BindGroup* bindGroup)
+        {
+            _bindGroupLayouts.Add((IntPtr)layout);
+            _bindGroups.Add((IntPtr)bindGroup);
+        }
+
+        public BindGroupLayout* GetBindGroupLayout(int index)
+        {
+            if (index < 0 || index >= _bindGroupLayouts.Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
+            return (BindGroupLayout*)_bindGroupLayouts[index];
+        }
+
+        /// <summary>
+        /// Get a specific bind group by index
+        /// </summary>
+        public BindGroup* GetBindGroup(int index = 0)
+        {
+            if (index < 0 || index >= _bindGroups.Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
+            return (BindGroup*)_bindGroups[index];
+        }
 
         public RenderPipeline* GetPipeline(string variant = "default")
         {
@@ -63,7 +98,7 @@ namespace XNOEdit.Renderer.Wgpu
         {
             var builder = new RenderPipelineBuilder(Wgpu, Device)
                 .WithShader(_shaderModule)
-                .WithBindGroupLayout(_bindGroupLayout)
+                .WithBindGroupLayouts(_bindGroupLayouts.ToArray())
                 .WithVertexLayouts(_vertexLayouts)
                 .WithTopology(descriptor.Topology)
                 .WithCulling(descriptor.CullMode, descriptor.FrontFace)
@@ -133,11 +168,18 @@ namespace XNOEdit.Renderer.Wgpu
             if (Attributes.IsAllocated)
                 Attributes.Free();
 
-            if (_bindGroup != null)
-                Wgpu.BindGroupRelease(_bindGroup);
+            // Release all bind groups and layouts
+            foreach (BindGroup* bindGroup in _bindGroups)
+            {
+                if (bindGroup != null)
+                    Wgpu.BindGroupRelease(bindGroup);
+            }
 
-            if (_bindGroupLayout != null)
-                Wgpu.BindGroupLayoutRelease(_bindGroupLayout);
+            foreach (BindGroupLayout* layout in _bindGroupLayouts)
+            {
+                if (layout != null)
+                    Wgpu.BindGroupLayoutRelease(layout);
+            }
 
             if (_shaderModule != null)
                 Wgpu.ShaderModuleRelease(_shaderModule);
@@ -148,7 +190,7 @@ namespace XNOEdit.Renderer.Wgpu
 
     public unsafe class WgpuShader<TUniforms> : WgpuShader where TUniforms : unmanaged
     {
-        private WgpuBuffer<TUniforms> _uniformBuffer;
+        protected WgpuBuffer<TUniforms> _uniformBuffer;
 
         protected WgpuShader(
             WebGPU wgpu,
@@ -165,8 +207,9 @@ namespace XNOEdit.Renderer.Wgpu
             throw new NotImplementedException();
         }
 
-        protected override (IntPtr, IntPtr) CreateBindGroupResources()
+        protected override void SetupBindGroups()
         {
+            // Default: Create bind group 0 for uniforms
             _uniformBuffer = WgpuBuffer<TUniforms>.CreateUniform(Wgpu, Device);
             RegisterResource(_uniformBuffer);
 
@@ -176,7 +219,7 @@ namespace XNOEdit.Renderer.Wgpu
             var layout = bindGroupBuilder.BuildLayout();
             var bindGroup = bindGroupBuilder.BuildBindGroup();
 
-            return ((IntPtr)layout, (IntPtr)bindGroup);
+            RegisterBindGroup(layout, bindGroup);
         }
 
         public void UpdateUniforms(Queue* queue, in TUniforms uniforms)

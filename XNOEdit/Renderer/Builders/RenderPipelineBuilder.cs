@@ -79,6 +79,12 @@ namespace XNOEdit.Renderer.Builders
             return this;
         }
 
+        public RenderPipelineBuilder WithBindGroupLayouts(IntPtr[] layout)
+        {
+            _bindGroupLayouts.AddRange(layout);
+            return this;
+        }
+
         public RenderPipelineBuilder WithDepth(
             bool write = true,
             CompareFunction compare = CompareFunction.Less)

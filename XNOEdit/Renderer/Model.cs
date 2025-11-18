@@ -2,11 +2,20 @@ using System.Numerics;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
+using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Shaders;
 
 namespace XNOEdit.Renderer
 {
+    public struct TextureSet
+    {
+        public string MainTexture;
+        public string BlendMap;
+        public string NormalMap;
+        public string LightMap;
+    }
+
     public unsafe class Model : IDisposable
     {
         private readonly WebGPU _wgpu;
@@ -91,21 +100,22 @@ namespace XNOEdit.Renderer
 
             foreach (var subObject in objectChunk.SubObjects)
             {
-                var textures = textureListChunk.Textures
-                    .Select((tex, i) => new { Tex = tex, Index = i })
-                    .Where(i => subObject.TextureIndices.Contains(i.Index))
-                    .Select(i => i.Tex)
-                    .ToList();
-
-                IntuitTextures(textures);
-
                 foreach (var meshSet in subObject.MeshSets)
                 {
                     var vertexListIndex = meshSet.VertexListIndex;
                     var primitiveList = meshSet.GetPrimitiveList(objectChunk);
                     var technique = meshSet.GetTechnique(effectListChunk);
+                    var material = meshSet.GetMaterial(objectChunk);
                     var effectName = string.Empty;
                     var techniqueName = string.Empty;
+
+                    var textures = material.TextureMap.Descriptions
+                        .Where(d => d.Index >= 0 && d.Index < textureListChunk.Textures.Count)
+                        .Select(d => textureListChunk.Textures[d.Index])
+                        .Distinct()
+                        .ToList();
+
+                    var textureSet = IntuitTextures(textures);
 
                     if (technique != null)
                     {
@@ -120,7 +130,7 @@ namespace XNOEdit.Renderer
                         continue;
                     }
 
-                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, effectName, techniqueName);
+                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, effectName, techniqueName, textureSet);
                     _meshes.Add(mesh);
                 }
             }
@@ -128,7 +138,7 @@ namespace XNOEdit.Renderer
             Console.WriteLine($"Loaded {_sharedVertexBuffers.Count} vertex buffers, {_meshes.Count} meshes");
         }
 
-        private static void IntuitTextures(List<TextureFile> textures)
+        private static TextureSet IntuitTextures(List<TextureFile> textures)
         {
             // Adapted from Beatz
             int FindDiffuseIndex(string lowerName, out string mainTag)
@@ -191,13 +201,21 @@ namespace XNOEdit.Renderer
 
             if (lightMapName != null)
                 Console.WriteLine($"Light Map: {lightMapName}");
+
+            return new TextureSet
+            {
+                MainTexture = mainTextureName,
+                BlendMap = blendMapName,
+                NormalMap = normalMapName,
+                LightMap = lightMapName
+            };
         }
 
-        public void Draw(RenderPassEncoder* passEncoder, bool wireframe)
+        public void Draw(RenderPassEncoder* passEncoder, bool wireframe, IReadOnlyDictionary<string, IntPtr> textures, ModelShader shader)
         {
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(passEncoder, wireframe);
+                mesh.Draw(passEncoder, wireframe, textures, shader);
             }
         }
 
@@ -226,6 +244,7 @@ namespace XNOEdit.Renderer
         private int _wireframeIndexCount;
         private string _effect;
         private string _technique;
+        private TextureSet _textureSet;
 
         public ModelMesh(
             WebGPU wgpu,
@@ -233,12 +252,14 @@ namespace XNOEdit.Renderer
             WgpuBuffer<float> sharedVbo,
             PrimitiveList primitiveList,
             string effect,
-            string technique)
+            string technique,
+            TextureSet textureSet)
         {
             _wgpu = wgpu;
             _effect = effect;
             _technique = technique;
             _vertexBuffer = sharedVbo;
+            _textureSet = textureSet;
 
             LoadMesh(device, primitiveList);
         }
@@ -323,20 +344,58 @@ namespace XNOEdit.Renderer
                 lines.Add((b, a));
         }
 
-        public void Draw(RenderPassEncoder* passEncoder, bool wireframe = false)
+        public void Draw(
+            RenderPassEncoder* passEncoder,
+            bool wireframe,
+            IReadOnlyDictionary<string, IntPtr> textures,
+            ModelShader shader)
         {
             _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
+
+            TextureView* mainTexture = null;
+            if (_textureSet.MainTexture != null &&
+                textures.TryGetValue(_textureSet.MainTexture, out var mainTexturePtr))
+            {
+                mainTexture = (TextureView*)mainTexturePtr;
+            }
+
+            TextureView* blendTexture = null;
+            if (_textureSet.BlendMap != null &&
+                textures.TryGetValue(_textureSet.BlendMap, out var blendTexturePtr))
+            {
+                blendTexture = (TextureView*)blendTexturePtr;
+            }
+
+            TextureView* noramlTexture = null;
+            if (_textureSet.NormalMap != null &&
+                textures.TryGetValue(_textureSet.NormalMap, out var normalTexturePtr))
+            {
+                noramlTexture = (TextureView*)normalTexturePtr;
+            }
+
+            TextureView* lightmapTexture = null;
+            if (_textureSet.BlendMap != null &&
+                textures.TryGetValue(_textureSet.BlendMap, out var lightmapTexturePtr))
+            {
+                lightmapTexture = (TextureView*)lightmapTexturePtr;
+            }
+
+            var textureBindGroup = shader.GetTextureBindGroup(
+                mainTexture, blendTexture, noramlTexture, lightmapTexture);
+            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 1, textureBindGroup, 0, null);
 
             if (wireframe)
             {
                 if (_wireframeIndexCount == 0) return;
-                _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _wireframeIndexBuffer.Handle, IndexFormat.Uint16, 0, _wireframeIndexBuffer.Size);
+                _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _wireframeIndexBuffer.Handle,
+                    IndexFormat.Uint16, 0, _wireframeIndexBuffer.Size);
                 _wgpu.RenderPassEncoderDrawIndexed(passEncoder, (uint)_wireframeIndexCount, 1, 0, 0, 0);
             }
             else
             {
                 if (_indexCount == 0) return;
-                _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _indexBuffer.Handle, IndexFormat.Uint16, 0, _indexBuffer.Size);
+                _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _indexBuffer.Handle,
+                    IndexFormat.Uint16, 0, _indexBuffer.Size);
                 _wgpu.RenderPassEncoderDrawIndexed(passEncoder, (uint)_indexCount, 1, 0, 0, 0);
             }
         }

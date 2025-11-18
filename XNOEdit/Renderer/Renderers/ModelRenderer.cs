@@ -13,6 +13,7 @@ namespace XNOEdit.Renderer.Renderers
         public float VertColorStrength;
         public bool Wireframe;
         public bool CullBackfaces;
+        public IReadOnlyDictionary<string, IntPtr> Textures;
     }
 
     public unsafe class ModelRenderer : WgpuRenderer<ModelParameters>
@@ -50,12 +51,14 @@ namespace XNOEdit.Renderer.Renderers
                 VertColorStrength = modelParameters.VertColorStrength
             };
 
-            ((ModelShader)Shader).UpdateUniforms(queue, in uniforms);
+            var modelShader = (ModelShader)Shader;
 
-            var pipeline = ((ModelShader)Shader).GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
+            modelShader.UpdateUniforms(queue, in uniforms);
+
+            var pipeline = modelShader.GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
             Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
 
-            _model.Draw(passEncoder, modelParameters.Wireframe);
+            _model.Draw(passEncoder, modelParameters.Wireframe, modelParameters.Textures, modelShader);
         }
 
         public override void Dispose()

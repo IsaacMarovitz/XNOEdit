@@ -21,13 +21,26 @@ namespace XNOEdit.Renderer.Wgpu
             Matrix4x4 projection,
             TParameters parameters)
         {
-            uint dynamicOffset = 0;
-            Wgpu.RenderPassEncoderSetBindGroup(passEncoder, 0, Shader.BindGroup, 0, &dynamicOffset);
+            BindStaticBindGroups(passEncoder);
+        }
+
+        protected void BindStaticBindGroups(RenderPassEncoder* passEncoder)
+        {
+            for (uint i = 0; i < Shader.BindGroupCount; i++)
+            {
+                var bindGroup = Shader.GetBindGroup((int)i);
+
+                // Only bind non-null bind groups (some may be dynamic, created elsewhere)
+                if (bindGroup != null)
+                {
+                    uint dynamicOffset = 0;
+                    Wgpu.RenderPassEncoderSetBindGroup(passEncoder, i, bindGroup, 0, &dynamicOffset);
+                }
+            }
         }
 
         public virtual void Dispose()
         {
-            Wgpu?.Dispose();
             Shader?.Dispose();
         }
     }

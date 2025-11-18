@@ -236,7 +236,8 @@ namespace XNOEdit
                         Position =  _camera.Position,
                         VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
                         Wireframe = _settings.WireframeMode,
-                        CullBackfaces =  _settings.BackfaceCulling
+                        CullBackfaces =  _settings.BackfaceCulling,
+                        Textures = _textureManager.Textures
                     });
             }
 
