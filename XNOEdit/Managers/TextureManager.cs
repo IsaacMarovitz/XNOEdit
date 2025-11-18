@@ -101,7 +101,7 @@ namespace XNOEdit.Managers
             var textureView = _wgpu.TextureCreateView(wgpuTexture, &viewDesc);
             _controller.BindImGuiTextureView(textureView);
 
-            _textures.Add(name, (IntPtr)textureView);
+            _textures.TryAdd(name, (IntPtr)textureView);
         }
 
         private void UploadMipLevel(Texture* texture, byte[] sourceData, int dataOffset, int dataLen,
