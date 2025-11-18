@@ -5,10 +5,19 @@ using Silk.NET.Windowing;
 
 namespace XNOEdit.Managers
 {
+    public enum SettingsToggle
+    {
+        WireframeMode,
+        ShowGrid,
+        BackfaceCulling,
+        VertexColors,
+        None
+    }
+
     public class InputManager : IDisposable
     {
         public event Action ResetCameraAction;
-        public event Action<RenderSettings, string> SettingsChangedAction;
+        public event Action<SettingsToggle> SettingsChangedAction;
         public event Action<float, float> MouseMoveAction;
         public event Action<float> MouseScrollAction;
 
@@ -16,14 +25,12 @@ namespace XNOEdit.Managers
         public IInputContext Input { get; private set; }
 
         private IWindow _window;
-        private RenderSettings _settings;
         private bool _mouseCaptured;
         private Vector2 _lastMousePosition;
 
-        public void OnLoad(IWindow window, RenderSettings settings)
+        public void OnLoad(IWindow window)
         {
             _window = window;
-            _settings = settings;
             Input = _window.CreateInput();
 
             PrimaryKeyboard = Input.Keyboards.FirstOrDefault();
@@ -48,33 +55,29 @@ namespace XNOEdit.Managers
             if (key == Key.Escape)
                 _window.Close();
 
-            var alert = string.Empty;
+            var toggle = SettingsToggle.None;
 
             switch (key)
             {
                 case Key.F:
-                    _settings.WireframeMode = !_settings.WireframeMode;
-                    alert = $"Wireframe Mode: {(_settings.WireframeMode ? "ON" : "OFF")}";
+                    toggle = SettingsToggle.WireframeMode;
                     break;
                 case Key.G:
-                    _settings.ShowGrid = !_settings.ShowGrid;
-                    alert = $"Grid: {(_settings.ShowGrid ? "ON" : "OFF")}";
+                    toggle = SettingsToggle.ShowGrid;
                     break;
                 case Key.C:
-                    _settings.BackfaceCulling = !_settings.BackfaceCulling;
-                    alert = $"Backface Culling: {(_settings.BackfaceCulling ? "ON" : "OFF")}";
+                    toggle = SettingsToggle.BackfaceCulling;
                     break;
                 case Key.V:
-                    _settings.VertexColors = !_settings.VertexColors;
-                    alert = $"Vertex Colors: {(_settings.VertexColors ? "ON" : "OFF")}";
+                    toggle = SettingsToggle.VertexColors;
                     break;
                 case Key.R:
                     ResetCameraAction?.Invoke();
-                    alert = "Camera Reset";
                     break;
             }
 
-            SettingsChangedAction?.Invoke(_settings, alert);
+            if (toggle != SettingsToggle.None)
+                SettingsChangedAction?.Invoke(toggle);
         }
 
         private void OnMouseMove(IMouse mouse, Vector2 position)

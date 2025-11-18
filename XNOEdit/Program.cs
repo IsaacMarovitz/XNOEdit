@@ -67,8 +67,12 @@ namespace XNOEdit
             _grid = new GridRenderer(_wgpu, _device);
             _skybox = new SkyboxRenderer(_wgpu, _device);
 
-            InputManager.OnLoad(_window, _settings);
-            InputManager.ResetCameraAction += ResetCamera;
+            InputManager.OnLoad(_window);
+            InputManager.ResetCameraAction += () =>
+            {
+                UIManager.TriggerAlert("Camera Reset");
+                ResetCamera();
+            };
             InputManager.SettingsChangedAction += OnRenderSettingsChanged;
             InputManager.MouseMoveAction += _camera.OnMouseMove;
             InputManager.MouseScrollAction += _camera.OnMouseScroll;
@@ -117,9 +121,30 @@ namespace XNOEdit
             _depthTextureView = _wgpu.TextureCreateView(_depthTexture, &depthViewDesc);
         }
 
-        private static void OnRenderSettingsChanged(RenderSettings settings, string alert)
+        private static void OnRenderSettingsChanged(SettingsToggle toggle)
         {
-            _settings = settings;
+            var alert = string.Empty;
+
+            switch (toggle)
+            {
+                case SettingsToggle.WireframeMode:
+                    _settings.WireframeMode = !_settings.WireframeMode;
+                    alert = $"Wireframe Mode: {(_settings.WireframeMode ? "ON" : "OFF")}";
+                    break;
+                case SettingsToggle.ShowGrid:
+                    _settings.ShowGrid = !_settings.ShowGrid;
+                    alert = $"Grid: {(_settings.ShowGrid ? "ON" : "OFF")}";
+                    break;
+                case SettingsToggle.BackfaceCulling:
+                    _settings.BackfaceCulling = !_settings.BackfaceCulling;
+                    alert = $"Backface Culling: {(_settings.BackfaceCulling ? "ON" : "OFF")}";
+                    break;
+                case SettingsToggle.VertexColors:
+                    _settings.VertexColors = !_settings.VertexColors;
+                    alert = $"Vertex Colors: {(_settings.VertexColors ? "ON" : "OFF")}";
+                    break;
+            }
+
             UIManager.TriggerAlert(alert);
         }
 
