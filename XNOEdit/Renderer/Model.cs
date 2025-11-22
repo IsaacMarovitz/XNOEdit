@@ -1,4 +1,5 @@
 using System.Numerics;
+using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
@@ -22,7 +23,7 @@ namespace XNOEdit.Renderer
         private readonly Device* _device;
         private readonly List<ModelMesh> _meshes = [];
         private readonly Dictionary<int, WgpuBuffer<float>> _sharedVertexBuffers = new();
-        private readonly ShaderArchive _shaderArchive;
+        private readonly ArcFile _shaderArchive;
 
         public Model(
             WebGPU wgpu,
@@ -30,7 +31,7 @@ namespace XNOEdit.Renderer
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
-            ShaderArchive shaderArchive)
+            ArcFile shaderArchive)
         {
             _wgpu = wgpu;
             _device = device;
@@ -132,6 +133,10 @@ namespace XNOEdit.Renderer
                     {
                         continue;
                     }
+
+                    var shaderFile = _shaderArchive.GetFile($"xenon/shader/std/{effectName}o");
+                    // var shaderData = shaderFile.Decompress
+                    // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
 
                     var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, effectName, techniqueName, textureSet, material.Colour);
                     _meshes.Add(mesh);

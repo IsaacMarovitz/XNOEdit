@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Silk.NET.Maths;
@@ -22,7 +23,7 @@ namespace XNOEdit
         private static TextureView* _depthTextureView;
 
         private static Camera _camera;
-        private static ShaderArchive _shaderArchive;
+        private static ArcFile _shaderArchive;
         private static Model _model;
         private static ModelRenderer _modelRenderer;
         private static GridRenderer _grid;
@@ -309,7 +310,7 @@ namespace XNOEdit
                 switch (extension)
                 {
                     case ".arc":
-                        _shaderArchive = new ShaderArchive(file);
+                        _shaderArchive = new ArcFile(file);
                         return;
                     case ".xno":
                         ReadXno(file);
