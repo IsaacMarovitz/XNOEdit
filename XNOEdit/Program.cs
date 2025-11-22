@@ -9,7 +9,6 @@ using XNOEdit.Managers;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Wgpu;
-using XNOEdit.Shaders;
 
 namespace XNOEdit
 {
@@ -83,6 +82,11 @@ namespace XNOEdit
             UIManager.ResetCameraAction += ResetCamera;
 
             _textureManager = new TextureManager(_wgpu, _device, _queue, UIManager.Controller);
+
+            if (Configuration.ShaderArcPath != null)
+            {
+                ReadArc(Configuration.ShaderArcPath);
+            }
         }
 
         private static void InitializeWgpu()
@@ -310,12 +314,28 @@ namespace XNOEdit
                 switch (extension)
                 {
                     case ".arc":
-                        _shaderArchive = new ArcFile(file);
+                        ReadArc(file);
                         return;
                     case ".xno":
                         ReadXno(file);
                         return;
                 }
+            }
+        }
+
+        private static void ReadArc(string file)
+        {
+            try
+            {
+                if (file != Configuration.ShaderArcPath)
+                    Configuration.ShaderArcPath = file;
+
+                _shaderArchive = new ArcFile(file);
+                UIManager.TriggerAlert("Loaded shader.arc");
+            }
+            catch (Exception ex)
+            {
+                UIManager.TriggerAlert($"Unable to load shader.arc: \"{ex.Message}\"");
             }
         }
 
