@@ -6,6 +6,7 @@ using Silk.NET.Maths;
 using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
 using XNOEdit.Managers;
+using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Wgpu;
@@ -70,7 +71,7 @@ namespace XNOEdit
             InputManager.OnLoad(_window);
             InputManager.ResetCameraAction += () =>
             {
-                UIManager.TriggerAlert("Camera Reset");
+                UIManager.TriggerAlert(AlertLevel.Info, "Camera Reset");
                 ResetCamera();
             };
             InputManager.SettingsChangedAction += OnRenderSettingsChanged;
@@ -150,7 +151,7 @@ namespace XNOEdit
                     break;
             }
 
-            UIManager.TriggerAlert(alert);
+            UIManager.TriggerAlert(AlertLevel.Info, alert);
         }
 
         private static void OnUpdate(double deltaTime)
@@ -331,11 +332,11 @@ namespace XNOEdit
                     Configuration.ShaderArcPath = file;
 
                 _shaderArchive = new ArcFile(file);
-                UIManager.TriggerAlert("Loaded shader.arc");
+                UIManager.TriggerAlert(AlertLevel.Info, "Loaded shader.arc");
             }
             catch (Exception ex)
             {
-                UIManager.TriggerAlert($"Unable to load shader.arc: \"{ex.Message}\"");
+                UIManager.TriggerAlert(AlertLevel.Warning, $"Unable to load shader.arc: \"{ex.Message}\"");
             }
         }
 
@@ -360,6 +361,12 @@ namespace XNOEdit
                     _textureManager.ClearTextures();
 
                     _textureManager.LoadTextures(Path.GetDirectoryName(file), textureListChunk);
+
+                    if (objectChunk.PrimitiveLists.Count == 0)
+                    {
+                        UIManager.TriggerAlert(AlertLevel.Warning, "XNO has no geometry");
+                    }
+
                     _model = new Model(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
                     _modelRenderer = new ModelRenderer(_wgpu, _device, _model);
 
@@ -378,12 +385,12 @@ namespace XNOEdit
                 }
                 else
                 {
-                    UIManager.TriggerAlert("Error loading XNO: \"XNO lacks an object chunk\"");
+                    UIManager.TriggerAlert(AlertLevel.Error, "XNO lacks an object chunk");
                 }
             }
             catch (Exception ex)
             {
-                UIManager.TriggerAlert($"Error loading XNO: \"{ex.Message}\"");
+                UIManager.TriggerAlert(AlertLevel.Error, $"Error loading XNO: \"{ex.Message}\"");
                 Console.WriteLine(ex.StackTrace);
             }
         }

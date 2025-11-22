@@ -128,10 +128,10 @@ namespace XNOEdit.Managers
             Controller?.Dispose();
         }
 
-        public void TriggerAlert(string alert)
+        public void TriggerAlert(AlertLevel alertLevel, string alert)
         {
             if (alert != string.Empty)
-                _alertPanel.TriggerAlert(alert);
+                _alertPanel.TriggerAlert(alertLevel, alert);
         }
     }
 }
