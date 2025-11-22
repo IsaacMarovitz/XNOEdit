@@ -349,7 +349,7 @@ namespace XNOEdit
                 var effectChunk = xno.GetChunk<EffectListChunk>();
                 var textureListChunk = xno.GetChunk<TextureListChunk>();
 
-                if (objectChunk != null && effectChunk != null)
+                if (objectChunk != null)
                 {
                     UIManager.InitXnoPanel(xno);
 
@@ -376,10 +376,14 @@ namespace XNOEdit
 
                     ResetCamera();
                 }
+                else
+                {
+                    UIManager.TriggerAlert("Error loading XNO: \"XNO lacks an object chunk\"");
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading file: {ex.Message}");
+                UIManager.TriggerAlert($"Error loading XNO: \"{ex.Message}\"");
                 Console.WriteLine(ex.StackTrace);
             }
         }

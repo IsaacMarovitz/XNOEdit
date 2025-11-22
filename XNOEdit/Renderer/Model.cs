@@ -108,25 +108,33 @@ namespace XNOEdit.Renderer
                 {
                     var vertexListIndex = meshSet.VertexListIndex;
                     var primitiveList = meshSet.GetPrimitiveList(objectChunk);
-                    var technique = meshSet.GetTechnique(effectListChunk);
                     var material = meshSet.GetMaterial(objectChunk);
-                    var effectName = string.Empty;
-                    var techniqueName = string.Empty;
+                    var textureSet = new TextureSet();
+                    string effectName = null;
+                    string techniqueName = null;
 
-                    var textures = material.TextureMap.Descriptions
-                        .Where(d => d.Index >= 0 && d.Index < textureListChunk.Textures.Count)
-                        .Select(d => textureListChunk.Textures[d.Index])
-                        .Distinct()
-                        .ToList();
-
-                    var textureSet = IntuitTextures(textures);
-
-                    if (technique != null)
+                    if (effectListChunk != null)
                     {
-                        var effect = technique.GetEffect(effectListChunk);
+                        var technique = meshSet.GetTechnique(effectListChunk);
 
-                        effectName = effect.Name;
-                        techniqueName = technique.Name;
+                        if (technique != null)
+                        {
+                            var effect = technique.GetEffect(effectListChunk);
+
+                            effectName = effect.Name;
+                            techniqueName = technique.Name;
+                        }
+                    }
+
+                    if (textureListChunk != null)
+                    {
+                        var textures = material.TextureMap.Descriptions
+                            .Where(d => d.Index >= 0 && d.Index < textureListChunk.Textures.Count)
+                            .Select(d => textureListChunk.Textures[d.Index])
+                            .Distinct()
+                            .ToList();
+
+                        textureSet = IntuitTextures(textures);
                     }
 
                     if (primitiveList == null || !_sharedVertexBuffers.TryGetValue(vertexListIndex, out var buffer))
@@ -134,11 +142,14 @@ namespace XNOEdit.Renderer
                         continue;
                     }
 
-                    var shaderFile = _shaderArchive.GetFile($"xenon/shader/std/{effectName}o");
-                    // var shaderData = shaderFile.Decompress
-                    // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
+                    if (effectName != null)
+                    {
+                        var shaderFile = _shaderArchive.GetFile($"xenon/shader/std/{effectName}o");
+                        // var shaderData = shaderFile.Decompress
+                        // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
+                    }
 
-                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, effectName, techniqueName, textureSet, material.Colour);
+                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, textureSet, material.Colour);
                     _meshes.Add(mesh);
                 }
             }
@@ -256,8 +267,6 @@ namespace XNOEdit.Renderer
         private WgpuBuffer<float> _vertexBuffer;
         private int _indexCount;
         private int _wireframeIndexCount;
-        private string _effect;
-        private string _technique;
         private TextureSet _textureSet;
         private MaterialColour _materialColour;
 
@@ -266,14 +275,10 @@ namespace XNOEdit.Renderer
             Device* device,
             WgpuBuffer<float> sharedVbo,
             PrimitiveList primitiveList,
-            string effect,
-            string technique,
             TextureSet textureSet,
             MaterialColour materialColour)
         {
             _wgpu = wgpu;
-            _effect = effect;
-            _technique = technique;
             _vertexBuffer = sharedVbo;
             _textureSet = textureSet;
             _materialColour = materialColour;
