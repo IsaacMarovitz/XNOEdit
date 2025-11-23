@@ -39,7 +39,8 @@ struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) color: vec4<f32>,
-    @location(3) uv: vec2<f32>
+    @location(3) uv: vec2<f32>,
+    @location(4) uv2: vec2<f32>
 }
 
 // Vertex output / Fragment input
@@ -50,7 +51,8 @@ struct VertexOutput {
     @location(2) tangent: vec3<f32>,
     @location(3) bitangent: vec3<f32>,
     @location(4) color: vec4<f32>,
-    @location(5) uv: vec2<f32>
+    @location(5) uv: vec2<f32>,
+    @location(6) uv2: vec2<f32>
 }
 
 // Calculate tangent space for normal mapping
@@ -87,6 +89,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     out.bitangent = tbn[1];
 
     out.uv = in.uv;
+    out.uv2 = in.uv2;
     out.color = mix(vec4<f32>(1.0), in.color, uniforms.vertColorStrength);
     out.position = uniforms.projection * uniforms.view * worldPos;
 
@@ -99,7 +102,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let mainColor = textureSample(mainTexture, mainSampler, in.uv);
     let blendColor = textureSample(blendTexture, mainSampler, in.uv);
     let normalMap = textureSample(normalTexture, mainSampler, in.uv);
-    let lightmap = textureSample(lightmapTexture, mainSampler, in.uv);
+    let lightmap = textureSample(lightmapTexture, mainSampler, in.uv2);
 
     // Blend main and blend texture using vertex alpha
     var textureColor: vec4<f32>;
@@ -168,7 +171,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var alpha: f32;
 
     if (uniforms.alpha == 1.0) {
-        alpha = baseDiffuse.a * in.color.a;
+        alpha = uniforms.specularColor.a * in.color.a;
     } else {
         alpha = 1.0;
     }

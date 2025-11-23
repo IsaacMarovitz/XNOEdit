@@ -81,14 +81,28 @@ namespace XNOEdit.Renderer
                     // UV
                     if (vertex.TextureCoordinates != null)
                     {
-                        if (vertex.TextureCoordinates.Count >= 1)
+                        if (vertex.TextureCoordinates.Count >= 2)
                         {
                             vertices.Add(vertex.TextureCoordinates[0].X);
                             vertices.Add(vertex.TextureCoordinates[0].Y);
+
+                            vertices.Add(vertex.TextureCoordinates[1].X);
+                            vertices.Add(vertex.TextureCoordinates[1].Y);
+                        }
+                        else if (vertex.TextureCoordinates.Count >= 1)
+                        {
+                            vertices.Add(vertex.TextureCoordinates[0].X);
+                            vertices.Add(vertex.TextureCoordinates[0].Y);
+
+                            vertices.Add(1.0f);
+                            vertices.Add(1.0f);
                         }
                     }
                     else
                     {
+                        vertices.Add(1.0f);
+                        vertices.Add(1.0f);
+
                         vertices.Add(1.0f);
                         vertices.Add(1.0f);
                     }
