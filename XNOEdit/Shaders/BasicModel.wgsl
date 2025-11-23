@@ -19,6 +19,8 @@ struct Uniforms {
     alphaRef: f32,
     alpha: f32,
     blend: f32,
+    specular: f32,
+    worldSpace: f32
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -145,10 +147,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let diffuse = diff * uniforms.lightColor;
 
     // === Specular ===
-    let halfDir = normalize(mainLightDir + viewDir);
-    let specPower = max(uniforms.specularPower, 1.0);  // Clamp to prevent issues
-    let spec = pow(max(dot(worldNormal, halfDir), 0.0), specPower);
-    let specular = spec * uniforms.specularColor.rgb;
+    var specular = vec3(0.0, 0.0, 0.0);
+    if (uniforms.specular == 1.0) {
+        let halfDir = normalize(mainLightDir + viewDir);
+        let specPower = max(uniforms.specularPower, 1.0);  // Clamp to prevent issues
+        let spec = pow(max(dot(worldNormal, halfDir), 0.0), specPower);
+        specular = spec * uniforms.specularColor.rgb;
+    }
 
     // === Combine Lighting ===
     let lightmapColor = lightmap.rgb;

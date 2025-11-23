@@ -136,23 +136,14 @@ namespace XNOEdit.Panels
                                 var zUpdate = material.Logic.ZUpdate;
                                 ImGui.Checkbox("Z Update", ref zUpdate);
 
-                                if (material.Logic.Blend)
-                                {
-                                    ImGui.Text($"Source Blend: {PropertyUtility.BlendModeToString(material.Logic.SourceBlend)}");
-                                    ImGui.Text($"Destination Blend: {PropertyUtility.BlendModeToString(material.Logic.DestinationBlend)}");
-                                    ImGui.Text($"Blend Factor: {material.Logic.BlendFactor}");
-                                    ImGui.Text($"Blend Operation: {PropertyUtility.BlendOperationToString(material.Logic.BlendOperation)}");
-                                    ImGui.Text($"Logic Operation: {PropertyUtility.LogicOperationToString(material.Logic.LogicOperation)}");
-                                }
-
-                                if (material.Logic.Alpha)
-                                {
-                                    ImGui.Text($"Alpha Ref: {material.Logic.AlphaRef}");
-                                    ImGui.Text($"Alpha Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.AlphaFunction)}");
-                                }
-
-                                if (material.Logic.ZCompare)
-                                    ImGui.Text($"Z Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.ZCompareFunction)}");
+                                ImGui.Text($"Source Blend: {PropertyUtility.BlendModeToString(material.Logic.SourceBlend)}");
+                                ImGui.Text($"Destination Blend: {PropertyUtility.BlendModeToString(material.Logic.DestinationBlend)}");
+                                ImGui.Text($"Blend Factor: {material.Logic.BlendFactor}");
+                                ImGui.Text($"Blend Operation: {PropertyUtility.BlendOperationToString(material.Logic.BlendOperation)}");
+                                ImGui.Text($"Logic Operation: {PropertyUtility.LogicOperationToString(material.Logic.LogicOperation)}");
+                                ImGui.Text($"Alpha Ref: {material.Logic.AlphaRef}");
+                                ImGui.Text($"Alpha Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.AlphaFunction)}");
+                                ImGui.Text($"Z Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.ZCompareFunction)}");
                             }
                             ImGui.PopID();
                         }

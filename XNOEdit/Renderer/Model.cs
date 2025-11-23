@@ -2,11 +2,9 @@ using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
-using Marathon.IO.Types;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
-using XNOEdit.Shaders;
 
 namespace XNOEdit.Renderer
 {
@@ -16,6 +14,7 @@ namespace XNOEdit.Renderer
         public string BlendMap;
         public string NormalMap;
         public string LightMap;
+        public bool Specular;
     }
 
     public unsafe class Model : IDisposable
@@ -210,11 +209,27 @@ namespace XNOEdit.Renderer
                     !t.Name.ToLowerInvariant().Contains("_nt"))?.Name ?? textures.FirstOrDefault()?.Name;
             }
 
+            var specular = false;
+
             if (mainTextureName != null)
+            {
                 Console.WriteLine($"Main Texture: {mainTextureName}");
 
+                if (mainTextureName.Contains("_dfsp"))
+                {
+                    specular = true;
+                }
+            }
+
             if (blendMapName != null)
+            {
                 Console.WriteLine($"Blend Map: {blendMapName}");
+
+                if (blendMapName.Contains("_dfsp"))
+                {
+                    specular = true;
+                }
+            }
 
             if (normalMapName != null)
                 Console.WriteLine($"Normal Map: {normalMapName}");
@@ -227,7 +242,8 @@ namespace XNOEdit.Renderer
                 MainTexture = mainTextureName,
                 BlendMap = blendMapName,
                 NormalMap = normalMapName,
-                LightMap = lightMapName
+                LightMap = lightMapName,
+                Specular = specular,
             };
         }
 
@@ -384,6 +400,7 @@ namespace XNOEdit.Renderer
             uniforms.AlphaRef = _material.Logic.AlphaRef / 255.0f;
             uniforms.Alpha = _material.Logic.Alpha ? 1.0f : 0.0f;
             uniforms.Blend = _material.Logic.Blend ? 1.0f : 0.0f;
+            uniforms.Specular = _textureSet.Specular ? 1.0f : 0.0f;
 
             shader.UpdateUniforms(queue, in uniforms);
 
@@ -411,8 +428,8 @@ namespace XNOEdit.Renderer
             }
 
             TextureView* lightmapTexture = null;
-            if (_textureSet.BlendMap != null &&
-                textures.TryGetValue(_textureSet.BlendMap, out var lightmapTexturePtr))
+            if (_textureSet.LightMap != null &&
+                textures.TryGetValue(_textureSet.LightMap, out var lightmapTexturePtr))
             {
                 lightmapTexture = (TextureView*)lightmapTexturePtr;
             }

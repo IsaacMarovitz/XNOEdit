@@ -25,6 +25,7 @@ namespace XNOEdit.Renderer.Shaders
         public float AlphaRef;
         public float Alpha;
         public float Blend;
+        public float Specular;
     }
 
     public unsafe class ModelShader : WgpuShader<BasicModelUniforms>
