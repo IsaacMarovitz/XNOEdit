@@ -105,17 +105,10 @@ namespace XNOEdit.Panels
                             {
                                 var material = objectChunk.Materials[i];
 
-                                var ambient = new Vector4(material.Colour.Ambient.R, material.Colour.Ambient.G,
-                                    material.Colour.Ambient.B, material.Colour.Ambient.A);
-
-                                var diffuse = new Vector4(material.Colour.Diffuse.R, material.Colour.Diffuse.G,
-                                    material.Colour.Diffuse.B, material.Colour.Diffuse.A);
-
-                                var specular = new Vector4(material.Colour.Specular.R, material.Colour.Specular.G,
-                                    material.Colour.Specular.B, material.Colour.Specular.A);
-
-                                var emissive = new Vector4(material.Colour.Emissive.R, material.Colour.Emissive.G,
-                                    material.Colour.Emissive.B, material.Colour.Emissive.A);
+                                var ambient = ColorUtility.MaterialColorToVec4(material.Colour.Ambient);
+                                var diffuse = ColorUtility.MaterialColorToVec4(material.Colour.Diffuse);
+                                var specular = ColorUtility.MaterialColorToVec4(material.Colour.Specular);
+                                var emissive = ColorUtility.MaterialColorToVec4(material.Colour.Emissive);
 
                                 var power = material.Colour.Power;
 

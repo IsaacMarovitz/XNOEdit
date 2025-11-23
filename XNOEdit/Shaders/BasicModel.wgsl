@@ -15,7 +15,10 @@ struct Uniforms {
     _pad2: f32,
     viewPos: vec3<f32>,
     vertColorStrength: f32,
-    specularPower: f32
+    specularPower: f32,
+    alphaRef: f32,
+    alpha: f32,
+    blend: f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -97,10 +100,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let lightmap = textureSample(lightmapTexture, mainSampler, in.uv);
 
     // Blend main and blend texture using vertex alpha
-    let textureColor = mix(blendColor, mainColor, in.color.a);
+    var textureColor: vec4<f32>;
+
+    if (uniforms.blend == 1.0) {
+        textureColor = mix(blendColor, mainColor, in.color.a);
+    } else {
+        textureColor = mainColor;
+    }
 
     // Apply material diffuse color to texture
     let baseDiffuse = textureColor * uniforms.diffuseColor;
+
+    if (baseDiffuse.a < uniforms.alphaRef) {
+        discard;
+    }
 
     // Normal mapping
     var worldNormal: vec3<f32>;
@@ -147,5 +160,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let litDiffuse = baseDiffuse.rgb * in.color.rgb * sceneLighting;
     let finalColor = litDiffuse + specular; // + uniforms.emissiveColor.rgb;
 
-    return vec4<f32>(finalColor, in.color.a);
+    var alpha: f32;
+
+    if (uniforms.alpha == 1.0) {
+        alpha = baseDiffuse.a * in.color.a;
+    } else {
+        alpha = 1.0;
+    }
+
+    return vec4<f32>(finalColor, alpha);
 }

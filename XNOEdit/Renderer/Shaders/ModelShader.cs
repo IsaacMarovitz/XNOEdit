@@ -22,6 +22,9 @@ namespace XNOEdit.Renderer.Shaders
         public Vector3 Position;
         public float VertColorStrength;
         public float SpecularPower;
+        public float AlphaRef;
+        public float Alpha;
+        public float Blend;
     }
 
     public unsafe class ModelShader : WgpuShader<BasicModelUniforms>

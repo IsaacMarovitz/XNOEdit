@@ -2,6 +2,7 @@ using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
+using Marathon.IO.Types;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
@@ -149,7 +150,7 @@ namespace XNOEdit.Renderer
                         // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
                     }
 
-                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, textureSet, material.Colour);
+                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, textureSet, material);
                     _meshes.Add(mesh);
                 }
             }
@@ -268,7 +269,7 @@ namespace XNOEdit.Renderer
         private int _indexCount;
         private int _wireframeIndexCount;
         private TextureSet _textureSet;
-        private MaterialColour _materialColour;
+        private Material _material;
 
         public ModelMesh(
             WebGPU wgpu,
@@ -276,12 +277,12 @@ namespace XNOEdit.Renderer
             WgpuBuffer<float> sharedVbo,
             PrimitiveList primitiveList,
             TextureSet textureSet,
-            MaterialColour materialColour)
+            Material material)
         {
             _wgpu = wgpu;
             _vertexBuffer = sharedVbo;
             _textureSet = textureSet;
-            _materialColour = materialColour;
+            _material = material;
 
             LoadMesh(device, primitiveList);
         }
@@ -374,12 +375,15 @@ namespace XNOEdit.Renderer
             ModelShader shader,
             BasicModelUniforms uniforms)
         {
-            uniforms.AmbientColor = new Vector4(_materialColour.Ambient.B, _materialColour.Ambient.G, _materialColour.Ambient.R, _materialColour.Ambient.A);
-            uniforms.DiffuseColor = new Vector4(_materialColour.Diffuse.B, _materialColour.Diffuse.G, _materialColour.Diffuse.R, _materialColour.Diffuse.A);
-            uniforms.SpecularColor = new Vector4(_materialColour.Specular.B, _materialColour.Specular.G, _materialColour.Specular.R, _materialColour.Specular.A);
-            uniforms.EmissiveColor = new Vector4(_materialColour.Emissive.B, _materialColour.Emissive.G, _materialColour.Emissive.R, _materialColour.Emissive.A);
+            uniforms.AmbientColor = ColorUtility.MaterialColorToVec4(_material.Colour.Ambient);
+            uniforms.DiffuseColor = ColorUtility.MaterialColorToVec4(_material.Colour.Diffuse);
+            uniforms.SpecularColor = ColorUtility.MaterialColorToVec4(_material.Colour.Specular);
+            uniforms.EmissiveColor = ColorUtility.MaterialColorToVec4(_material.Colour.Emissive);
 
-            uniforms.SpecularPower = _materialColour.Power;
+            uniforms.SpecularPower = _material.Colour.Power;
+            uniforms.AlphaRef = _material.Logic.AlphaRef / 255.0f;
+            uniforms.Alpha = _material.Logic.Alpha ? 1.0f : 0.0f;
+            uniforms.Blend = _material.Logic.Blend ? 1.0f : 0.0f;
 
             shader.UpdateUniforms(queue, in uniforms);
 
