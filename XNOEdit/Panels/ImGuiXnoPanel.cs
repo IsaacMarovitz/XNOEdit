@@ -105,18 +105,54 @@ namespace XNOEdit.Panels
                             {
                                 var material = objectChunk.Materials[i];
 
-                                var ambient = ColorUtility.MaterialColorToVec4(material.Colour.Ambient);
-                                var diffuse = ColorUtility.MaterialColorToVec4(material.Colour.Diffuse);
-                                var specular = ColorUtility.MaterialColorToVec4(material.Colour.Specular);
-                                var emissive = ColorUtility.MaterialColorToVec4(material.Colour.Emissive);
+                                var ambient = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient);
+                                var diffuse = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse);
+                                var specular = PropertyUtility.MaterialColorToVec4(material.Colour.Specular);
+                                var emissive = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive);
 
                                 var power = material.Colour.Power;
 
+                                ImGui.SeparatorText("Color");
                                 ImGui.ColorEdit4("Ambient", ref ambient, ImGuiColorEditFlags.NoInputs);
                                 ImGui.ColorEdit4("Diffuse", ref diffuse, ImGuiColorEditFlags.NoInputs);
                                 ImGui.ColorEdit4("Specular", ref specular, ImGuiColorEditFlags.NoInputs);
                                 ImGui.ColorEdit4("Emissive", ref emissive, ImGuiColorEditFlags.NoInputs);
                                 ImGui.InputFloat("Power", ref power, 0f, 0f, "%.1f", ImGuiInputTextFlags.ReadOnly);
+
+                                ImGui.SeparatorText("Logic");
+
+                                var blend = material.Logic.Blend;
+                                ImGui.Checkbox("Blend", ref blend);
+                                ImGui.SameLine();
+
+                                var alpha = material.Logic.Alpha;
+                                ImGui.Checkbox("Alpha", ref alpha);
+                                ImGui.SameLine();
+
+                                var zCompare = material.Logic.ZCompare;
+                                ImGui.Checkbox("Z Compare", ref zCompare);
+                                ImGui.SameLine();
+
+                                var zUpdate = material.Logic.ZUpdate;
+                                ImGui.Checkbox("Z Update", ref zUpdate);
+
+                                if (material.Logic.Blend)
+                                {
+                                    ImGui.Text($"Source Blend: {PropertyUtility.BlendModeToString(material.Logic.SourceBlend)}");
+                                    ImGui.Text($"Destination Blend: {PropertyUtility.BlendModeToString(material.Logic.DestinationBlend)}");
+                                    ImGui.Text($"Blend Factor: {material.Logic.BlendFactor}");
+                                    ImGui.Text($"Blend Operation: {PropertyUtility.BlendOperationToString(material.Logic.BlendOperation)}");
+                                    ImGui.Text($"Logic Operation: {PropertyUtility.LogicOperationToString(material.Logic.LogicOperation)}");
+                                }
+
+                                if (material.Logic.Alpha)
+                                {
+                                    ImGui.Text($"Alpha Ref: {material.Logic.AlphaRef}");
+                                    ImGui.Text($"Alpha Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.AlphaFunction)}");
+                                }
+
+                                if (material.Logic.ZCompare)
+                                    ImGui.Text($"Z Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.ZCompareFunction)}");
                             }
                             ImGui.PopID();
                         }

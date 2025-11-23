@@ -375,10 +375,10 @@ namespace XNOEdit.Renderer
             ModelShader shader,
             BasicModelUniforms uniforms)
         {
-            uniforms.AmbientColor = ColorUtility.MaterialColorToVec4(_material.Colour.Ambient);
-            uniforms.DiffuseColor = ColorUtility.MaterialColorToVec4(_material.Colour.Diffuse);
-            uniforms.SpecularColor = ColorUtility.MaterialColorToVec4(_material.Colour.Specular);
-            uniforms.EmissiveColor = ColorUtility.MaterialColorToVec4(_material.Colour.Emissive);
+            uniforms.AmbientColor = PropertyUtility.MaterialColorToVec4(_material.Colour.Ambient);
+            uniforms.DiffuseColor = PropertyUtility.MaterialColorToVec4(_material.Colour.Diffuse);
+            uniforms.SpecularColor = PropertyUtility.MaterialColorToVec4(_material.Colour.Specular);
+            uniforms.EmissiveColor = PropertyUtility.MaterialColorToVec4(_material.Colour.Emissive);
 
             uniforms.SpecularPower = _material.Colour.Power;
             uniforms.AlphaRef = _material.Logic.AlphaRef / 255.0f;
