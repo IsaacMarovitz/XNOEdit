@@ -1,4 +1,5 @@
 using Marathon.Formats.Ninja.Chunks;
+using Marathon.IO.Types.FileSystem;
 using Pfim;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer;
@@ -24,7 +25,7 @@ namespace XNOEdit.Managers
             _controller = controller;
         }
 
-        public void LoadTextures(string baseDirectory, TextureListChunk textureListChunk)
+        public void LoadTextures(IFile file, TextureListChunk textureListChunk)
         {
             ClearTextures();
 
@@ -32,23 +33,20 @@ namespace XNOEdit.Managers
 
             Console.WriteLine($"Loading {textureListChunk.Textures.Count} textures...");
 
-            foreach (var texture in textureListChunk.Textures)
+            var parentDirectory = file.Parent;
+            foreach (var textureFile in parentDirectory.EnumerateFiles("*.dds", SearchOption.AllDirectories))
             {
-                var texturePath = Path.Combine(baseDirectory, texture.Name);
-
-                if (!File.Exists(texturePath))
+                if (textureListChunk.Textures.Any(x => x.Name == textureFile.Name))
                 {
-                    Console.WriteLine($"  Warning: Texture not found: {texture.Name}");
-                    continue;
+                    LoadTexture(textureFile.Name, textureFile);
                 }
-
-                LoadTexture(texture.Name, texturePath);
             }
         }
 
-        private void LoadTexture(string name, string path)
+        private void LoadTexture(string name, IFile file)
         {
-            using var image = Pfimage.FromFile(path);
+            using var stream = file.Decompress().Open();
+            using var image = Pfimage.FromStream(stream);
 
             var mipLevelCount = image.MipMaps != null && image.MipMaps.Length > 0
                 ? (uint)(image.MipMaps.Length + 1)

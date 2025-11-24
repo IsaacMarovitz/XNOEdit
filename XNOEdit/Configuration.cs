@@ -5,7 +5,7 @@ namespace XNOEdit
 {
     public class ConfigurationData
     {
-        public string ShaderArcPath { get; set; }
+        public string GameFolder { get; set; }
     }
 
     [JsonSourceGenerationOptions(WriteIndented = true)]
@@ -19,12 +19,12 @@ namespace XNOEdit
         private static readonly Lazy<Configuration> Lazy = new(() => new Configuration());
         private static Configuration Instance => Lazy.Value;
 
-        public static string ShaderArcPath
+        public static string GameFolder
         {
-            get => Instance._data.ShaderArcPath;
+            get => Instance._data.GameFolder;
             set
             {
-                Instance._data.ShaderArcPath = value;
+                Instance._data.GameFolder = value;
                 Instance.Save();
             }
         }

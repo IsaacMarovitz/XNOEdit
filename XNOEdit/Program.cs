@@ -2,6 +2,7 @@
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
+using Marathon.IO.Types.FileSystem;
 using Silk.NET.Maths;
 using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
@@ -34,6 +35,8 @@ namespace XNOEdit
         private static TextureManager _textureManager;
         private static readonly UIManager UIManager = new();
         private static readonly InputManager InputManager = new();
+
+        private static IFile _pendingFileLoad = null;
 
         private const TextureFormat DepthTextureFormat = TextureFormat.Depth24Plus;
 
@@ -81,12 +84,13 @@ namespace XNOEdit
             UIManager.OnLoad(new ImGuiController(_wgpu, _device, _window, InputManager.Input, 2));
             UIManager.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
+            UIManager.FilesPanel.LoadXno += QueueFileLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, _queue, UIManager.Controller);
 
-            if (Configuration.ShaderArcPath != null)
+            if (Configuration.GameFolder != null)
             {
-                ReadArc(Configuration.ShaderArcPath);
+                LoadGameFolderResources();
             }
         }
 
@@ -157,6 +161,12 @@ namespace XNOEdit
         private static void OnUpdate(double deltaTime)
         {
             _camera.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime);
+
+            if (_pendingFileLoad != null)
+            {
+                ReadXno(_pendingFileLoad);
+                _pendingFileLoad = null;
+            }
         }
 
         private static void OnRender(double deltaTime)
@@ -310,28 +320,34 @@ namespace XNOEdit
         {
             foreach (var file in files)
             {
-                var extension = Path.GetExtension(file);
-
-                switch (extension)
+                if (Directory.Exists(file))
                 {
-                    case ".arc":
-                        ReadArc(file);
+                    var defaultXex = Path.Combine(file, "default.xex");
+                    if (File.Exists(defaultXex))
+                    {
+                        // We can reasonably assume this is the right folder
+                        Configuration.GameFolder = file;
+                        LoadGameFolderResources();
                         return;
-                    case ".xno":
-                        ReadXno(file);
-                        return;
+                    }
                 }
             }
         }
 
-        private static void ReadArc(string file)
+        private static void LoadGameFolderResources()
         {
+            UIManager.LoadGameFolderResources();
+
+            var shaderArcPath = Path.Join([
+                Configuration.GameFolder,
+                "xenon",
+                "archives",
+                "shader.arc"
+            ]);
+
             try
             {
-                if (file != Configuration.ShaderArcPath)
-                    Configuration.ShaderArcPath = file;
-
-                _shaderArchive = new ArcFile(file);
+                _shaderArchive = new ArcFile(shaderArcPath);
                 UIManager.TriggerAlert(AlertLevel.Info, "Loaded shader.arc");
             }
             catch (Exception ex)
@@ -340,11 +356,16 @@ namespace XNOEdit
             }
         }
 
-        private static void ReadXno(string file)
+        private static void QueueFileLoad(IFile file)
+        {
+            _pendingFileLoad = file;
+        }
+
+        private static void ReadXno(IFile file)
         {
             try
             {
-                var xno = new NinjaNext(file);
+                var xno = new NinjaNext(file.Decompress());
 
                 var objectChunk = xno.GetChunk<ObjectChunk>();
                 var effectChunk = xno.GetChunk<EffectListChunk>();
@@ -360,7 +381,7 @@ namespace XNOEdit
                     _modelRenderer?.Dispose();
                     _textureManager.ClearTextures();
 
-                    _textureManager.LoadTextures(Path.GetDirectoryName(file), textureListChunk);
+                    _textureManager.LoadTextures(file, textureListChunk);
 
                     if (objectChunk.PrimitiveLists.Count == 0)
                     {

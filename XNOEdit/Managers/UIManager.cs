@@ -12,6 +12,7 @@ namespace XNOEdit.Managers
         public event Action ResetCameraAction;
 
         public ImGuiController Controller { get; private set; }
+        public ImGuiFilesPanel FilesPanel { get; private set; }
         private ImGuiXnoPanel _xnoPanel;
         private ImGuiAlertPanel _alertPanel;
 
@@ -24,6 +25,7 @@ namespace XNOEdit.Managers
         {
             Controller = controller;
             _alertPanel = new ImGuiAlertPanel();
+            FilesPanel = new ImGuiFilesPanel();
 
             ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         }
@@ -112,12 +114,8 @@ namespace XNOEdit.Managers
                 if (_xnoWindow)
                     _xnoPanel.Render(textures);
             }
-            else
-            {
-                ImGui.Begin("Help", ImGuiWindowFlags.AlwaysAutoResize);
-                ImGui.Text("Drag and drop a .xno file");
-                ImGui.End();
-            }
+
+            FilesPanel.Render();
 
             _alertPanel.Render(deltaTime);
             Controller.Render(pass);
@@ -132,6 +130,11 @@ namespace XNOEdit.Managers
         {
             if (alert != string.Empty)
                 _alertPanel.TriggerAlert(alertLevel, alert);
+        }
+
+        public void LoadGameFolderResources()
+        {
+            FilesPanel.LoadGameFolderResources();
         }
     }
 }

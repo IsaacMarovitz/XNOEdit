@@ -22,7 +22,7 @@ namespace XNOEdit.Renderer.Wgpu
             var extras = new InstanceExtras
             {
                 Chain = new ChainedStruct { SType = (SType)NativeSType.STypeInstanceExtras },
-                Backends = InstanceBackend.Vulkan
+                Backends = InstanceBackend.Metal,
             };
 
             var instanceDesc = new InstanceDescriptor
@@ -31,6 +31,7 @@ namespace XNOEdit.Renderer.Wgpu
             };
 
             _instance = _wgpu.CreateInstance(&instanceDesc);
+
             _surface = window.CreateWebGPUSurface(_wgpu, _instance);
 
             var adapterOptions = new RequestAdapterOptions
