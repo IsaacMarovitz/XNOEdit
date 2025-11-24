@@ -13,7 +13,7 @@ namespace XNOEdit.Managers
 
         public ImGuiController Controller { get; private set; }
         public ImGuiFilesPanel FilesPanel { get; private set; }
-        private ImGuiXnoPanel _xnoPanel;
+        public ImGuiXnoPanel XnoPanel { get; private set; }
         private ImGuiAlertPanel _alertPanel;
 
         private bool _xnoWindow = true;
@@ -39,9 +39,11 @@ namespace XNOEdit.Managers
                 _sunAzimuth += 360.0f;
         }
 
-        public void InitXnoPanel(NinjaNext xno)
+        public void InitXnoPanel(NinjaNext xno, Action<int, bool> toggleSubobjectVisibility, Action<int, int, bool> toggleMeshSetVisibility)
         {
-            _xnoPanel = new ImGuiXnoPanel(xno);
+            XnoPanel = new ImGuiXnoPanel(xno);
+            XnoPanel.ToggleSubobjectVisibility += toggleSubobjectVisibility;
+            XnoPanel.ToggleMeshSetVisibility += toggleMeshSetVisibility;
         }
 
         public unsafe void OnRender(double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, IReadOnlyDictionary<string, IntPtr> textures)
@@ -109,10 +111,10 @@ namespace XNOEdit.Managers
                 ImGui.End();
             }
 
-            if (_xnoPanel != null)
+            if (XnoPanel != null)
             {
                 if (_xnoWindow)
-                    _xnoPanel.Render(textures);
+                    XnoPanel.Render(textures);
             }
 
             FilesPanel.Render();

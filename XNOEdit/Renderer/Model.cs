@@ -31,16 +31,41 @@ namespace XNOEdit.Renderer
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
-            ArcFile shaderArchive)
+            ArcFile shaderArchive,
+            ModelShader shader)
         {
             _wgpu = wgpu;
             _device = device;
             _shaderArchive = shaderArchive;
 
-            LoadModel(objectChunk, textureListChunk, effectListChunk);
+            LoadModel(objectChunk, textureListChunk, effectListChunk, shader);
         }
 
-        private void LoadModel(ObjectChunk objectChunk, TextureListChunk textureListChunk, EffectListChunk effectListChunk)
+        public void SetVisible(int subobject, int? meshSet, bool visibility)
+        {
+            foreach (var mesh in _meshes)
+            {
+                if (mesh.Subobject != subobject) continue;
+
+                if (meshSet != null)
+                {
+                    if (mesh.MeshSet == meshSet)
+                    {
+                        mesh.SetVisible(visibility);
+                    }
+                }
+                else
+                {
+                    mesh.SetVisible(visibility);
+                }
+            }
+        }
+
+        private void LoadModel(
+            ObjectChunk objectChunk,
+            TextureListChunk textureListChunk,
+            EffectListChunk effectListChunk,
+            ModelShader shader)
         {
             // Create shared vertex buffers for each unique VertexList
             for (var i = 0; i < objectChunk.VertexLists.Count; i++)
@@ -116,10 +141,14 @@ namespace XNOEdit.Renderer
                 _sharedVertexBuffers[i] = vbo;
             }
 
-            foreach (var subObject in objectChunk.SubObjects)
+            for (var i = 0; i < objectChunk.SubObjects.Count; i++)
             {
-                foreach (var meshSet in subObject.MeshSets)
+                var subObject = objectChunk.SubObjects[i];
+
+                for (var j = 0; j < subObject.MeshSets.Count; j++)
                 {
+                    var meshSet = subObject.MeshSets[j];
+
                     var vertexListIndex = meshSet.VertexListIndex;
                     var primitiveList = meshSet.GetPrimitiveList(objectChunk);
                     var material = meshSet.GetMaterial(objectChunk);
@@ -163,7 +192,7 @@ namespace XNOEdit.Renderer
                         // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
                     }
 
-                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, textureSet, material);
+                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, textureSet, material, shader, i, j);
                     _meshes.Add(mesh);
                 }
             }
@@ -262,16 +291,14 @@ namespace XNOEdit.Renderer
         }
 
         public void Draw(
-            Queue* queue,
             RenderPassEncoder* passEncoder,
             bool wireframe,
             IReadOnlyDictionary<string, IntPtr> textures,
-            ModelShader shader,
-            BasicModelUniforms uniforms)
+            ModelShader shader)
         {
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(queue, passEncoder, wireframe, textures, shader, uniforms);
+                mesh.Draw(passEncoder, wireframe, textures, shader);
             }
         }
 
@@ -292,6 +319,9 @@ namespace XNOEdit.Renderer
 
     public unsafe class ModelMesh : IDisposable
     {
+        public int Subobject { get; private set; }
+        public int MeshSet { get; private set; }
+
         private readonly WebGPU _wgpu;
         private WgpuBuffer<ushort> _indexBuffer;
         private WgpuBuffer<ushort> _wireframeIndexBuffer;
@@ -299,7 +329,11 @@ namespace XNOEdit.Renderer
         private int _indexCount;
         private int _wireframeIndexCount;
         private TextureSet _textureSet;
-        private Material _material;
+        private bool _visible = true;
+
+        // Per-mesh uniform buffer and bind group (set once at creation)
+        private WgpuBuffer<PerMeshUniforms> _meshUniformBuffer;
+        private BindGroup* _meshBindGroup;
 
         public ModelMesh(
             WebGPU wgpu,
@@ -307,14 +341,47 @@ namespace XNOEdit.Renderer
             WgpuBuffer<float> sharedVbo,
             PrimitiveList primitiveList,
             TextureSet textureSet,
-            Material material)
+            Material material,
+            ModelShader shader,
+            int subobject,
+            int meshSet)
         {
             _wgpu = wgpu;
             _vertexBuffer = sharedVbo;
             _textureSet = textureSet;
-            _material = material;
+
+            Subobject = subobject;
+            MeshSet = meshSet;
 
             LoadMesh(device, primitiveList);
+            CreateMeshUniforms(wgpu, device, material, shader);
+        }
+
+        public void SetVisible(bool visible)
+        {
+            _visible = visible;
+        }
+
+        private void CreateMeshUniforms(WebGPU wgpu, Device* device, Material material, ModelShader shader)
+        {
+            _meshUniformBuffer = WgpuBuffer<PerMeshUniforms>.CreateUniform(wgpu, device);
+
+            var meshUniforms = new PerMeshUniforms
+            {
+                AmbientColor = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient),
+                DiffuseColor = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse),
+                SpecularColor = PropertyUtility.MaterialColorToVec4(material.Colour.Specular),
+                EmissiveColor = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive),
+                SpecularPower = material.Colour.Power,
+                AlphaRef = material.Logic.AlphaRef / 255.0f,
+                Alpha = material.Logic.Alpha ? 1.0f : 0.0f,
+                Blend = material.Logic.Blend ? 1.0f : 0.0f,
+                Specular = _textureSet.Specular ? 1.0f : 0.0f
+            };
+
+            var queue = wgpu.DeviceGetQueue(device);
+            _meshUniformBuffer.UpdateData(queue, in meshUniforms);
+            _meshBindGroup = shader.CreatePerMeshBindGroup(_meshUniformBuffer);
         }
 
         private void LoadMesh(Device* device, PrimitiveList primitiveList)
@@ -398,27 +465,15 @@ namespace XNOEdit.Renderer
         }
 
         public void Draw(
-            Queue* queue,
             RenderPassEncoder* passEncoder,
             bool wireframe,
             IReadOnlyDictionary<string, IntPtr> textures,
-            ModelShader shader,
-            BasicModelUniforms uniforms)
+            ModelShader shader)
         {
-            uniforms.AmbientColor = PropertyUtility.MaterialColorToVec4(_material.Colour.Ambient);
-            uniforms.DiffuseColor = PropertyUtility.MaterialColorToVec4(_material.Colour.Diffuse);
-            uniforms.SpecularColor = PropertyUtility.MaterialColorToVec4(_material.Colour.Specular);
-            uniforms.EmissiveColor = PropertyUtility.MaterialColorToVec4(_material.Colour.Emissive);
-
-            uniforms.SpecularPower = _material.Colour.Power;
-            uniforms.AlphaRef = _material.Logic.AlphaRef / 255.0f;
-            uniforms.Alpha = _material.Logic.Alpha ? 1.0f : 0.0f;
-            uniforms.Blend = _material.Logic.Blend ? 1.0f : 0.0f;
-            uniforms.Specular = _textureSet.Specular ? 1.0f : 0.0f;
-
-            shader.UpdateUniforms(queue, in uniforms);
+            if (!_visible) return;
 
             _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
+            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 1, _meshBindGroup, 0, null);
 
             TextureView* mainTexture = null;
             if (_textureSet.MainTexture != null &&
@@ -434,11 +489,11 @@ namespace XNOEdit.Renderer
                 blendTexture = (TextureView*)blendTexturePtr;
             }
 
-            TextureView* noramlTexture = null;
+            TextureView* normalTexture = null;
             if (_textureSet.NormalMap != null &&
                 textures.TryGetValue(_textureSet.NormalMap, out var normalTexturePtr))
             {
-                noramlTexture = (TextureView*)normalTexturePtr;
+                normalTexture = (TextureView*)normalTexturePtr;
             }
 
             TextureView* lightmapTexture = null;
@@ -449,8 +504,8 @@ namespace XNOEdit.Renderer
             }
 
             var textureBindGroup = shader.GetTextureBindGroup(
-                mainTexture, blendTexture, noramlTexture, lightmapTexture);
-            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 1, textureBindGroup, 0, null);
+                mainTexture, blendTexture, normalTexture, lightmapTexture);
+            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 2, textureBindGroup, 0, null);
 
             if (wireframe)
             {
@@ -472,6 +527,10 @@ namespace XNOEdit.Renderer
         {
             _indexBuffer?.Dispose();
             _wireframeIndexBuffer?.Dispose();
+            _meshUniformBuffer?.Dispose();
+
+            if (_meshBindGroup != null)
+                _wgpu.BindGroupRelease(_meshBindGroup);
         }
     }
 }

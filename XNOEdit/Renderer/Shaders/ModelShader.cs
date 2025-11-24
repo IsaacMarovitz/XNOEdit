@@ -1,26 +1,30 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
+using XNOEdit.Renderer.Builders;
 using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer.Shaders
 {
     [StructLayout(LayoutKind.Sequential, Pack = 16)]
-    public struct BasicModelUniforms
+    public struct PerFrameUniforms
     {
         public Matrix4x4 Model;
         public Matrix4x4 View;
         public Matrix4x4 Projection;
+        public Vector4 SunDirection;
+        public Vector4 SunColor;
+        public Vector3 CameraPosition;
+        public float VertColorStrength;
+    }
 
+    [StructLayout(LayoutKind.Sequential, Pack = 16)]
+    public struct PerMeshUniforms
+    {
         public Vector4 AmbientColor;
         public Vector4 DiffuseColor;
         public Vector4 SpecularColor;
         public Vector4 EmissiveColor;
-
-        public Vector4 SunDirection;
-        public Vector4 SunColor;
-        public Vector3 Position;
-        public float VertColorStrength;
         public float SpecularPower;
         public float AlphaRef;
         public float Alpha;
@@ -28,8 +32,11 @@ namespace XNOEdit.Renderer.Shaders
         public float Specular;
     }
 
-    public unsafe class ModelShader : WgpuShader<BasicModelUniforms>
+    public unsafe class ModelShader : WgpuShader
     {
+        private WgpuBuffer<PerFrameUniforms> _perFrameUniformBuffer;
+        private BindGroup* _perFrameBindGroup;
+
         private Sampler* _sampler;
         private Texture* _defaultTexture;
         private TextureView* _defaultTextureView;
@@ -74,7 +81,6 @@ namespace XNOEdit.Renderer.Shaders
                     }
                 })
         {
-
         }
 
         private void CreateSampler()
@@ -147,18 +153,74 @@ namespace XNOEdit.Renderer.Shaders
 
         protected override void SetupBindGroups()
         {
-            // Group 0: Uniforms
-            base.SetupBindGroups();
-
             CreateSampler();
             CreateDefaultTexture();
 
-            // Group 1: Texture layout with default bind group
-            var textureLayout = CreateTextureBindGroupLayout();
-            var defaultBindGroup = CreateTextureBindGroup(textureLayout,
-                null, null, null, null);
+            // Group 0: Per-frame uniforms (updated every frame)
+            _perFrameUniformBuffer = WgpuBuffer<PerFrameUniforms>.CreateUniform(Wgpu, Device);
+            RegisterResource(_perFrameUniformBuffer);
 
-            RegisterBindGroup(textureLayout, defaultBindGroup);
+            var perFrameBuilder = new BindGroupBuilder(Wgpu, Device);
+            perFrameBuilder.AddUniformBuffer(0, _perFrameUniformBuffer);
+
+            var perFrameLayout = perFrameBuilder.BuildLayout();
+            _perFrameBindGroup = perFrameBuilder.BuildBindGroup();
+
+            RegisterBindGroup(perFrameLayout, _perFrameBindGroup);
+
+            // Group 1: Per-mesh uniforms (created per mesh, set once)
+            // We only create the layout here; meshes will create their own bind groups
+            var perMeshLayout = CreatePerMeshBindGroupLayout();
+            RegisterBindGroup(perMeshLayout, null); // null bind group - meshes create their own
+
+            // Group 2: Textures (created per draw call)
+            var textureLayout = CreateTextureBindGroupLayout();
+            var defaultTextureBindGroup = CreateTextureBindGroup(textureLayout, null, null, null, null);
+            RegisterBindGroup(textureLayout, defaultTextureBindGroup);
+        }
+
+        private BindGroupLayout* CreatePerMeshBindGroupLayout()
+        {
+            var entry = new BindGroupLayoutEntry
+            {
+                Binding = 0,
+                Visibility = ShaderStage.Vertex | ShaderStage.Fragment,
+                Buffer = new BufferBindingLayout
+                {
+                    Type = BufferBindingType.Uniform,
+                    MinBindingSize = 0
+                }
+            };
+
+            var layoutDesc = new BindGroupLayoutDescriptor
+            {
+                EntryCount = 1,
+                Entries = &entry
+            };
+
+            return Wgpu.DeviceCreateBindGroupLayout(Device, &layoutDesc);
+        }
+
+        public BindGroup* CreatePerMeshBindGroup(WgpuBuffer<PerMeshUniforms> uniformBuffer)
+        {
+            var layout = GetBindGroupLayout(1);
+
+            var entry = new BindGroupEntry
+            {
+                Binding = 0,
+                Buffer = uniformBuffer.Handle,
+                Offset = 0,
+                Size = uniformBuffer.Size
+            };
+
+            var bindGroupDesc = new BindGroupDescriptor
+            {
+                Layout = layout,
+                EntryCount = 1,
+                Entries = &entry
+            };
+
+            return Wgpu.DeviceCreateBindGroup(Device, &bindGroupDesc);
         }
 
         private BindGroupLayout* CreateTextureBindGroupLayout()
@@ -304,13 +366,18 @@ namespace XNOEdit.Renderer.Shaders
             ];
         }
 
+        public void UpdatePerFrameUniforms(Queue* queue, in PerFrameUniforms uniforms)
+        {
+            _perFrameUniformBuffer.UpdateData(queue, in uniforms);
+        }
+
         public BindGroup* GetTextureBindGroup(
             TextureView* mainTextureView,
             TextureView* blendTextureView,
             TextureView* normalTextureView,
             TextureView* lightmapTextureView)
         {
-            var layout = GetBindGroupLayout(1);
+            var layout = GetBindGroupLayout(2);
             return CreateTextureBindGroup(layout, mainTextureView, blendTextureView, normalTextureView, lightmapTextureView);
         }
 

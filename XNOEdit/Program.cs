@@ -25,7 +25,6 @@ namespace XNOEdit
 
         private static Camera _camera;
         private static ArcFile _shaderArchive;
-        private static Model _model;
         private static ModelRenderer _modelRenderer;
         private static GridRenderer _grid;
         private static SkyboxRenderer _skybox;
@@ -92,6 +91,16 @@ namespace XNOEdit
             {
                 LoadGameFolderResources();
             }
+        }
+
+        private static void ToggleSubobjectVisibility(int objectIndex, bool visibility)
+        {
+            _modelRenderer.SetVisible(objectIndex, null, visibility);
+        }
+
+        private static void ToggleMeshSetVisibility(int objectIndex, int meshIndex, bool visibility)
+        {
+            _modelRenderer.SetVisible(objectIndex, meshIndex, visibility);
         }
 
         private static void InitializeWgpu()
@@ -242,20 +251,17 @@ namespace XNOEdit
                     });
             }
 
-            if (_model != null && _modelRenderer != null)
-            {
-                _modelRenderer.Draw(_queue, pass, view, projection,
-                    new ModelParameters
-                    {
-                        SunDirection = _settings.SunDirection,
-                        SunColor = _settings.SunColor,
-                        Position =  _camera.Position,
-                        VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
-                        Wireframe = _settings.WireframeMode,
-                        CullBackfaces =  _settings.BackfaceCulling,
-                        Textures = _textureManager.Textures
-                    });
-            }
+            _modelRenderer?.Draw(_queue, pass, view, projection,
+                new ModelParameters
+                {
+                    SunDirection = _settings.SunDirection,
+                    SunColor = _settings.SunColor,
+                    Position =  _camera.Position,
+                    VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
+                    Wireframe = _settings.WireframeMode,
+                    CullBackfaces =  _settings.BackfaceCulling,
+                    Textures = _textureManager.Textures
+                });
 
             UIManager.OnRender(deltaTime, ref _settings, pass, _textureManager.Textures);
 
@@ -296,7 +302,6 @@ namespace XNOEdit
 
         private static void OnClose()
         {
-            _model?.Dispose();
             _modelRenderer?.Dispose();
             _grid?.Dispose();
             _skybox?.Dispose();
@@ -373,11 +378,10 @@ namespace XNOEdit
 
                 if (objectChunk != null)
                 {
-                    UIManager.InitXnoPanel(xno);
+                    UIManager.InitXnoPanel(xno, ToggleSubobjectVisibility, ToggleMeshSetVisibility);
 
                     _window.Title = $"XNOEdit - {xno.Name}";
 
-                    _model?.Dispose();
                     _modelRenderer?.Dispose();
                     _textureManager.ClearTextures();
 
@@ -388,8 +392,7 @@ namespace XNOEdit
                         UIManager.TriggerAlert(AlertLevel.Warning, "XNO has no geometry");
                     }
 
-                    _model = new Model(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
-                    _modelRenderer = new ModelRenderer(_wgpu, _device, _model);
+                    _modelRenderer = new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
 
                     _modelCenter = objectChunk.Centre;
                     _modelRadius = objectChunk.Radius;

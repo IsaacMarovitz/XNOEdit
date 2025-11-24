@@ -1,4 +1,6 @@
 using System.Numerics;
+using Marathon.Formats.Archive;
+using Marathon.Formats.Ninja.Chunks;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
@@ -20,10 +22,21 @@ namespace XNOEdit.Renderer.Renderers
     {
         private readonly Model _model;
 
-        public ModelRenderer(WebGPU wgpu, WgpuDevice device, Model model)
+        public ModelRenderer(
+            WebGPU wgpu,
+            WgpuDevice device,
+            ObjectChunk objectChunk,
+            TextureListChunk textureListChunk,
+            EffectListChunk effectListChunk,
+            ArcFile shaderArchive)
             : base(wgpu, CreateShader(wgpu, device))
         {
-            _model = model;
+            _model = new Model(wgpu, device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (ModelShader)Shader);
+        }
+
+        public void SetVisible(int subobject, int? meshSet, bool visibility)
+        {
+            _model.SetVisible(subobject, meshSet, visibility);
         }
 
         private static ModelShader CreateShader(WebGPU wgpu, WgpuDevice device)
@@ -40,24 +53,25 @@ namespace XNOEdit.Renderer.Renderers
         {
             base.Draw(queue, passEncoder, view, projection, modelParameters);
 
-            var uniforms = new BasicModelUniforms
+            var modelShader = (ModelShader)Shader;
+
+            var perFrameUniforms = new PerFrameUniforms
             {
                 Model = Matrix4x4.Identity,
                 View = view,
                 Projection = projection,
-
                 SunDirection = modelParameters.SunDirection.AsVector4(),
                 SunColor = modelParameters.SunColor.AsVector4(),
-                Position = modelParameters.Position,
+                CameraPosition = modelParameters.Position,
                 VertColorStrength = modelParameters.VertColorStrength
             };
 
-            var modelShader = (ModelShader)Shader;
+            modelShader.UpdatePerFrameUniforms(queue, in perFrameUniforms);
 
             var pipeline = modelShader.GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
             Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
 
-            _model.Draw(queue, passEncoder, modelParameters.Wireframe, modelParameters.Textures, modelShader, uniforms);
+            _model.Draw(passEncoder, modelParameters.Wireframe, modelParameters.Textures, modelShader);
         }
 
         public override void Dispose()

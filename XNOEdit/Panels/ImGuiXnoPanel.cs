@@ -8,11 +8,25 @@ namespace XNOEdit.Panels
 {
     public class ImGuiXnoPanel
     {
+        public event Action<int, bool> ToggleSubobjectVisibility;
+        public event Action<int, int, bool> ToggleMeshSetVisibility;
+
         private readonly NinjaNext _xno;
+        private Dictionary<(int subobjectIndex, int? meshSetIndex), bool> _visibilityState = new();
 
         public ImGuiXnoPanel(NinjaNext xno)
         {
             _xno = xno;
+        }
+
+        private bool GetVisibility(int subobjectIndex, int? meshSetIndex = null)
+        {
+            return !_visibilityState.TryGetValue((subobjectIndex, meshSetIndex), out var visible) || visible;
+        }
+
+        private void SetVisibility(int subobjectIndex, int? meshSetIndex, bool visible)
+        {
+            _visibilityState[(subobjectIndex, meshSetIndex)] = visible;
         }
 
         public void Render(IReadOnlyDictionary<string, IntPtr> textures)
@@ -46,7 +60,7 @@ namespace XNOEdit.Panels
             ImGui.End();
         }
 
-        private static void RenderObjectChunk(ObjectChunk objectChunk, EffectListChunk effectListChunk)
+        private void RenderObjectChunk(ObjectChunk objectChunk, EffectListChunk effectListChunk)
         {
             if (ImGui.BeginTabItem("Object"))
             {
@@ -70,7 +84,18 @@ namespace XNOEdit.Panels
                 for (var i = 0; i < objectChunk.SubObjects.Count; i++)
                 {
                     ImGui.PushID(i);
-                    if (ImGui.CollapsingHeader($"Subobject {i + 1}"))
+
+                    var open = ImGui.CollapsingHeader($"Subobject {i + 1}", ImGuiTreeNodeFlags.AllowOverlap);
+                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - ImGui.GetFrameHeight());
+
+                    var visible = GetVisibility(i);
+                    if (ImGui.Checkbox($"##VisibilitySubobject{i + 1}", ref visible))
+                    {
+                        SetVisibility(i, null, visible);
+                    }
+                    ToggleSubobjectVisibility?.Invoke(i, visible);
+
+                    if (open)
                     {
                         var subobject = objectChunk.SubObjects[i];
 
@@ -83,7 +108,18 @@ namespace XNOEdit.Panels
                         for (var j = 0; j < subobject.MeshSets.Count; j++)
                         {
                             ImGui.PushID(j);
-                            if (ImGui.CollapsingHeader($"Mesh Set {j + 1}"))
+
+                            var openMeshSet = ImGui.CollapsingHeader($"Mesh Set {j + 1}", ImGuiTreeNodeFlags.AllowOverlap);
+                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - ImGui.GetFrameHeight());
+
+                            var visibleMeshSet = GetVisibility(i, j);
+                            if (ImGui.Checkbox($"##VisibilityMeshSet{j + 1}", ref visibleMeshSet))
+                            {
+                                SetVisibility(i, j, visibleMeshSet);
+                            }
+                            ToggleMeshSetVisibility?.Invoke(i, j, visibleMeshSet);
+
+                            if (openMeshSet)
                             {
                                 RenderMeshSet(subobject.MeshSets[j], effectListChunk);
                             }
@@ -112,7 +148,7 @@ namespace XNOEdit.Panels
             }
         }
 
-        private static void RenderMeshSet(MeshSet meshSet, EffectListChunk effectListChunk)
+        private void RenderMeshSet(MeshSet meshSet, EffectListChunk effectListChunk)
         {
             var meshCenter = meshSet.Centre;
             ImGui.InputFloat3("Center", ref meshCenter, "%.1f", ImGuiInputTextFlags.ReadOnly);
@@ -186,7 +222,7 @@ namespace XNOEdit.Panels
             ImGui.Text($"Z Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.ZCompareFunction)}");
         }
 
-        private static void RenderTextureChunk(IReadOnlyDictionary<string, IntPtr> textures, TextureListChunk textureListChunk)
+        private void RenderTextureChunk(IReadOnlyDictionary<string, IntPtr> textures, TextureListChunk textureListChunk)
         {
             if (ImGui.BeginTabItem("Texture List"))
             {
@@ -208,7 +244,7 @@ namespace XNOEdit.Panels
             }
         }
 
-        private static void RenderEffectChunk(EffectListChunk effectListChunk)
+        private void RenderEffectChunk(EffectListChunk effectListChunk)
         {
             if (ImGui.BeginTabItem("Effect List"))
             {

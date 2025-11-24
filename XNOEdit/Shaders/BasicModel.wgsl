@@ -1,59 +1,54 @@
-// Uniform bindings
-struct Uniforms {
+struct PerFrameUniforms {
     model: mat4x4<f32>,
     view: mat4x4<f32>,
     projection: mat4x4<f32>,
+    sunDirection: vec4<f32>,
+    sunColor: vec4<f32>,
+    cameraPosition: vec3<f32>,
+    vertColorStrength: f32,
+}
 
+struct PerMeshUniforms {
     ambientColor: vec4<f32>,
     diffuseColor: vec4<f32>,
     specularColor: vec4<f32>,
     emissiveColor: vec4<f32>,
-
-    lightDir: vec3<f32>,
-    _pad1: f32,
-    lightColor: vec3<f32>,
-    _pad2: f32,
-    viewPos: vec3<f32>,
-    vertColorStrength: f32,
     specularPower: f32,
     alphaRef: f32,
     alpha: f32,
     blend: f32,
     specular: f32,
-    worldSpace: f32
 }
 
-@group(0) @binding(0) var<uniform> uniforms: Uniforms;
-
-// Group 1: Textures (matching your binding layout)
-@group(1) @binding(0) var mainSampler: sampler;
-@group(1) @binding(1) var mainTexture: texture_2d<f32>;
-@group(1) @binding(2) var blendTexture: texture_2d<f32>;
-@group(1) @binding(3) var normalTexture: texture_2d<f32>;
-@group(1) @binding(4) var lightmapTexture: texture_2d<f32>;
-
-const WORLD_SPACE_NORMALS: i32 = 0;
-
-// Vertex input
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) color: vec4<f32>,
-    @location(3) uv: vec2<f32>,
-    @location(4) uv2: vec2<f32>
+    @location(3) uv0: vec2<f32>,
+    @location(4) uv1: vec2<f32>,
 }
 
-// Vertex output / Fragment input
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) fragPos: vec3<f32>,
+    @location(0) world_position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) tangent: vec3<f32>,
     @location(3) bitangent: vec3<f32>,
     @location(4) color: vec4<f32>,
-    @location(5) uv: vec2<f32>,
-    @location(6) uv2: vec2<f32>
+    @location(5) uv0: vec2<f32>,
+    @location(6) uv1: vec2<f32>
 }
+
+@group(0) @binding(0) var<uniform> per_frame: PerFrameUniforms;
+@group(1) @binding(0) var<uniform> per_mesh: PerMeshUniforms;
+
+@group(2) @binding(0) var texture_sampler: sampler;
+@group(2) @binding(1) var main_texture: texture_2d<f32>;
+@group(2) @binding(2) var blend_texture: texture_2d<f32>;
+@group(2) @binding(3) var normal_texture: texture_2d<f32>;
+@group(2) @binding(4) var lightmap_texture: texture_2d<f32>;
+
+const WORLD_SPACE_NORMALS: i32 = 0;
 
 // Calculate tangent space for normal mapping
 fn calculateTangentSpace(normal: vec3<f32>) -> mat3x3<f32> {
@@ -71,14 +66,14 @@ fn calculateTangentSpace(normal: vec3<f32>) -> mat3x3<f32> {
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
-    let worldPos = uniforms.model * vec4<f32>(in.position, 1.0);
-    out.fragPos = worldPos.xyz;
+    let worldPos = per_frame.model * vec4<f32>(in.position, 1.0);
+    out.world_position = worldPos.xyz;
 
     // Transform normal to world space
     let normalMatrix = mat3x3<f32>(
-        uniforms.model[0].xyz,
-        uniforms.model[1].xyz,
-        uniforms.model[2].xyz
+        per_frame.model[0].xyz,
+        per_frame.model[1].xyz,
+        per_frame.model[2].xyz
     );
 
     out.normal = normalize(normalMatrix * in.normal);
@@ -88,10 +83,10 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     out.tangent = tbn[0];
     out.bitangent = tbn[1];
 
-    out.uv = in.uv;
-    out.uv2 = in.uv2;
-    out.color = mix(vec4<f32>(1.0), in.color, uniforms.vertColorStrength);
-    out.position = uniforms.projection * uniforms.view * worldPos;
+    out.uv0 = in.uv0;
+    out.uv1 = in.uv1;
+    out.color = mix(vec4<f32>(1.0), in.color, per_frame.vertColorStrength);
+    out.position = per_frame.projection * per_frame.view * worldPos;
 
     return out;
 }
@@ -99,24 +94,24 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Sample textures
-    let mainColor = textureSample(mainTexture, mainSampler, in.uv);
-    let blendColor = textureSample(blendTexture, mainSampler, in.uv);
-    let normalMap = textureSample(normalTexture, mainSampler, in.uv);
-    let lightmap = textureSample(lightmapTexture, mainSampler, in.uv2);
+    let mainColor = textureSample(main_texture, texture_sampler, in.uv0);
+    let blendColor = textureSample(blend_texture, texture_sampler, in.uv0);
+    let normalMap = textureSample(normal_texture, texture_sampler, in.uv0);
+    let lightmap = textureSample(lightmap_texture, texture_sampler, in.uv1);
 
     // Blend main and blend texture using vertex alpha
     var textureColor: vec4<f32>;
 
-    if (uniforms.blend == 1.0) {
+    if (per_mesh.blend == 1.0) {
         textureColor = mix(blendColor, mainColor, in.color.a);
     } else {
         textureColor = mainColor;
     }
 
     // Apply material diffuse color to texture
-    let baseDiffuse = textureColor * uniforms.diffuseColor;
+    let baseDiffuse = textureColor * per_mesh.diffuseColor;
 
-    if (baseDiffuse.a < uniforms.alphaRef) {
+    if (baseDiffuse.a < per_mesh.alphaRef) {
         discard;
     }
 
@@ -138,24 +133,24 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // === Lighting Setup ===
-    let mainLightDir = normalize(uniforms.lightDir);
-    let viewDir = normalize(uniforms.viewPos - in.fragPos);
+    let mainLightDir = normalize(per_frame.sunDirection);
+    let viewDir = normalize(per_frame.cameraPosition - in.world_position);
 
     // === Ambient ===
     // Material ambient color * scene ambient
-    let ambient = uniforms.ambientColor.rgb * 0.3 * uniforms.lightColor;
+    let ambient = per_mesh.ambientColor.rgb * 0.3 * per_frame.sunColor.rgb;
 
     // === Diffuse ===
-    let diff = max(dot(worldNormal, mainLightDir), 0.0);
-    let diffuse = diff * uniforms.lightColor;
+    let diff = max(dot(worldNormal, mainLightDir.rgb), 0.0);
+    let diffuse = diff * per_frame.sunColor.rgb;
 
     // === Specular ===
     var specular = vec3(0.0, 0.0, 0.0);
-    if (uniforms.specular == 1.0) {
-        let halfDir = normalize(mainLightDir + viewDir);
-        let specPower = max(uniforms.specularPower, 1.0);  // Clamp to prevent issues
+    if (per_mesh.specular == 1.0) {
+        let halfDir = normalize(mainLightDir.rgb + viewDir);
+        let specPower = max(per_mesh.specularPower, 1.0);  // Clamp to prevent issues
         let spec = pow(max(dot(worldNormal, halfDir), 0.0), specPower);
-        specular = spec * uniforms.specularColor.rgb;
+        specular = spec * per_mesh.specularColor.rgb;
     }
 
     // === Combine Lighting ===
@@ -166,12 +161,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // Apply to diffuse texture, then add specular and emissive
     let litDiffuse = baseDiffuse.rgb * in.color.rgb * sceneLighting;
-    let finalColor = litDiffuse + specular; // + uniforms.emissiveColor.rgb;
+    let finalColor = litDiffuse + specular; // + per_mesh.emissiveColor.rgb;
 
     var alpha: f32;
 
-    if (uniforms.alpha == 1.0) {
-        alpha = uniforms.specularColor.a * in.color.a;
+    if (per_mesh.alpha == 1.0) {
+        alpha = per_mesh.specularColor.a * in.color.a;
     } else {
         alpha = 1.0;
     }
