@@ -137,7 +137,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let viewDir = normalize(per_frame.cameraPosition - in.world_position);
 
     // === Ambient ===
-    // Material ambient color * scene ambient
     let ambient = per_mesh.ambientColor.rgb * 0.3 * per_frame.sunColor.rgb;
 
     // === Diffuse ===
@@ -148,18 +147,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var specular = vec3(0.0, 0.0, 0.0);
     if (per_mesh.specular == 1.0) {
         let halfDir = normalize(mainLightDir.rgb + viewDir);
-        let specPower = max(per_mesh.specularPower, 1.0);  // Clamp to prevent issues
+        let specPower = max(per_mesh.specularPower, 1.0);
         let spec = pow(max(dot(worldNormal, halfDir), 0.0), specPower);
-        specular = spec * per_mesh.specularColor.rgb;
+        specular = spec * per_mesh.specularColor.rgb * textureColor.a;
     }
 
     // === Combine Lighting ===
     let lightmapColor = lightmap.rgb;
-
-    // Scene lighting: (ambient + diffuse) * lightmap
     let sceneLighting = (ambient + diffuse) * lightmapColor;
 
-    // Apply to diffuse texture, then add specular and emissive
     let litDiffuse = baseDiffuse.rgb * in.color.rgb * sceneLighting;
     let finalColor = litDiffuse + specular; // + per_mesh.emissiveColor.rgb;
 
