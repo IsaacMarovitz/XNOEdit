@@ -62,6 +62,7 @@ namespace XNOEdit.Managers
                     ImGui.MenuItem("Vertex Colors", "V", ref settings.VertexColors);
                     ImGui.MenuItem("Backface Culling", "C", ref settings.BackfaceCulling);
                     ImGui.MenuItem("Wireframe", "F", ref settings.WireframeMode);
+                    ImGui.MenuItem("Lightmap", null, ref settings.Lightmap);
 
                     ImGui.Separator();
 

@@ -6,6 +6,7 @@ struct PerFrameUniforms {
     sunColor: vec4<f32>,
     cameraPosition: vec3<f32>,
     vertColorStrength: f32,
+    lightmap: f32,
 }
 
 struct PerMeshUniforms {
@@ -153,8 +154,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // === Combine Lighting ===
-    let lightmapColor = lightmap.rgb * 0.5 + 0.5;
-    let sceneLighting = (ambient + diffuse) * lightmapColor;
+    var sceneLighting = (ambient + diffuse);
+
+    if (per_frame.lightmap == 1.0) {
+        let lightmapColor = lightmap.rgb * 0.5 + 0.5;
+        sceneLighting *= lightmapColor;
+    }
 
     let litDiffuse = baseDiffuse.rgb * in.color.rgb * sceneLighting;
     let finalColor = litDiffuse + specular; // + per_mesh.emissiveColor.rgb;

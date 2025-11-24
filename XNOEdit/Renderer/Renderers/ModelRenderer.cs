@@ -15,6 +15,7 @@ namespace XNOEdit.Renderer.Renderers
         public float VertColorStrength;
         public bool Wireframe;
         public bool CullBackfaces;
+        public bool Lightmap;
         public IReadOnlyDictionary<string, IntPtr> Textures;
     }
 
@@ -63,7 +64,8 @@ namespace XNOEdit.Renderer.Renderers
                 SunDirection = modelParameters.SunDirection.AsVector4(),
                 SunColor = modelParameters.SunColor.AsVector4(),
                 CameraPosition = modelParameters.Position,
-                VertColorStrength = modelParameters.VertColorStrength
+                VertColorStrength = modelParameters.VertColorStrength,
+                Lightmap = modelParameters.Lightmap ? 1.0f: 0.0f,
             };
 
             modelShader.UpdatePerFrameUniforms(queue, in perFrameUniforms);

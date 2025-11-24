@@ -11,6 +11,7 @@ namespace XNOEdit.Managers
         ShowGrid,
         BackfaceCulling,
         VertexColors,
+        Lightmap,
         None
     }
 

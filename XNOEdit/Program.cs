@@ -162,6 +162,10 @@ namespace XNOEdit
                     _settings.VertexColors = !_settings.VertexColors;
                     alert = $"Vertex Colors: {(_settings.VertexColors ? "ON" : "OFF")}";
                     break;
+                case SettingsToggle.Lightmap:
+                    _settings.Lightmap = !_settings.Lightmap;
+                    alert = $"Lightmap: {(_settings.Lightmap ? "ON" : "OFF")}";
+                    break;
             }
 
             UIManager.TriggerAlert(AlertLevel.Info, alert);
@@ -260,7 +264,8 @@ namespace XNOEdit
                     VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
                     Wireframe = _settings.WireframeMode,
                     CullBackfaces =  _settings.BackfaceCulling,
-                    Textures = _textureManager.Textures
+                    Textures = _textureManager.Textures,
+                    Lightmap = _settings.Lightmap,
                 });
 
             UIManager.OnRender(deltaTime, ref _settings, pass, _textureManager.Textures);

@@ -383,7 +383,7 @@ namespace XNOEdit.Renderer
                 AlphaRef = material.Logic.AlphaRef / 255.0f,
                 Alpha = material.Logic.Alpha ? 1.0f : 0.0f,
                 Blend = material.Logic.Blend ? 1.0f : 0.0f,
-                Specular = _textureSet.Specular ? 1.0f : 0.0f
+                Specular = _textureSet.Specular ? 1.0f : 0.0f,
             };
 
             var queue = wgpu.DeviceGetQueue(device);

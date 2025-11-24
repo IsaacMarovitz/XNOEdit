@@ -16,6 +16,7 @@ namespace XNOEdit.Renderer.Shaders
         public Vector4 SunColor;
         public Vector3 CameraPosition;
         public float VertColorStrength;
+        public float Lightmap;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 16)]
