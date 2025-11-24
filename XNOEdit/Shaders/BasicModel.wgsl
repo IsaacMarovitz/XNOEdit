@@ -159,13 +159,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let litDiffuse = baseDiffuse.rgb * in.color.rgb * sceneLighting;
     let finalColor = litDiffuse + specular; // + per_mesh.emissiveColor.rgb;
 
-    var alpha: f32;
-
-    if (per_mesh.alpha == 1.0) {
-        alpha = per_mesh.specularColor.a * in.color.a;
-    } else {
-        alpha = 1.0;
-    }
-
-    return vec4<f32>(finalColor, alpha);
+    return vec4<f32>(finalColor, 1.0);
 }
