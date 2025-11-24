@@ -153,7 +153,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     // === Combine Lighting ===
-    let lightmapColor = lightmap.rgb;
+    let lightmapColor = lightmap.rgb * 0.5 + 0.5;
     let sceneLighting = (ambient + diffuse) * lightmapColor;
 
     let litDiffuse = baseDiffuse.rgb * in.color.rgb * sceneLighting;

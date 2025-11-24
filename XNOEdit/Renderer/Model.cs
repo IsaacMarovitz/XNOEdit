@@ -147,53 +147,60 @@ namespace XNOEdit.Renderer
 
                 for (var j = 0; j < subObject.MeshSets.Count; j++)
                 {
-                    var meshSet = subObject.MeshSets[j];
-
-                    var vertexListIndex = meshSet.VertexListIndex;
-                    var primitiveList = meshSet.GetPrimitiveList(objectChunk);
-                    var material = meshSet.GetMaterial(objectChunk);
-                    var textureSet = new TextureSet();
-                    string effectName = null;
-                    string techniqueName = null;
-
-                    if (effectListChunk != null)
+                    try
                     {
-                        var technique = meshSet.GetTechnique(effectListChunk);
+                        var meshSet = subObject.MeshSets[j];
 
-                        if (technique != null)
+                        var vertexListIndex = meshSet.VertexListIndex;
+                        var primitiveList = meshSet.GetPrimitiveList(objectChunk);
+                        var material = meshSet.GetMaterial(objectChunk);
+                        var textureSet = new TextureSet();
+                        string effectName = null;
+                        string techniqueName = null;
+
+                        if (effectListChunk != null)
                         {
-                            var effect = technique.GetEffect(effectListChunk);
+                            var technique = meshSet.GetTechnique(effectListChunk);
 
-                            effectName = effect.Name;
-                            techniqueName = technique.Name;
+                            if (technique != null)
+                            {
+                                var effect = technique.GetEffect(effectListChunk);
+
+                                effectName = effect.Name;
+                                techniqueName = technique.Name;
+                            }
                         }
-                    }
 
-                    if (textureListChunk != null)
+                        if (textureListChunk != null)
+                        {
+                            var textures = material.TextureMap.Descriptions
+                                .Where(d => d.Index >= 0 && d.Index < textureListChunk.Textures.Count)
+                                .Select(d => textureListChunk.Textures[d.Index])
+                                .Distinct()
+                                .ToList();
+
+                            textureSet = IntuitTextures(textures);
+                        }
+
+                        if (primitiveList == null || !_sharedVertexBuffers.TryGetValue(vertexListIndex, out var buffer))
+                        {
+                            continue;
+                        }
+
+                        if (effectName != null)
+                        {
+                            var shaderFile = _shaderArchive.GetFile($"xenon/shader/std/{effectName}o");
+                            // var shaderData = shaderFile.Decompress
+                            // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
+                        }
+
+                        var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, textureSet, material, shader, i, j);
+                        _meshes.Add(mesh);
+                    }
+                    catch (Exception ex)
                     {
-                        var textures = material.TextureMap.Descriptions
-                            .Where(d => d.Index >= 0 && d.Index < textureListChunk.Textures.Count)
-                            .Select(d => textureListChunk.Textures[d.Index])
-                            .Distinct()
-                            .ToList();
-
-                        textureSet = IntuitTextures(textures);
+                        Console.WriteLine(ex.Message);
                     }
-
-                    if (primitiveList == null || !_sharedVertexBuffers.TryGetValue(vertexListIndex, out var buffer))
-                    {
-                        continue;
-                    }
-
-                    if (effectName != null)
-                    {
-                        var shaderFile = _shaderArchive.GetFile($"xenon/shader/std/{effectName}o");
-                        // var shaderData = shaderFile.Decompress
-                        // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
-                    }
-
-                    var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, textureSet, material, shader, i, j);
-                    _meshes.Add(mesh);
                 }
             }
 
