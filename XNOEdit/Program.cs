@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using ImGuiNET;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
@@ -173,7 +174,8 @@ namespace XNOEdit
 
         private static void OnUpdate(double deltaTime)
         {
-            _camera.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime);
+            if (!ImGui.GetIO().WantCaptureMouse)
+                _camera.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime);
 
             if (_pendingFileLoad != null)
             {
