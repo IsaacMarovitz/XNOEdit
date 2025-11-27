@@ -2,6 +2,7 @@ using Marathon.Formats.Ninja.Chunks;
 using Marathon.IO.Types.FileSystem;
 using Pfim;
 using Silk.NET.WebGPU;
+using XNOEdit.Logging;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Wgpu;
 
@@ -31,7 +32,7 @@ namespace XNOEdit.Managers
 
             if (textureListChunk == null) return;
 
-            Console.WriteLine($"Loading {textureListChunk.Textures.Count} textures...");
+            Logger.Debug?.PrintMsg(LogClass.Application, $"Loading {textureListChunk.Textures.Count} textures...");
 
             var parentDirectory = file.Parent;
             foreach (var textureFile in parentDirectory.EnumerateFiles("*.dds", SearchOption.AllDirectories))
@@ -52,7 +53,7 @@ namespace XNOEdit.Managers
                 ? (uint)(image.MipMaps.Length + 1)
                 : 1u;
 
-            Console.WriteLine($"  Loading {name}: {image.Width}x{image.Height}, {mipLevelCount} mip levels, format: {image.Format}");
+            Logger.Debug?.PrintMsg(LogClass.Application, $"  Loading {name}: {image.Width}x{image.Height}, {mipLevelCount} mip levels, format: {image.Format}");
 
             var textureDesc = new TextureDescriptor
             {

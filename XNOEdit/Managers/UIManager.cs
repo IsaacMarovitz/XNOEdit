@@ -2,6 +2,7 @@ using System.Numerics;
 using ImGuiNET;
 using Marathon.Formats.Ninja;
 using Silk.NET.WebGPU;
+using XNOEdit.Logging;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
 
@@ -81,6 +82,17 @@ namespace XNOEdit.Managers
 
                     ImGui.MenuItem("XNO", null, ref _xnoWindow);
                     ImGui.MenuItem("Environment", null, ref _environmentWindow);
+
+                    ImGui.Separator();
+
+                    var debugLogs = Configuration.DebugLogs;
+                    ImGui.MenuItem("Debug Logs", null, ref debugLogs);
+
+                    if (debugLogs != Configuration.DebugLogs)
+                    {
+                        Configuration.DebugLogs = debugLogs;
+                        Logger.SetEnable(LogLevel.Debug, debugLogs);
+                    }
 
                     ImGui.PopItemFlag();
                     ImGui.EndMenu();

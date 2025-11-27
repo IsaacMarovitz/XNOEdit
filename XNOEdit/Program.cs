@@ -8,6 +8,7 @@ using Marathon.IO.Types.FileSystem;
 using Silk.NET.Maths;
 using Silk.NET.WebGPU;
 using Silk.NET.Windowing;
+using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
@@ -89,6 +90,8 @@ namespace XNOEdit
             UIManager.FilesPanel.LoadFile += QueueFileLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, _queue, UIManager.Controller);
+
+            Logger.SetEnable(LogLevel.Debug, Configuration.DebugLogs);
 
             if (Configuration.GameFolder != null)
             {
@@ -428,7 +431,7 @@ namespace XNOEdit
             catch (Exception ex)
             {
                 UIManager.TriggerAlert(AlertLevel.Error, $"Error loading XNO: \"{ex.Message}\"");
-                Console.WriteLine(ex.StackTrace);
+                Logger.Error?.PrintStack(LogClass.Application, "Error loading XNO");
             }
         }
 
@@ -446,16 +449,16 @@ namespace XNOEdit
                         var param = parameters.FirstOrDefault(x => x.Name == (string)setObject.Parameters[0].Value);
 
                         if (param == null)
-                            Console.WriteLine($"Missing Model {setObject.Name} of type {setObject.Type}");
+                            Logger.Debug?.PrintMsg(LogClass.Application, $"Missing Model {setObject.Name} of type {setObject.Type}");
                         else
-                            Console.WriteLine($"Model: {param.Model}");
+                            Logger.Debug?.PrintMsg(LogClass.Application, $"Model: {param.Model}");
                     }
                 }
             }
             catch (Exception ex)
             {
                 UIManager.TriggerAlert(AlertLevel.Error, $"Error loading SET: \"{ex.Message}\"");
-                Console.WriteLine(ex.StackTrace);
+                Logger.Error?.PrintStack(LogClass.Application, "Error loading SET");
             }
         }
 

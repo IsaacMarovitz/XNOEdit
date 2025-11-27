@@ -1,5 +1,6 @@
 using System.Numerics;
 using ImGuiNET;
+using XNOEdit.Logging;
 
 namespace XNOEdit.Panels
 {
@@ -19,7 +20,7 @@ namespace XNOEdit.Panels
 
         public void TriggerAlert(AlertLevel level, string message)
         {
-            Console.WriteLine(message);
+            Logger.Info?.PrintMsg(LogClass.Application, message);
 
             _timer = 0;
             _currentMessage = message;

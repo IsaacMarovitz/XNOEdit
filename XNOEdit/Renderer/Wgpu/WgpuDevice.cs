@@ -1,6 +1,7 @@
 using Silk.NET.WebGPU;
 using Silk.NET.WebGPU.Extensions.WGPU;
 using Silk.NET.Windowing;
+using XNOEdit.Logging;
 
 namespace XNOEdit.Renderer.Wgpu
 {
@@ -57,7 +58,7 @@ namespace XNOEdit.Renderer.Wgpu
 
             AdapterProperties adapterProps = default;
             _wgpu.AdapterGetProperties(_adapter, &adapterProps);
-            Console.WriteLine($"Backend type: {adapterProps.BackendType}");
+            Logger.Info?.PrintMsg(LogClass.Application, $"Backend type: {adapterProps.BackendType}");
 
             NativeFeature[] feature = [NativeFeature.BufferBindingArray];
 

@@ -3,6 +3,7 @@ using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
+using XNOEdit.Logging;
 using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
 
@@ -199,12 +200,12 @@ namespace XNOEdit.Renderer
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
+                        Logger.Error?.PrintMsg(LogClass.Application, ex.Message);
                     }
                 }
             }
 
-            Console.WriteLine($"Loaded {_sharedVertexBuffers.Count} vertex buffers, {_meshes.Count} meshes");
+            Logger.Debug?.PrintMsg(LogClass.Application, $"Loaded {_sharedVertexBuffers.Count} vertex buffers, {_meshes.Count} meshes");
         }
 
         private static TextureSet IntuitTextures(List<TextureFile> textures)
@@ -263,7 +264,7 @@ namespace XNOEdit.Renderer
 
             if (mainTextureName != null)
             {
-                Console.WriteLine($"Main Texture: {mainTextureName}");
+                Logger.Debug?.PrintMsg(LogClass.Application, $"Main Texture: {mainTextureName}");
 
                 if (mainTextureName.Contains("_dfsp"))
                 {
@@ -273,7 +274,7 @@ namespace XNOEdit.Renderer
 
             if (blendMapName != null)
             {
-                Console.WriteLine($"Blend Map: {blendMapName}");
+                Logger.Debug?.PrintMsg(LogClass.Application, $"Blend Map: {blendMapName}");
 
                 if (blendMapName.Contains("_dfsp"))
                 {
@@ -282,10 +283,10 @@ namespace XNOEdit.Renderer
             }
 
             if (normalMapName != null)
-                Console.WriteLine($"Normal Map: {normalMapName}");
+                Logger.Debug?.PrintMsg(LogClass.Application, $"Normal Map: {normalMapName}");
 
             if (lightMapName != null)
-                Console.WriteLine($"Light Map: {lightMapName}");
+                Logger.Debug?.PrintMsg(LogClass.Application, $"Light Map: {lightMapName}");
 
             return new TextureSet
             {

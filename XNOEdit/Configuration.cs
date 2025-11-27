@@ -1,11 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using XNOEdit.Logging;
 
 namespace XNOEdit
 {
     public class ConfigurationData
     {
         public string GameFolder { get; set; }
+        public bool DebugLogs { get; set; }
     }
 
     [JsonSourceGenerationOptions(WriteIndented = true)]
@@ -25,6 +27,16 @@ namespace XNOEdit
             set
             {
                 Instance._data.GameFolder = value;
+                Instance.Save();
+            }
+        }
+
+        public static bool DebugLogs
+        {
+            get => Instance._data.DebugLogs;
+            set
+            {
+                Instance._data.DebugLogs = value;
                 Instance.Save();
             }
         }
@@ -49,7 +61,7 @@ namespace XNOEdit
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
+                    Logger.Error?.PrintMsg(LogClass.Application, ex.Message);
                     throw;
                 }
             }
@@ -69,7 +81,7 @@ namespace XNOEdit
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
+                    Logger.Error?.PrintMsg(LogClass.Application, ex.Message);
                 }
             }
         }
@@ -84,7 +96,7 @@ namespace XNOEdit
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.Message);
+                    Logger.Error?.PrintMsg(LogClass.Application, ex.Message);
                     throw;
                 }
             }
@@ -98,7 +110,7 @@ namespace XNOEdit
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                Logger.Error?.PrintMsg(LogClass.Application, ex.Message);
             }
         }
     }
