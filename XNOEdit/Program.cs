@@ -3,6 +3,7 @@ using ImGuiNET;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
+using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using Silk.NET.Maths;
 using Silk.NET.WebGPU;
@@ -27,6 +28,7 @@ namespace XNOEdit
         private static Camera _camera;
         private static ArcFile _shaderArchive;
         private static ModelRenderer _modelRenderer;
+        private static List<ModelRenderer> _renderers = [];
         private static GridRenderer _grid;
         private static SkyboxRenderer _skybox;
         private static Vector3 _modelCenter = Vector3.Zero;
@@ -36,7 +38,7 @@ namespace XNOEdit
         private static readonly UIManager UIManager = new();
         private static readonly InputManager InputManager = new();
 
-        private static IFile _pendingFileLoad = null;
+        private static IFile _pendingFileLoad;
 
         private const TextureFormat DepthTextureFormat = TextureFormat.Depth24Plus;
 
@@ -84,7 +86,7 @@ namespace XNOEdit
             UIManager.OnLoad(new ImGuiController(_wgpu, _device, _window, InputManager.Input, 2));
             UIManager.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
-            UIManager.FilesPanel.LoadXno += QueueFileLoad;
+            UIManager.FilesPanel.LoadFile += QueueFileLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, _queue, UIManager.Controller);
 
@@ -179,7 +181,11 @@ namespace XNOEdit
 
             if (_pendingFileLoad != null)
             {
-                ReadXno(_pendingFileLoad);
+                if (_pendingFileLoad.Name.EndsWith(".xno"))
+                    ReadXno(_pendingFileLoad);
+                else if (_pendingFileLoad.Name.EndsWith(".set"))
+                    ReadSet(_pendingFileLoad);
+
                 _pendingFileLoad = null;
             }
         }
@@ -390,6 +396,7 @@ namespace XNOEdit
                     _window.Title = $"XNOEdit - {xno.Name}";
 
                     _modelRenderer?.Dispose();
+                    _grid?.Dispose();
                     _textureManager.ClearTextures();
 
                     _textureManager.LoadTextures(file, textureListChunk);
@@ -408,7 +415,6 @@ namespace XNOEdit
                     _camera.NearPlane = Math.Max(_modelRadius * 0.01f, 0.1f);
                     _camera.FarPlane = Math.Max(_modelRadius * 10.0f, 1000.0f);
 
-                    _grid?.Dispose();
                     var gridSize = _modelRadius * 4.0f;
                     _grid = new GridRenderer(_wgpu, _device, gridSize);
 
@@ -422,6 +428,33 @@ namespace XNOEdit
             catch (Exception ex)
             {
                 UIManager.TriggerAlert(AlertLevel.Error, $"Error loading XNO: \"{ex.Message}\"");
+                Console.WriteLine(ex.StackTrace);
+            }
+        }
+
+        private static void ReadSet(IFile file)
+        {
+            try
+            {
+                var set = new StageSet(file.Decompress());
+                var parameters = UIManager.FilesPanel.ObjectParameters.Parameters;
+
+                foreach (var setObject in set.Objects)
+                {
+                    if (setObject.Type == "objectphysics_item" || setObject.Type == "objectphysics")
+                    {
+                        var param = parameters.FirstOrDefault(x => x.Name == (string)setObject.Parameters[0].Value);
+
+                        if (param == null)
+                            Console.WriteLine($"Missing Model {setObject.Name} of type {setObject.Type}");
+                        else
+                            Console.WriteLine($"Model: {param.Model}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                UIManager.TriggerAlert(AlertLevel.Error, $"Error loading SET: \"{ex.Message}\"");
                 Console.WriteLine(ex.StackTrace);
             }
         }

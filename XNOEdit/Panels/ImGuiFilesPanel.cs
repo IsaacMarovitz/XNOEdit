@@ -1,12 +1,14 @@
 using ImGuiNET;
 using Marathon.Formats.Archive;
+using Marathon.Formats.Parameter;
 using Marathon.IO.Types.FileSystem;
 
 namespace XNOEdit.Panels
 {
     public class ImGuiFilesPanel
     {
-        public event Action<IFile> LoadXno;
+        public event Action<IFile> LoadFile;
+        public ObjectPhysicsParameterList ObjectParameters { get; private set; }
 
         private List<IFile> _enemyFiles;
         private List<IFile> _humanFiles;
@@ -67,6 +69,9 @@ namespace XNOEdit.Panels
             {
                 _objectFiles.Add(node);
             }
+
+            var parametersFile = objectArchive.GetFile("/xenon/object/Common.bin");
+            ObjectParameters = new ObjectPhysicsParameterList(parametersFile.Decompress());
 
             var win32Path = Path.Join([
                 Configuration.GameFolder,
@@ -232,7 +237,7 @@ namespace XNOEdit.Panels
                     // Handle click
                     if (clicked || ImGui.IsItemClicked())
                     {
-                        LoadXno?.Invoke(file);
+                        LoadFile?.Invoke(file);
                     }
 
                     ImGui.PopID();
