@@ -33,11 +33,23 @@ namespace XNOEdit.Renderer
 
         public Matrix4x4 GetProjectionMatrix(float aspectRatio)
         {
-            return Matrix4x4.CreatePerspectiveFieldOfView(
+            return CreatePerspectiveReverseZ(
                 Fov * MathF.PI / 180f,
                 aspectRatio,
                 NearPlane,
                 FarPlane
+            );
+        }
+
+        private static Matrix4x4 CreatePerspectiveReverseZ(float fovY, float aspectRatio, float near, float far)
+        {
+            var f = 1.0f / MathF.Tan(fovY * 0.5f);
+
+            return new Matrix4x4(
+                f / aspectRatio, 0,  0,                          0,
+                0,               f,  0,                          0,
+                0,               0,  near / (far - near),       -1,
+                0,               0,  far * near / (far - near), 0
             );
         }
 
@@ -46,9 +58,9 @@ namespace XNOEdit.Renderer
             _modelRadius = radius;
         }
 
-        public void ProcessKeyboard(IKeyboard keyboard, float deltaTime)
+        public void ProcessKeyboard(IKeyboard keyboard, float deltaTime, float cameraSensitivity)
         {
-            var velocity = MoveSpeed * deltaTime * _modelRadius;
+            var velocity = MoveSpeed * deltaTime * _modelRadius * cameraSensitivity;
 
             if (keyboard.IsKeyPressed(Key.W))
                 Position += _frontHorizontal * velocity;
@@ -69,6 +81,11 @@ namespace XNOEdit.Renderer
                 Position += Vector3.UnitY * velocity;
         }
 
+        public void ProcessMouseScroll(float scrollY, float cameraSensitivity)
+        {
+            Position += _front * scrollY * DollySpeed * _modelRadius *  cameraSensitivity;
+        }
+
         public void OnMouseMove(float xOffset, float yOffset)
         {
             xOffset *= LookSensitivity;
@@ -80,11 +97,6 @@ namespace XNOEdit.Renderer
             _pitch = Math.Clamp(_pitch, -89.0f, 89.0f);
 
             UpdateVectors();
-        }
-
-        public void OnMouseScroll(float scrollY)
-        {
-            Position += _front * scrollY * DollySpeed * _modelRadius;
         }
 
         public void FrameTarget(Vector3 target, float distance)

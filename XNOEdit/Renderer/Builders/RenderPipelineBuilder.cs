@@ -20,12 +20,12 @@ namespace XNOEdit.Renderer.Builders
 
         private bool _hasDepth;
         private bool _depthWrite = true;
-        private CompareFunction _depthCompare = CompareFunction.Less;
+        private CompareFunction _depthCompare = CompareFunction.Greater;
 
         private bool _hasBlend;
         private BlendState _blendState;
 
-        private const TextureFormat DepthTextureFormat = TextureFormat.Depth24Plus;
+        private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
 
         public RenderPipelineBuilder(WebGPU wgpu, WgpuDevice device)
         {
@@ -87,7 +87,7 @@ namespace XNOEdit.Renderer.Builders
 
         public RenderPipelineBuilder WithDepth(
             bool write = true,
-            CompareFunction compare = CompareFunction.Less)
+            CompareFunction compare = CompareFunction.Greater)
         {
             _hasDepth = true;
             _depthWrite = write;

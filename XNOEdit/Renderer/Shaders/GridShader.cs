@@ -35,7 +35,7 @@ namespace XNOEdit.Renderer.Shaders
                         CullMode = CullMode.None,
                         FrontFace = FrontFace.CW,
                         DepthWrite = true,
-                        DepthCompare = CompareFunction.Less,
+                        DepthCompare = CompareFunction.Greater,
                         AlphaBlend = true
                     }
                 })

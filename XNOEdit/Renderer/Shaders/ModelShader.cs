@@ -59,7 +59,7 @@ namespace XNOEdit.Renderer.Shaders
                         CullMode = CullMode.None,
                         FrontFace = FrontFace.CW,
                         DepthWrite = true,
-                        DepthCompare = CompareFunction.Less,
+                        DepthCompare = CompareFunction.Greater,
                         AlphaBlend = true
                     },
                     ["culled"] = new()
@@ -68,7 +68,7 @@ namespace XNOEdit.Renderer.Shaders
                         CullMode = CullMode.Back,
                         FrontFace = FrontFace.CW,
                         DepthWrite = true,
-                        DepthCompare = CompareFunction.Less,
+                        DepthCompare = CompareFunction.Greater,
                         AlphaBlend = true
                     },
                     ["wireframe"] = new()
@@ -77,7 +77,7 @@ namespace XNOEdit.Renderer.Shaders
                         CullMode = CullMode.None,
                         FrontFace = FrontFace.CW,
                         DepthWrite = true,
-                        DepthCompare = CompareFunction.Less,
+                        DepthCompare = CompareFunction.Greater,
                         AlphaBlend = false
                     }
                 })

@@ -13,6 +13,7 @@ using XNOEdit.Managers;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
+using XNOEdit.Renderer.Scene;
 using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit
@@ -28,8 +29,7 @@ namespace XNOEdit
 
         private static Camera _camera;
         private static ArcFile _shaderArchive;
-        private static ModelRenderer _modelRenderer;
-        private static List<ModelRenderer> _renderers = [];
+        private static IScene _scene;
         private static GridRenderer _grid;
         private static SkyboxRenderer _skybox;
         private static Vector3 _modelCenter = Vector3.Zero;
@@ -40,8 +40,9 @@ namespace XNOEdit
         private static readonly InputManager InputManager = new();
 
         private static IFile _pendingFileLoad;
+        private static ArcFile _pendingArcFile;
 
-        private const TextureFormat DepthTextureFormat = TextureFormat.Depth24Plus;
+        private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
 
         private static void Main()
         {
@@ -82,12 +83,16 @@ namespace XNOEdit
             };
             InputManager.SettingsChangedAction += OnRenderSettingsChanged;
             InputManager.MouseMoveAction += _camera.OnMouseMove;
-            InputManager.MouseScrollAction += _camera.OnMouseScroll;
+            InputManager.MouseScrollAction += scrollY =>
+            {
+                _camera.ProcessMouseScroll(scrollY, _settings.CameraSensitivity);
+            };
 
             UIManager.OnLoad(new ImGuiController(_wgpu, _device, _window, InputManager.Input, 2));
             UIManager.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
-            UIManager.FilesPanel.LoadFile += QueueFileLoad;
+            UIManager.ObjectsPanel.LoadObject += QueueObjectLoad;
+            UIManager.StagesPanel.LoadStage += QueueArcLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, _queue, UIManager.Controller);
 
@@ -101,12 +106,18 @@ namespace XNOEdit
 
         private static void ToggleSubobjectVisibility(int objectIndex, bool visibility)
         {
-            _modelRenderer.SetVisible(objectIndex, null, visibility);
+            if (_scene is ObjectScene objectScene)
+            {
+                objectScene.SetVisible(objectIndex, null, visibility);
+            }
         }
 
         private static void ToggleMeshSetVisibility(int objectIndex, int meshIndex, bool visibility)
         {
-            _modelRenderer.SetVisible(objectIndex, meshIndex, visibility);
+            if (_scene is ObjectScene objectScene)
+            {
+                objectScene.SetVisible(objectIndex, meshIndex, visibility);
+            }
         }
 
         private static void InitializeWgpu()
@@ -180,7 +191,7 @@ namespace XNOEdit
         private static void OnUpdate(double deltaTime)
         {
             if (!ImGui.GetIO().WantCaptureMouse)
-                _camera.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime);
+                _camera.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime, _settings.CameraSensitivity);
 
             if (_pendingFileLoad != null)
             {
@@ -190,6 +201,13 @@ namespace XNOEdit
                     ReadSet(_pendingFileLoad);
 
                 _pendingFileLoad = null;
+            }
+
+            if (_pendingArcFile != null)
+            {
+                ReadArc(_pendingArcFile);
+
+                _pendingArcFile = null;
             }
         }
 
@@ -236,7 +254,7 @@ namespace XNOEdit
                 View = _depthTextureView,
                 DepthLoadOp = LoadOp.Clear,
                 DepthStoreOp = StoreOp.Store,
-                DepthClearValue = 1.0f
+                DepthClearValue = 0.0f
             };
 
             var renderPassDesc = new RenderPassDescriptor
@@ -266,7 +284,7 @@ namespace XNOEdit
                     });
             }
 
-            _modelRenderer?.Draw(_queue, pass, view, projection,
+            _scene?.Render(_queue, pass, view, projection,
                 new ModelParameters
                 {
                     SunDirection = _settings.SunDirection,
@@ -318,7 +336,7 @@ namespace XNOEdit
 
         private static void OnClose()
         {
-            _modelRenderer?.Dispose();
+            _scene?.Dispose();
             _grid?.Dispose();
             _skybox?.Dispose();
             _textureManager?.Dispose();
@@ -377,9 +395,34 @@ namespace XNOEdit
             }
         }
 
-        private static void QueueFileLoad(IFile file)
+        private static void QueueObjectLoad(IFile file)
         {
             _pendingFileLoad = file;
+        }
+
+        private static void QueueArcLoad(ArcFile arcFile)
+        {
+            _pendingArcFile = arcFile;
+        }
+
+        private static void SetModelRadius(float radius)
+        {
+            _modelRadius = radius;
+
+            _camera.SetModelRadius(radius);
+            _camera.NearPlane = 0.01f;
+            _camera.FarPlane = Math.Max(radius * 10.0f, 1000.0f);
+
+            var gridSize = radius * 4.0f;
+            _grid = new GridRenderer(_wgpu, _device, gridSize);
+
+            ResetCamera();
+        }
+
+        private static void ResetCamera()
+        {
+            var distance = Math.Max(_modelRadius * 2.5f, 10.0f);
+            _camera.FrameTarget(_modelCenter, distance);
         }
 
         private static void ReadXno(IFile file)
@@ -398,7 +441,7 @@ namespace XNOEdit
 
                     _window.Title = $"XNOEdit - {xno.Name}";
 
-                    _modelRenderer?.Dispose();
+                    _scene?.Dispose();
                     _grid?.Dispose();
                     _textureManager.ClearTextures();
 
@@ -409,19 +452,11 @@ namespace XNOEdit
                         UIManager.TriggerAlert(AlertLevel.Warning, "XNO has no geometry");
                     }
 
-                    _modelRenderer = new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
+                    var renderer  = new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
+                    _scene = new ObjectScene(renderer);
 
                     _modelCenter = objectChunk.Centre;
-                    _modelRadius = objectChunk.Radius;
-
-                    _camera.SetModelRadius(_modelRadius);
-                    _camera.NearPlane = Math.Max(_modelRadius * 0.01f, 0.1f);
-                    _camera.FarPlane = Math.Max(_modelRadius * 10.0f, 1000.0f);
-
-                    var gridSize = _modelRadius * 4.0f;
-                    _grid = new GridRenderer(_wgpu, _device, gridSize);
-
-                    ResetCamera();
+                    SetModelRadius(objectChunk.Radius);
                 }
                 else
                 {
@@ -440,11 +475,11 @@ namespace XNOEdit
             try
             {
                 var set = new StageSet(file.Decompress());
-                var parameters = UIManager.FilesPanel.ObjectParameters.Parameters;
+                var parameters = UIManager.ObjectsPanel.ObjectParameters.Parameters;
 
                 foreach (var setObject in set.Objects)
                 {
-                    if (setObject.Type == "objectphysics_item" || setObject.Type == "objectphysics")
+                    if (setObject.Type is "objectphysics_item" or "objectphysics")
                     {
                         var param = parameters.FirstOrDefault(x => x.Name == (string)setObject.Parameters[0].Value);
 
@@ -462,10 +497,49 @@ namespace XNOEdit
             }
         }
 
-        private static void ResetCamera()
+        private static void ReadArc(ArcFile file)
         {
-            var distance = Math.Max(_modelRadius * 2.5f, 10.0f);
-            _camera.FrameTarget(_modelCenter, distance);
+            try
+            {
+                List<ModelRenderer> renderers = new();
+                var radius = 0f;
+
+                _textureManager.ClearTextures();
+                _grid?.Dispose();
+
+                var name = Path.GetFileName(file.Location);
+                _window.Title = $"XNOEdit - {name}";
+                Logger.Info?.PrintMsg(LogClass.Application, $"Loading ARC: {name}");
+
+                UIManager.InitStagePanel();
+
+                foreach (var model in file.EnumerateFiles("*.xno", SearchOption.AllDirectories))
+                {
+                    var xno = new NinjaNext(model.Decompress());
+                    Logger.Debug?.PrintMsg(LogClass.Application, $"Loading XNO: {xno.Name}");
+
+                    var objectChunk = xno.GetChunk<ObjectChunk>();
+                    var effectChunk = xno.GetChunk<EffectListChunk>();
+                    var textureListChunk = xno.GetChunk<TextureListChunk>();
+
+                    if (objectChunk != null)
+                    {
+                        _textureManager.LoadTextures(model, textureListChunk);
+
+                        renderers.Add(new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive));
+                        radius = Math.Max(objectChunk.Radius, radius);
+                    }
+                }
+
+                _scene = new StageScene(renderers.ToArray());
+                _modelCenter = Vector3.Zero;
+                SetModelRadius(radius);
+            }
+            catch (Exception ex)
+            {
+                UIManager.TriggerAlert(AlertLevel.Error, $"Error loading arc: \"{ex.Message}\"");
+                Logger.Error?.PrintStack(LogClass.Application, "Error loading arc");
+            }
         }
     }
 }

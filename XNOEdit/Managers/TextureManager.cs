@@ -28,8 +28,6 @@ namespace XNOEdit.Managers
 
         public void LoadTextures(IFile file, TextureListChunk textureListChunk)
         {
-            ClearTextures();
-
             if (textureListChunk == null) return;
 
             Logger.Debug?.PrintMsg(LogClass.Application, $"Loading {textureListChunk.Textures.Count} textures...");

@@ -13,8 +13,9 @@ namespace XNOEdit.Managers
         public event Action ResetCameraAction;
 
         public ImGuiController Controller { get; private set; }
-        public ImGuiFilesPanel FilesPanel { get; private set; }
+        public ImGuiObjectsPanel ObjectsPanel { get; private set; }
         public ImGuiXnoPanel XnoPanel { get; private set; }
+        public ImGuiStagesPanel StagesPanel { get; private set; }
         private ImGuiAlertPanel _alertPanel;
 
         private bool _xnoWindow = true;
@@ -26,7 +27,8 @@ namespace XNOEdit.Managers
         {
             Controller = controller;
             _alertPanel = new ImGuiAlertPanel();
-            FilesPanel = new ImGuiFilesPanel();
+            ObjectsPanel = new ImGuiObjectsPanel();
+            StagesPanel = new ImGuiStagesPanel(this);
 
             ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         }
@@ -45,6 +47,11 @@ namespace XNOEdit.Managers
             XnoPanel = new ImGuiXnoPanel(xno);
             XnoPanel.ToggleSubobjectVisibility += toggleSubobjectVisibility;
             XnoPanel.ToggleMeshSetVisibility += toggleMeshSetVisibility;
+        }
+
+        public void InitStagePanel()
+        {
+            XnoPanel = null;
         }
 
         public unsafe void OnRender(double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, IReadOnlyDictionary<string, IntPtr> textures)
@@ -104,6 +111,7 @@ namespace XNOEdit.Managers
             if (_environmentWindow)
             {
                 ImGui.Begin("Environment");
+                ImGui.SliderFloat("Camera Sensitivity", ref settings.CameraSensitivity, 0.0f, 1.0f);
                 ImGui.SeparatorText("Sun");
                 ImGui.ColorEdit3("Color", ref settings.SunColor, ImGuiColorEditFlags.NoInputs);
 
@@ -130,7 +138,8 @@ namespace XNOEdit.Managers
                     XnoPanel.Render(textures);
             }
 
-            FilesPanel.Render();
+            ObjectsPanel.Render();
+            StagesPanel.Render();
 
             _alertPanel.Render(deltaTime);
             Controller.Render(pass);
@@ -149,7 +158,7 @@ namespace XNOEdit.Managers
 
         public void LoadGameFolderResources()
         {
-            FilesPanel.LoadGameFolderResources();
+            ObjectsPanel.LoadGameFolderResources();
         }
     }
 }
