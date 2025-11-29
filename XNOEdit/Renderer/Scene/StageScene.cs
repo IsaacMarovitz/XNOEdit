@@ -13,6 +13,11 @@ namespace XNOEdit.Renderer.Scene
             _renderers = renderers;
         }
 
+        public void SetVisible(int xnoIndex, bool visibility)
+        {
+            _renderers[xnoIndex]?.SetVisible(visibility);
+        }
+
         public unsafe void Render(Queue* queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
@@ -21,7 +26,7 @@ namespace XNOEdit.Renderer.Scene
         {
             foreach (var renderer in _renderers)
             {
-                renderer.Draw(queue, passEncoder, view, projection, modelParameters);
+                renderer?.Draw(queue, passEncoder, view, projection, modelParameters);
             }
         }
 

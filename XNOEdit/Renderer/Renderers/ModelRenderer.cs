@@ -22,6 +22,7 @@ namespace XNOEdit.Renderer.Renderers
     public unsafe class ModelRenderer : WgpuRenderer<ModelParameters>
     {
         private readonly Model _model;
+        private bool _visible;
 
         public ModelRenderer(
             WebGPU wgpu,
@@ -33,6 +34,11 @@ namespace XNOEdit.Renderer.Renderers
             : base(wgpu, CreateShader(wgpu, device))
         {
             _model = new Model(wgpu, device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (ModelShader)Shader);
+        }
+
+        public void SetVisible(bool visible)
+        {
+            _visible = visible;
         }
 
         public void SetVisible(int subobject, int? meshSet, bool visibility)
@@ -52,6 +58,8 @@ namespace XNOEdit.Renderer.Renderers
             Matrix4x4 projection,
             ModelParameters modelParameters)
         {
+            if (!_visible) { return; }
+
             base.Draw(queue, passEncoder, view, projection, modelParameters);
 
             var modelShader = (ModelShader)Shader;

@@ -120,6 +120,14 @@ namespace XNOEdit
             }
         }
 
+        private static void ToggleXnoVisibility(int xnoIndex, bool visibility)
+        {
+            if (_scene is StageScene stageScene)
+            {
+                stageScene.SetVisible(xnoIndex, visibility);
+            }
+        }
+
         private static void InitializeWgpu()
         {
             _wgpu = WebGPU.GetApi();
@@ -507,11 +515,12 @@ namespace XNOEdit
                 _textureManager.ClearTextures();
                 _grid?.Dispose();
 
+                // TODO: Replace when ArcFile.Name is corrected
                 var name = Path.GetFileName(file.Location);
                 _window.Title = $"XNOEdit - {name}";
                 Logger.Info?.PrintMsg(LogClass.Application, $"Loading ARC: {name}");
 
-                UIManager.InitStagePanel();
+                var xnos = new List<NinjaNext>();
 
                 foreach (var model in file.EnumerateFiles("*.xno", SearchOption.AllDirectories))
                 {
@@ -529,7 +538,11 @@ namespace XNOEdit
                         renderers.Add(new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive));
                         radius = Math.Max(objectChunk.Radius, radius);
                     }
+
+                    xnos.Add(xno);
                 }
+
+                UIManager.InitStagePanel(name, xnos, ToggleXnoVisibility);
 
                 _scene = new StageScene(renderers.ToArray());
                 _modelCenter = Vector3.Zero;

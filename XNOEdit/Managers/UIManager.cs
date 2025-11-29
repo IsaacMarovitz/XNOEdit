@@ -15,6 +15,7 @@ namespace XNOEdit.Managers
         public ImGuiController Controller { get; private set; }
         public ImGuiObjectsPanel ObjectsPanel { get; private set; }
         public ImGuiXnoPanel XnoPanel { get; private set; }
+        public ImGuiStagePanel StagePanel { get; private set; }
         public ImGuiStagesPanel StagesPanel { get; private set; }
         private ImGuiAlertPanel _alertPanel;
 
@@ -44,14 +45,17 @@ namespace XNOEdit.Managers
 
         public void InitXnoPanel(NinjaNext xno, Action<int, bool> toggleSubobjectVisibility, Action<int, int, bool> toggleMeshSetVisibility)
         {
+            StagePanel = null;
             XnoPanel = new ImGuiXnoPanel(xno);
             XnoPanel.ToggleSubobjectVisibility += toggleSubobjectVisibility;
             XnoPanel.ToggleMeshSetVisibility += toggleMeshSetVisibility;
         }
 
-        public void InitStagePanel()
+        public void InitStagePanel(string name, List<NinjaNext> xnos, Action<int, bool> toggleXnoVisibility)
         {
             XnoPanel = null;
+            StagePanel = new ImGuiStagePanel(name, xnos);
+            StagePanel.ToggleXnoVisibility += toggleXnoVisibility;
         }
 
         public unsafe void OnRender(double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, IReadOnlyDictionary<string, IntPtr> textures)
@@ -136,6 +140,11 @@ namespace XNOEdit.Managers
             {
                 if (_xnoWindow)
                     XnoPanel.Render(textures);
+            }
+
+            if (StagePanel != null)
+            {
+                StagePanel.Render();
             }
 
             ObjectsPanel.Render();

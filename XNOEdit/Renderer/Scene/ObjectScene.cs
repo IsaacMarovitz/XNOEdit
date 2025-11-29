@@ -24,7 +24,7 @@ namespace XNOEdit.Renderer.Scene
             Matrix4x4 projection,
             ModelParameters modelParameters)
         {
-            _renderer.Draw(queue, passEncoder, view, projection, modelParameters);
+            _renderer?.Draw(queue, passEncoder, view, projection, modelParameters);
         }
 
         public void Dispose()
