@@ -108,6 +108,7 @@ namespace XNOEdit.Services
                     progress?.Report(new LoadProgress(LoadStage.CreatingBuffers, "Creating GPU buffers..."));
 
                     renderer = new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, shaderArchive);
+                    renderer.Visible = true;
                 }
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {xno.Name}", 1, 1));
