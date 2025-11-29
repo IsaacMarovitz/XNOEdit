@@ -21,7 +21,7 @@ namespace XNOEdit.Renderer.Renderers
 
     public unsafe class ModelRenderer : WgpuRenderer<ModelParameters>
     {
-        public bool Visible;
+        public bool Visible = true;
 
         private readonly Model _model;
 
