@@ -331,17 +331,12 @@ namespace XNOEdit.Renderer
         public int MeshSet { get; private set; }
 
         private readonly WebGPU _wgpu;
-        private WgpuBuffer<ushort> _indexBuffer;
-        private WgpuBuffer<ushort> _wireframeIndexBuffer;
-        private WgpuBuffer<float> _vertexBuffer;
-        private int _indexCount;
-        private int _wireframeIndexCount;
+        private readonly MeshGeometry _geometry;
         private TextureSet _textureSet;
-        private bool _visible = true;
-
-        // Per-mesh uniform buffer and bind group (set once at creation)
         private WgpuBuffer<PerMeshUniforms> _meshUniformBuffer;
         private BindGroup* _meshBindGroup;
+
+        private bool _visible = true;
 
         public ModelMesh(
             WebGPU wgpu,
@@ -355,13 +350,13 @@ namespace XNOEdit.Renderer
             int meshSet)
         {
             _wgpu = wgpu;
-            _vertexBuffer = sharedVbo;
             _textureSet = textureSet;
-
             Subobject = subobject;
             MeshSet = meshSet;
 
-            LoadMesh(device, primitiveList);
+            var stripIndices = primitiveList.IndexIndices.Select(x => (int)x).ToList();
+            _geometry = MeshGeometry.CreateFromTriangleStrip(wgpu, device, sharedVbo, stripIndices, generateWireframe: true);
+
             CreateMeshUniforms(wgpu, device, material, shader);
         }
 
@@ -392,86 +387,6 @@ namespace XNOEdit.Renderer
             _meshBindGroup = shader.CreatePerMeshBindGroup(_meshUniformBuffer);
         }
 
-        private void LoadMesh(Device* device, PrimitiveList primitiveList)
-        {
-            var sourceIndices = primitiveList.IndexIndices.Select(x => (int)x).ToList();
-            var tris = new List<int>();
-
-            for (var i = 0; i + 2 < sourceIndices.Count; i++)
-            {
-                int a = sourceIndices[i], b = sourceIndices[i + 1], c = sourceIndices[i + 2];
-
-                // Skip degenerate triangles
-                if (a == b || b == c || c == a)
-                    continue;
-
-                // Handle alternating winding order in strips
-                tris.AddRange(i % 2 == 0 ? new[] { a, b, c } : new[] { c, b, a });
-            }
-
-            // Fix winding order
-            for (var i = 0; i < tris.Count; i += 3)
-            {
-                (tris[i + 1], tris[i + 2]) = (tris[i + 2], tris[i + 1]);
-            }
-
-            var finalIndices = tris.Select(x => (ushort)x).ToArray();
-            _indexCount = finalIndices.Length;
-
-            _indexBuffer = new WgpuBuffer<ushort>(
-                _wgpu,
-                device,
-                finalIndices,
-                BufferUsage.Index);
-
-            // Generate wireframe indices (convert triangles to lines)
-            var wireframeIndices = GenerateWireframeIndices(finalIndices);
-            _wireframeIndexCount = wireframeIndices.Length;
-
-            _wireframeIndexBuffer = new WgpuBuffer<ushort>(
-                _wgpu,
-                device,
-                wireframeIndices,
-                BufferUsage.Index);
-        }
-
-        private ushort[] GenerateWireframeIndices(ushort[] triangleIndices)
-        {
-            var lines = new HashSet<(ushort, ushort)>();
-
-            // Convert each triangle to 3 lines, avoiding duplicates
-            for (var i = 0; i < triangleIndices.Length; i += 3)
-            {
-                var v0 = triangleIndices[i];
-                var v1 = triangleIndices[i + 1];
-                var v2 = triangleIndices[i + 2];
-
-                // Add edges, ensuring consistent ordering to avoid duplicates
-                AddLine(lines, v0, v1);
-                AddLine(lines, v1, v2);
-                AddLine(lines, v2, v0);
-            }
-
-            // Flatten to array
-            var result = new List<ushort>(lines.Count * 2);
-            foreach (var (a, b) in lines)
-            {
-                result.Add(a);
-                result.Add(b);
-            }
-
-            return result.ToArray();
-        }
-
-        private void AddLine(HashSet<(ushort, ushort)> lines, ushort a, ushort b)
-        {
-            // Always store with smaller index first to avoid duplicate reversed edges
-            if (a < b)
-                lines.Add((a, b));
-            else
-                lines.Add((b, a));
-        }
-
         public void Draw(
             RenderPassEncoder* passEncoder,
             bool wireframe,
@@ -480,61 +395,31 @@ namespace XNOEdit.Renderer
         {
             if (!_visible) return;
 
-            _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
+            _geometry.BindVertexBuffer(passEncoder, 0);
             _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 1, _meshBindGroup, 0, null);
 
-            TextureView* mainTexture = null;
-            if (_textureSet.MainTexture != null &&
-                textures.TryGetValue(_textureSet.MainTexture, out var mainTexturePtr))
-            {
-                mainTexture = (TextureView*)mainTexturePtr;
-            }
-
-            TextureView* blendTexture = null;
-            if (_textureSet.BlendMap != null &&
-                textures.TryGetValue(_textureSet.BlendMap, out var blendTexturePtr))
-            {
-                blendTexture = (TextureView*)blendTexturePtr;
-            }
-
-            TextureView* normalTexture = null;
-            if (_textureSet.NormalMap != null &&
-                textures.TryGetValue(_textureSet.NormalMap, out var normalTexturePtr))
-            {
-                normalTexture = (TextureView*)normalTexturePtr;
-            }
-
-            TextureView* lightmapTexture = null;
-            if (_textureSet.LightMap != null &&
-                textures.TryGetValue(_textureSet.LightMap, out var lightmapTexturePtr))
-            {
-                lightmapTexture = (TextureView*)lightmapTexturePtr;
-            }
+            var mainTexture = ResolveTexture(textures, _textureSet.MainTexture);
+            var blendTexture = ResolveTexture(textures, _textureSet.BlendMap);
+            var normalTexture = ResolveTexture(textures, _textureSet.NormalMap);
+            var lightmapTexture = ResolveTexture(textures, _textureSet.LightMap);
 
             var textureBindGroup = shader.GetTextureBindGroup(
                 mainTexture, blendTexture, normalTexture, lightmapTexture);
             _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 2, textureBindGroup, 0, null);
 
-            if (wireframe)
-            {
-                if (_wireframeIndexCount == 0) return;
-                _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _wireframeIndexBuffer.Handle,
-                    IndexFormat.Uint16, 0, _wireframeIndexBuffer.Size);
-                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, (uint)_wireframeIndexCount, 1, 0, 0, 0);
-            }
-            else
-            {
-                if (_indexCount == 0) return;
-                _wgpu.RenderPassEncoderSetIndexBuffer(passEncoder, _indexBuffer.Handle,
-                    IndexFormat.Uint16, 0, _indexBuffer.Size);
-                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, (uint)_indexCount, 1, 0, 0, 0);
-            }
+            _geometry.Draw(passEncoder, wireframe);
+        }
+
+        private static TextureView* ResolveTexture(IReadOnlyDictionary<string, IntPtr> textures, string? name)
+        {
+            if (name != null && textures.TryGetValue(name, out var ptr))
+                return (TextureView*)ptr;
+            return null;
         }
 
         public void Dispose()
         {
-            _indexBuffer?.Dispose();
-            _wireframeIndexBuffer?.Dispose();
+            _geometry.Dispose();
             _meshUniformBuffer?.Dispose();
 
             if (_meshBindGroup != null)
