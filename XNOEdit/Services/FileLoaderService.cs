@@ -189,6 +189,14 @@ namespace XNOEdit.Services
                             loadedTextureNames.Add(tex.Name);
 
                         var renderer = new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, shaderArchive);
+                        renderer.Visible = true;
+
+                        // Disable shadow meshes by default
+                        if (xno.Name.Contains("sdw"))
+                        {
+                            renderer.Visible = false;
+                        }
+
                         entries.Add(new ArcXnoEntry(xno, objectChunk, renderer));
                         maxRadius = Math.Max(objectChunk.Radius, maxRadius);
                     }

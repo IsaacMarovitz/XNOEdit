@@ -342,8 +342,9 @@ namespace XNOEdit
 
             var renderers = result.Entries.Select(e => e.Renderer).ToArray();
             var xnos = result.Entries.Select(e => e.Xno).ToList();
+            var visibility = result.Entries.Select(e => e.Renderer.Visible).ToArray();
 
-            UIManager.InitStagePanel(result.Name, xnos, ToggleXnoVisibility);
+            UIManager.InitStagePanel(result.Name, xnos, visibility, ToggleXnoVisibility);
 
             _scene = new StageScene(renderers);
             _modelCenter = Vector3.Zero;

@@ -15,7 +15,7 @@ namespace XNOEdit.Panels
 
         private Dictionary<int, bool> _visibilityState = new();
 
-        public ImGuiStagePanel(string name, List<NinjaNext> xnos)
+        public ImGuiStagePanel(string name, List<NinjaNext> xnos, bool[] visibility)
         {
             _name = name;
             _xnos = xnos;
@@ -33,6 +33,11 @@ namespace XNOEdit.Panels
                         _meshSetCount += subObject.MeshSets.Count;
                     }
                 }
+            }
+
+            for (var i = 0; i < visibility.Length; i++)
+            {
+                _visibilityState[i] = visibility[i];
             }
         }
 

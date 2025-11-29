@@ -54,10 +54,10 @@ namespace XNOEdit.Managers
             XnoPanel.ToggleMeshSetVisibility += toggleMeshSetVisibility;
         }
 
-        public void InitStagePanel(string name, List<NinjaNext> xnos, Action<int, bool> toggleXnoVisibility)
+        public void InitStagePanel(string name, List<NinjaNext> xnos, bool[] visibility, Action<int, bool> toggleXnoVisibility)
         {
             XnoPanel = null;
-            StagePanel = new ImGuiStagePanel(name, xnos);
+            StagePanel = new ImGuiStagePanel(name, xnos, visibility);
             StagePanel.ToggleXnoVisibility += toggleXnoVisibility;
         }
 

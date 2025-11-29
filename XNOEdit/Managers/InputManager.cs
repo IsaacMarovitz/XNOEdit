@@ -53,9 +53,6 @@ namespace XNOEdit.Managers
 
         private void KeyDown(IKeyboard keyboard, Key key, int keyCode)
         {
-            if (key == Key.Escape)
-                _window.Close();
-
             var toggle = SettingsToggle.None;
 
             switch (key)
