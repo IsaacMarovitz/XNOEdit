@@ -1,9 +1,6 @@
 ﻿using System.Numerics;
 using ImGuiNET;
 using Marathon.Formats.Archive;
-using Marathon.Formats.Ninja;
-using Marathon.Formats.Ninja.Chunks;
-using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using Silk.NET.Maths;
 using Silk.NET.WebGPU;
@@ -15,6 +12,7 @@ using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Scene;
 using XNOEdit.Renderer.Wgpu;
+using XNOEdit.Services;
 
 namespace XNOEdit
 {
@@ -35,12 +33,16 @@ namespace XNOEdit
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
         private static RenderSettings _settings = new();
-        private static TextureManager _textureManager;
         private static readonly UIManager UIManager = new();
         private static readonly InputManager InputManager = new();
+        private static FileLoaderService _fileLoader;
 
-        private static IFile _pendingFileLoad;
-        private static ArcFile _pendingArcFile;
+        private static Task<XnoLoadResult?>? _pendingXnoLoad;
+        private static Task<SetLoadResult?>? _pendingSetLoad;
+        private static Task<ArcLoadResult?>? _pendingArcLoad;
+        private static CancellationTokenSource? _loadCts;
+
+        private static readonly Dictionary<string, IntPtr> _textures = new();
 
         private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
 
@@ -94,7 +96,7 @@ namespace XNOEdit
             UIManager.ObjectsPanel.LoadObject += QueueObjectLoad;
             UIManager.StagesPanel.LoadStage += QueueArcLoad;
 
-            _textureManager = new TextureManager(_wgpu, _device, _queue, UIManager.Controller);
+            _fileLoader = new FileLoaderService(_wgpu, _device, (IntPtr)_queue);
 
             Logger.SetEnable(LogLevel.Debug, Configuration.DebugLogs);
 
@@ -201,22 +203,151 @@ namespace XNOEdit
             if (!ImGui.GetIO().WantCaptureMouse)
                 _camera.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime, _settings.CameraSensitivity);
 
-            if (_pendingFileLoad != null)
-            {
-                if (_pendingFileLoad.Name.EndsWith(".xno"))
-                    ReadXno(_pendingFileLoad);
-                else if (_pendingFileLoad.Name.EndsWith(".set"))
-                    ReadSet(_pendingFileLoad);
+            ProcessPendingLoads();
+        }
 
-                _pendingFileLoad = null;
+        private static void ProcessPendingLoads()
+        {
+            if (_pendingXnoLoad is { IsCompleted: true })
+            {
+                try
+                {
+                    var result = _pendingXnoLoad.Result;
+                    if (result != null)
+                        ApplyXnoResult(result);
+                }
+                catch (AggregateException ex)
+                {
+                    var innerEx = ex.InnerException ?? ex;
+                    UIManager.TriggerAlert(AlertLevel.Error, $"Error loading XNO: \"{innerEx.Message}\"");
+                    Logger.Error?.PrintStack(LogClass.Application, "Error loading XNO");
+                }
+                finally
+                {
+                    _pendingXnoLoad = null;
+                    UIManager.CurrentLoadProgress = null;
+                }
             }
 
-            if (_pendingArcFile != null)
+            if (_pendingSetLoad is { IsCompleted: true })
             {
-                ReadArc(_pendingArcFile);
-
-                _pendingArcFile = null;
+                try
+                {
+                    var result = _pendingSetLoad.Result;
+                    if (result != null)
+                        ApplySetResult(result);
+                }
+                catch (AggregateException ex)
+                {
+                    var innerEx = ex.InnerException ?? ex;
+                    UIManager.TriggerAlert(AlertLevel.Error, $"Error loading SET: \"{innerEx.Message}\"");
+                    Logger.Error?.PrintStack(LogClass.Application, "Error loading SET");
+                }
+                finally
+                {
+                    _pendingSetLoad = null;
+                    UIManager.CurrentLoadProgress = null;
+                }
             }
+
+            if (_pendingArcLoad is { IsCompleted: true })
+            {
+                try
+                {
+                    var result = _pendingArcLoad.Result;
+                    if (result != null)
+                        ApplyArcResult(result);
+                }
+                catch (AggregateException ex)
+                {
+                    var innerEx = ex.InnerException ?? ex;
+                    UIManager.TriggerAlert(AlertLevel.Error, $"Error loading arc: \"{innerEx.Message}\"");
+                    Logger.Error?.PrintStack(LogClass.Application, "Error loading arc");
+                }
+                finally
+                {
+                    _pendingArcLoad = null;
+                    UIManager.CurrentLoadProgress = null;
+                }
+            }
+        }
+
+        private static void ApplyXnoResult(XnoLoadResult result)
+        {
+            if (result.ObjectChunk != null && result.Renderer != null)
+            {
+                UIManager.InitXnoPanel(result.Xno, ToggleSubobjectVisibility, ToggleMeshSetVisibility);
+
+                _window.Title = $"XNOEdit - {result.Xno.Name}";
+
+                _scene?.Dispose();
+                _grid?.Dispose();
+                ClearTextures();
+
+                // Bind textures to ImGui
+                foreach (var tex in result.Textures)
+                {
+                    UIManager.Controller.BindImGuiTextureView((TextureView*)tex.View);
+                    _textures.TryAdd(tex.Name, tex.View);
+                }
+
+                if (result.ObjectChunk.PrimitiveLists.Count == 0)
+                {
+                    UIManager.TriggerAlert(AlertLevel.Warning, "XNO has no geometry");
+                }
+
+                _scene = new ObjectScene(result.Renderer);
+
+                _modelCenter = result.ObjectChunk.Centre;
+                SetModelRadius(result.ObjectChunk.Radius);
+            }
+            else
+            {
+                UIManager.TriggerAlert(AlertLevel.Error, "XNO lacks an object chunk");
+            }
+        }
+
+        private static void ApplySetResult(SetLoadResult result)
+        {
+            var parameters = UIManager.ObjectsPanel.ObjectParameters.Parameters;
+
+            foreach (var setObject in result.Set.Objects)
+            {
+                if (setObject.Type is "objectphysics_item" or "objectphysics")
+                {
+                    var param = parameters.FirstOrDefault(x => x.Name == (string)setObject.Parameters[0].Value);
+
+                    if (param == null)
+                        Logger.Debug?.PrintMsg(LogClass.Application, $"Missing Model {setObject.Name} of type {setObject.Type}");
+                    else
+                        Logger.Debug?.PrintMsg(LogClass.Application, $"Model: {param.Model}");
+                }
+            }
+        }
+
+        private static void ApplyArcResult(ArcLoadResult result)
+        {
+            _scene?.Dispose();
+            _grid?.Dispose();
+            ClearTextures();
+
+            _window.Title = $"XNOEdit - {result.Name}";
+
+            // Bind textures to ImGui
+            foreach (var tex in result.Textures)
+            {
+                UIManager.Controller.BindImGuiTextureView((TextureView*)tex.View);
+                _textures.TryAdd(tex.Name, tex.View);
+            }
+
+            var renderers = result.Entries.Select(e => e.Renderer).ToArray();
+            var xnos = result.Entries.Select(e => e.Xno).ToList();
+
+            UIManager.InitStagePanel(result.Name, xnos, ToggleXnoVisibility);
+
+            _scene = new StageScene(renderers);
+            _modelCenter = Vector3.Zero;
+            SetModelRadius(result.MaxRadius);
         }
 
         private static void OnRender(double deltaTime)
@@ -301,11 +432,11 @@ namespace XNOEdit
                     VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
                     Wireframe = _settings.WireframeMode,
                     CullBackfaces =  _settings.BackfaceCulling,
-                    Textures = _textureManager.Textures,
+                    Textures = _textures,
                     Lightmap = _settings.Lightmap,
                 });
 
-            UIManager.OnRender(deltaTime, ref _settings, pass, _textureManager.Textures);
+            UIManager.OnRender(deltaTime, ref _settings, pass, _textures);
 
             _wgpu.RenderPassEncoderEnd(pass);
 
@@ -344,10 +475,13 @@ namespace XNOEdit
 
         private static void OnClose()
         {
+            _loadCts?.Cancel();
+            _loadCts?.Dispose();
+
             _scene?.Dispose();
             _grid?.Dispose();
             _skybox?.Dispose();
-            _textureManager?.Dispose();
+            ClearTextures();
             UIManager?.Dispose();
             InputManager?.Dispose();
 
@@ -403,14 +537,53 @@ namespace XNOEdit
             }
         }
 
+
+        private static void CancelPendingLoads()
+        {
+            _loadCts?.Cancel();
+            _loadCts?.Dispose();
+            _loadCts = new CancellationTokenSource();
+            UIManager.CurrentLoadProgress = null;
+        }
+
+        private static IProgress<LoadProgress> CreateProgressReporter()
+        {
+            return new Progress<LoadProgress>(progress =>
+            {
+                UIManager.CurrentLoadProgress = progress;
+            });
+        }
+
         private static void QueueObjectLoad(IFile file)
         {
-            _pendingFileLoad = file;
+            CancelPendingLoads();
+            var progress = CreateProgressReporter();
+
+            if (file.Name.EndsWith(".xno"))
+            {
+                _pendingXnoLoad = _fileLoader.ReadXnoAsync(file, _shaderArchive, progress, _loadCts!.Token);
+            }
+            else if (file.Name.EndsWith(".set"))
+            {
+                _pendingSetLoad = _fileLoader.ReadSetAsync(file, progress, _loadCts!.Token);
+            }
         }
 
         private static void QueueArcLoad(ArcFile arcFile)
         {
-            _pendingArcFile = arcFile;
+            CancelPendingLoads();
+            var progress = CreateProgressReporter();
+            _pendingArcLoad = _fileLoader.ReadArcAsync(arcFile, _shaderArchive, progress, _loadCts!.Token);
+        }
+
+        private static void ClearTextures()
+        {
+            foreach (var texturePtr in _textures.Values)
+            {
+                UIManager.Controller.UnbindImGuiTextureView((TextureView*)texturePtr);
+                _wgpu.TextureViewRelease((TextureView*)texturePtr);
+            }
+            _textures.Clear();
         }
 
         private static void SetModelRadius(float radius)
@@ -431,128 +604,6 @@ namespace XNOEdit
         {
             var distance = Math.Max(_modelRadius * 2.5f, 10.0f);
             _camera.FrameTarget(_modelCenter, distance);
-        }
-
-        private static void ReadXno(IFile file)
-        {
-            try
-            {
-                var xno = new NinjaNext(file.Decompress());
-
-                var objectChunk = xno.GetChunk<ObjectChunk>();
-                var effectChunk = xno.GetChunk<EffectListChunk>();
-                var textureListChunk = xno.GetChunk<TextureListChunk>();
-
-                if (objectChunk != null)
-                {
-                    UIManager.InitXnoPanel(xno, ToggleSubobjectVisibility, ToggleMeshSetVisibility);
-
-                    _window.Title = $"XNOEdit - {xno.Name}";
-
-                    _scene?.Dispose();
-                    _grid?.Dispose();
-                    _textureManager.ClearTextures();
-
-                    _textureManager.LoadTextures(file, textureListChunk);
-
-                    if (objectChunk.PrimitiveLists.Count == 0)
-                    {
-                        UIManager.TriggerAlert(AlertLevel.Warning, "XNO has no geometry");
-                    }
-
-                    var renderer  = new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive);
-                    _scene = new ObjectScene(renderer);
-
-                    _modelCenter = objectChunk.Centre;
-                    SetModelRadius(objectChunk.Radius);
-                }
-                else
-                {
-                    UIManager.TriggerAlert(AlertLevel.Error, "XNO lacks an object chunk");
-                }
-            }
-            catch (Exception ex)
-            {
-                UIManager.TriggerAlert(AlertLevel.Error, $"Error loading XNO: \"{ex.Message}\"");
-                Logger.Error?.PrintStack(LogClass.Application, "Error loading XNO");
-            }
-        }
-
-        private static void ReadSet(IFile file)
-        {
-            try
-            {
-                var set = new StageSet(file.Decompress());
-                var parameters = UIManager.ObjectsPanel.ObjectParameters.Parameters;
-
-                foreach (var setObject in set.Objects)
-                {
-                    if (setObject.Type is "objectphysics_item" or "objectphysics")
-                    {
-                        var param = parameters.FirstOrDefault(x => x.Name == (string)setObject.Parameters[0].Value);
-
-                        if (param == null)
-                            Logger.Debug?.PrintMsg(LogClass.Application, $"Missing Model {setObject.Name} of type {setObject.Type}");
-                        else
-                            Logger.Debug?.PrintMsg(LogClass.Application, $"Model: {param.Model}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                UIManager.TriggerAlert(AlertLevel.Error, $"Error loading SET: \"{ex.Message}\"");
-                Logger.Error?.PrintStack(LogClass.Application, "Error loading SET");
-            }
-        }
-
-        private static void ReadArc(ArcFile file)
-        {
-            try
-            {
-                List<ModelRenderer> renderers = new();
-                var radius = 0f;
-
-                _textureManager.ClearTextures();
-                _grid?.Dispose();
-
-                // TODO: Replace when ArcFile.Name is corrected
-                var name = Path.GetFileName(file.Location);
-                _window.Title = $"XNOEdit - {name}";
-                Logger.Info?.PrintMsg(LogClass.Application, $"Loading ARC: {name}");
-
-                var xnos = new List<NinjaNext>();
-
-                foreach (var model in file.EnumerateFiles("*.xno", SearchOption.AllDirectories))
-                {
-                    var xno = new NinjaNext(model.Decompress());
-                    Logger.Debug?.PrintMsg(LogClass.Application, $"Loading XNO: {xno.Name}");
-
-                    var objectChunk = xno.GetChunk<ObjectChunk>();
-                    var effectChunk = xno.GetChunk<EffectListChunk>();
-                    var textureListChunk = xno.GetChunk<TextureListChunk>();
-
-                    if (objectChunk != null)
-                    {
-                        _textureManager.LoadTextures(model, textureListChunk);
-
-                        renderers.Add(new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, _shaderArchive));
-                        radius = Math.Max(objectChunk.Radius, radius);
-                    }
-
-                    xnos.Add(xno);
-                }
-
-                UIManager.InitStagePanel(name, xnos, ToggleXnoVisibility);
-
-                _scene = new StageScene(renderers.ToArray());
-                _modelCenter = Vector3.Zero;
-                SetModelRadius(radius);
-            }
-            catch (Exception ex)
-            {
-                UIManager.TriggerAlert(AlertLevel.Error, $"Error loading arc: \"{ex.Message}\"");
-                Logger.Error?.PrintStack(LogClass.Application, "Error loading arc");
-            }
         }
     }
 }

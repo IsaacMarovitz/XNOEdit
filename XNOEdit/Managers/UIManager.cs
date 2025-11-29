@@ -5,6 +5,7 @@ using Silk.NET.WebGPU;
 using XNOEdit.Logging;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
+using XNOEdit.Services;
 
 namespace XNOEdit.Managers
 {
@@ -17,6 +18,8 @@ namespace XNOEdit.Managers
         public ImGuiXnoPanel XnoPanel { get; private set; }
         public ImGuiStagePanel StagePanel { get; private set; }
         public ImGuiStagesPanel StagesPanel { get; private set; }
+        public LoadProgress? CurrentLoadProgress { get; set; }
+
         private ImGuiAlertPanel _alertPanel;
 
         private bool _xnoWindow = true;
@@ -150,8 +153,68 @@ namespace XNOEdit.Managers
             ObjectsPanel.Render();
             StagesPanel.Render();
 
+            RenderLoadingOverlay();
             _alertPanel.Render(deltaTime);
             Controller.Render(pass);
+        }
+
+        private void RenderLoadingOverlay()
+        {
+            var progress = CurrentLoadProgress;
+            if (progress == null || progress.Stage == LoadStage.Complete)
+                return;
+
+            var viewport = ImGui.GetMainViewport();
+            var windowFlags = ImGuiWindowFlags.NoDecoration |
+                              ImGuiWindowFlags.NoMove |
+                              ImGuiWindowFlags.NoSavedSettings |
+                              ImGuiWindowFlags.NoFocusOnAppearing |
+                              ImGuiWindowFlags.NoNav;
+
+            var windowWidth = 400f;
+            var windowHeight = 80f;
+            var padding = 20f;
+
+            ImGui.SetNextWindowPos(new Vector2(
+                viewport.WorkPos.X + viewport.WorkSize.X - windowWidth - padding,
+                viewport.WorkPos.Y + viewport.WorkSize.Y - windowHeight - padding
+            ));
+            ImGui.SetNextWindowSize(new Vector2(windowWidth, windowHeight));
+            ImGui.SetNextWindowBgAlpha(0.85f);
+
+            if (ImGui.Begin("##LoadingOverlay", windowFlags))
+            {
+                ImGui.Text(progress.Message);
+
+                if (progress.IsIndeterminate)
+                {
+                    var time = (float)(DateTime.Now.TimeOfDay.TotalSeconds % 2.0) / 2.0f;
+                    var barWidth = 0.3f;
+                    var position = (float)(time * (1.0 + barWidth) - barWidth);
+
+                    ImGui.ProgressBar(0f, new Vector2(-1, 0), "");
+
+                    var drawList = ImGui.GetWindowDrawList();
+                    var cursorPos = ImGui.GetItemRectMin();
+                    var itemSize = ImGui.GetItemRectSize();
+
+                    var startX = cursorPos.X + Math.Max(0, position) * itemSize.X;
+                    var endX = cursorPos.X + Math.Min(1, position + barWidth) * itemSize.X;
+
+                    drawList.AddRectFilled(
+                        new Vector2(startX, cursorPos.Y),
+                        new Vector2(endX, cursorPos.Y + itemSize.Y),
+                        ImGui.GetColorU32(ImGuiCol.PlotHistogram)
+                    );
+                }
+                else
+                {
+                    var progressText = $"{progress.Current}/{progress.Total}";
+                    ImGui.ProgressBar(progress.Percentage, new Vector2(-1, 0), progressText);
+                }
+
+                ImGui.End();
+            }
         }
 
         public void Dispose()
