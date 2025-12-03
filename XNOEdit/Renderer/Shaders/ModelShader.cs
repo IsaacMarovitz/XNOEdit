@@ -178,7 +178,7 @@ namespace XNOEdit.Renderer.Shaders
             // Group 1: Per-mesh uniforms (created per mesh, set once)
             // We only create the layout here; meshes will create their own bind groups
             _perMeshLayout = CreatePerMeshBindGroupLayout();
-            RegisterBindGroup(_perMeshLayout, null); // null bind group - meshes create their own
+            RegisterBindGroup(_perMeshLayout, null);
 
             // Group 2: Textures (created per draw call)
             _textureLayout = CreateTextureBindGroupLayout();

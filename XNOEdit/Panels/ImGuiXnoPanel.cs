@@ -61,7 +61,7 @@ namespace XNOEdit.Panels
             ImGui.End();
         }
 
-        private void RenderObjectChunk(ObjectChunk objectChunk, EffectListChunk effectListChunk)
+        private void RenderObjectChunk(ObjectChunk objectChunk, EffectListChunk? effectListChunk)
         {
             if (ImGui.BeginTabItem("Object"))
             {
@@ -86,17 +86,16 @@ namespace XNOEdit.Panels
                 {
                     ImGui.PushID(i);
 
-                    var open = ImGui.CollapsingHeader($"Subobject {i + 1}", ImGuiTreeNodeFlags.AllowOverlap);
-                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - ImGui.GetFrameHeight());
-
                     var visible = GetVisibility(i);
                     if (ImGui.Checkbox($"##VisibilitySubobject{i + 1}", ref visible))
                     {
                         SetVisibility(i, null, visible);
+                        ToggleSubobjectVisibility?.Invoke(i, visible);
                     }
-                    ToggleSubobjectVisibility?.Invoke(i, visible);
 
-                    if (open)
+                    ImGui.SameLine();
+
+                    if (ImGui.CollapsingHeader($"Subobject {i + 1}", ImGuiTreeNodeFlags.AllowOverlap))
                     {
                         var subobject = objectChunk.SubObjects[i];
 
@@ -110,17 +109,16 @@ namespace XNOEdit.Panels
                         {
                             ImGui.PushID(j);
 
-                            var openMeshSet = ImGui.CollapsingHeader($"Mesh Set {j + 1}", ImGuiTreeNodeFlags.AllowOverlap);
-                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - ImGui.GetFrameHeight());
-
                             var visibleMeshSet = GetVisibility(i, j);
                             if (ImGui.Checkbox($"##VisibilityMeshSet{j + 1}", ref visibleMeshSet))
                             {
                                 SetVisibility(i, j, visibleMeshSet);
+                                ToggleMeshSetVisibility?.Invoke(i, j, visibleMeshSet);
                             }
-                            ToggleMeshSetVisibility?.Invoke(i, j, visibleMeshSet);
 
-                            if (openMeshSet)
+                            ImGui.SameLine();
+
+                            if (ImGui.CollapsingHeader($"Mesh Set {j + 1}", ImGuiTreeNodeFlags.AllowOverlap))
                             {
                                 RenderMeshSet(subobject.MeshSets[j], effectListChunk);
                             }
@@ -138,10 +136,12 @@ namespace XNOEdit.Panels
                 for (var i = 0; i < objectChunk.Materials.Count; i++)
                 {
                     ImGui.PushID(i);
+
                     if (ImGui.CollapsingHeader($"Material {i + 1}"))
                     {
                         RenderMaterial(objectChunk.Materials[i]);
                     }
+
                     ImGui.PopID();
                 }
 
@@ -149,7 +149,7 @@ namespace XNOEdit.Panels
             }
         }
 
-        private void RenderMeshSet(MeshSet meshSet, EffectListChunk effectListChunk)
+        private void RenderMeshSet(MeshSet meshSet, EffectListChunk? effectListChunk)
         {
             var meshCenter = meshSet.Centre;
             ImGui.InputFloat3("Center", ref meshCenter, "%.1f", ImGuiInputTextFlags.ReadOnly);

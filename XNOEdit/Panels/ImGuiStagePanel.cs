@@ -1,3 +1,4 @@
+using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
@@ -13,7 +14,7 @@ namespace XNOEdit.Panels
         private readonly int _subobjectCount;
         private readonly int _meshSetCount;
 
-        private Dictionary<int, bool> _visibilityState = new();
+        private readonly Dictionary<int, bool> _visibilityState = new();
 
         public ImGuiStagePanel(string name, List<NinjaNext> xnos, bool[] visibility)
         {
@@ -61,25 +62,32 @@ namespace XNOEdit.Panels
 
             ImGui.SeparatorText("XNOs");
 
-            for (int i = 0; i < _xnos.Count; i++)
+            for (var i = 0; i < _xnos.Count; i++)
             {
                 ImGui.PushID(i);
 
-                var xno = _xnos[i];
-                var open = ImGui.Button(xno.Name);
-                ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - ImGui.GetFrameHeight());
                 var visible = GetVisibility(i);
                 if (ImGui.Checkbox($"##VisibilityObject{i + 1}", ref visible))
                 {
                     SetVisibility(i, visible);
+                    ToggleXnoVisibility?.Invoke(i, visible);
                 }
-                ToggleXnoVisibility?.Invoke(i, visible);
 
-                if (open)
+                ImGui.SameLine();
+
+                // Style the button like a Collapsing Header
+                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.Header]);
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ImGui.GetStyle().Colors[(int)ImGuiCol.HeaderHovered]);
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive, ImGui.GetStyle().Colors[(int)ImGuiCol.HeaderActive]);
+                ImGui.PushStyleVar(ImGuiStyleVar.ButtonTextAlign, new Vector2(0, 0.5f));
+
+                if (ImGui.Button(_xnos[i].Name, new Vector2(ImGui.GetContentRegionAvail().X, 0)))
                 {
-
+                    // TODO: Allow viewing individual XNO
                 }
 
+                ImGui.PopStyleVar();
+                ImGui.PopStyleColor(3);
                 ImGui.PopID();
             }
 
