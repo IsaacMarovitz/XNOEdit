@@ -13,15 +13,16 @@ namespace XNOEdit.Managers
     {
         public event Action ResetCameraAction;
 
-        public ImGuiController Controller { get; private set; }
-        public ImGuiObjectsPanel ObjectsPanel { get; private set; }
-        public ImGuiXnoPanel XnoPanel { get; private set; }
-        public ImGuiStagePanel StagePanel { get; private set; }
-        public ImGuiStagesPanel StagesPanel { get; private set; }
+        public ImGuiController? Controller { get; private set; }
+        public ImGuiObjectsPanel? ObjectsPanel { get; private set; }
+        public ImGuiXnoPanel? XnoPanel { get; private set; }
+        public ImGuiStagePanel? StagePanel { get; private set; }
+        public ImGuiStagesPanel? StagesPanel { get; private set; }
         public LoadProgress? CurrentLoadProgress { get; set; }
 
-        private ImGuiAlertPanel _alertPanel;
+        private ImGuiAlertPanel? _alertPanel;
 
+        private bool _firstLoop = true;
         private bool _xnoWindow = true;
         private bool _environmentWindow = true;
         private float _sunAzimuth;
@@ -63,9 +64,38 @@ namespace XNOEdit.Managers
 
         public unsafe void OnRender(double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, TextureManager textureManager)
         {
-            Controller.Update((float)deltaTime);
+            Controller?.Update((float)deltaTime);
 
-            ImGui.DockSpaceOverViewport(0, ImGui.GetMainViewport(), ImGuiDockNodeFlags.PassthruCentralNode | ImGuiDockNodeFlags.NoDockingOverCentralNode);
+            var flags = ImGuiDockNodeFlags.PassthruCentralNode | ImGuiDockNodeFlags.NoDockingOverCentralNode;
+            var dockspaceId = ImGui.DockSpaceOverViewport(0, ImGui.GetMainViewport(), flags);
+
+            if (_firstLoop)
+            {
+                ImGuiP.DockBuilderRemoveNode(dockspaceId);
+                var central = ImGuiP.DockBuilderAddNode(dockspaceId,
+                    flags | (ImGuiDockNodeFlags)ImGuiDockNodeFlagsPrivate.Space);
+
+                var viewport = ImGui.GetMainViewport();
+                ImGuiP.DockBuilderSetNodeSize(central, viewport.WorkSize);
+                ImGuiP.DockBuilderSetNodePos(central, viewport.WorkPos);
+
+                var remainingId = dockspaceId;
+
+                var leftDock = ImGuiP.DockBuilderSplitNode(remainingId, ImGuiDir.Left, 0.2f, null, &remainingId);
+                var bottomDock = ImGuiP.DockBuilderSplitNode(remainingId, ImGuiDir.Down, 0.3f, null, &remainingId);
+                var centralNode = ImGuiP.DockBuilderGetNode(remainingId);
+                centralNode.LocalFlags |= (ImGuiDockNodeFlags)ImGuiDockNodeFlagsPrivate.CentralNode;
+
+                ImGuiP.DockBuilderDockWindow("Environment", leftDock);
+                ImGuiP.DockBuilderDockWindow("###XnoPanel", leftDock);
+                ImGuiP.DockBuilderDockWindow("###StagePanel", leftDock);
+                ImGuiP.DockBuilderDockWindow("Objects", bottomDock);
+                ImGuiP.DockBuilderDockWindow("Stages", bottomDock);
+
+                ImGuiP.DockBuilderFinish(dockspaceId);
+
+                _firstLoop = false;
+            }
 
             if (ImGui.BeginMainMenuBar())
             {
@@ -83,7 +113,7 @@ namespace XNOEdit.Managers
 
                     if (ImGui.MenuItem("Reset Camera", "R"))
                     {
-                        ResetCameraAction?.Invoke();
+                        ResetCameraAction.Invoke();
                     }
 
                     ImGui.PopItemFlag();
@@ -139,23 +169,16 @@ namespace XNOEdit.Managers
                 ImGui.End();
             }
 
-            if (XnoPanel != null)
-            {
-                if (_xnoWindow)
-                    XnoPanel.Render(textureManager);
-            }
+            if (_xnoWindow)
+                XnoPanel?.Render(textureManager);
 
-            if (StagePanel != null)
-            {
-                StagePanel.Render();
-            }
-
-            ObjectsPanel.Render();
-            StagesPanel.Render();
+            StagePanel?.Render();
+            ObjectsPanel?.Render();
+            StagesPanel?.Render();
 
             RenderLoadingOverlay();
-            _alertPanel.Render(deltaTime);
-            Controller.Render(pass);
+            _alertPanel?.Render(deltaTime);
+            Controller?.Render(pass);
         }
 
         private void RenderLoadingOverlay()
@@ -225,12 +248,12 @@ namespace XNOEdit.Managers
         public void TriggerAlert(AlertLevel alertLevel, string alert)
         {
             if (alert != string.Empty)
-                _alertPanel.TriggerAlert(alertLevel, alert);
+                _alertPanel?.TriggerAlert(alertLevel, alert);
         }
 
         public void LoadGameFolderResources()
         {
-            ObjectsPanel.LoadGameFolderResources();
+            ObjectsPanel?.LoadGameFolderResources();
         }
     }
 }
