@@ -405,6 +405,9 @@ namespace XNOEdit.Renderer.Shaders
                 Wgpu.TextureRelease(_defaultTexture);
             }
 
+            _perFrameUniformBuffer.Dispose();
+            Wgpu.BindGroupRelease(_perFrameBindGroup);
+
             base.Dispose();
         }
     }

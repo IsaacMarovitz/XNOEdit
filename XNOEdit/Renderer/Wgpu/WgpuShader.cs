@@ -11,8 +11,8 @@ namespace XNOEdit.Renderer.Wgpu
         protected readonly WgpuDevice Device;
         private readonly ShaderModule* _shaderModule;
 
-        protected readonly List<IntPtr> _bindGroupLayouts = new();
-        protected readonly List<IntPtr> _bindGroups = new();
+        private readonly List<IntPtr> _bindGroupLayouts = [];
+        private readonly List<IntPtr> _bindGroups = [];
 
         public int BindGroupCount => _bindGroups.Count;
 
