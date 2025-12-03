@@ -274,8 +274,7 @@ namespace XNOEdit.Renderer
                 .WithTopology(PrimitiveTopology.TriangleList)
                 .WithCulling(CullMode.None)
                 .WithVertexLayout(vbLayout)
-                .WithShader(_shaderModule)
-                .WithDepth(false, CompareFunction.Always);
+                .WithShader(_shaderModule);
 
             _renderPipeline = pipelineBuilder;
         }

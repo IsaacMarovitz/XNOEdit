@@ -5,6 +5,7 @@ using Silk.NET.WebGPU;
 using XNOEdit.Logging;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
+using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Services;
 
 namespace XNOEdit.Managers
@@ -13,12 +14,15 @@ namespace XNOEdit.Managers
     {
         public event Action ResetCameraAction;
 
+        public ViewportPanel? ViewportPanel { get; private set; }
         public ImGuiController? Controller { get; private set; }
         public ImGuiObjectsPanel? ObjectsPanel { get; private set; }
         public ImGuiXnoPanel? XnoPanel { get; private set; }
         public ImGuiStagePanel? StagePanel { get; private set; }
         public ImGuiStagesPanel? StagesPanel { get; private set; }
         public LoadProgress? CurrentLoadProgress { get; set; }
+
+        public bool ViewportWantsInput => ViewportPanel?.IsHovered ?? false;
 
         private ImGuiAlertPanel? _alertPanel;
 
@@ -28,12 +32,13 @@ namespace XNOEdit.Managers
         private float _sunAzimuth;
         private float _sunAltitude;
 
-        public void OnLoad(ImGuiController controller)
+        public void OnLoad(ImGuiController controller, WebGPU wgpu, WgpuDevice device)
         {
             Controller = controller;
             _alertPanel = new ImGuiAlertPanel();
             ObjectsPanel = new ImGuiObjectsPanel();
             StagesPanel = new ImGuiStagesPanel(this);
+            ViewportPanel = new ViewportPanel(wgpu, device, controller);
 
             ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
         }
@@ -66,7 +71,7 @@ namespace XNOEdit.Managers
         {
             Controller?.Update((float)deltaTime);
 
-            var flags = ImGuiDockNodeFlags.PassthruCentralNode | ImGuiDockNodeFlags.NoDockingOverCentralNode;
+            var flags = ImGuiDockNodeFlags.NoDockingOverCentralNode;
             var dockspaceId = ImGui.DockSpaceOverViewport(0, ImGui.GetMainViewport(), flags);
 
             if (_firstLoop)
@@ -84,8 +89,9 @@ namespace XNOEdit.Managers
                 var leftDock = ImGuiP.DockBuilderSplitNode(remainingId, ImGuiDir.Left, 0.2f, null, &remainingId);
                 var bottomDock = ImGuiP.DockBuilderSplitNode(remainingId, ImGuiDir.Down, 0.3f, null, &remainingId);
                 var centralNode = ImGuiP.DockBuilderGetNode(remainingId);
-                centralNode.LocalFlags |= (ImGuiDockNodeFlags)ImGuiDockNodeFlagsPrivate.CentralNode;
+                centralNode.LocalFlags |= (ImGuiDockNodeFlags)(ImGuiDockNodeFlagsPrivate.CentralNode | ImGuiDockNodeFlagsPrivate.HiddenTabBar) | ImGuiDockNodeFlags.NoUndocking;
 
+                ImGuiP.DockBuilderDockWindow("Viewport", remainingId);
                 ImGuiP.DockBuilderDockWindow("Environment", leftDock);
                 ImGuiP.DockBuilderDockWindow("###XnoPanel", leftDock);
                 ImGuiP.DockBuilderDockWindow("###StagePanel", leftDock);
@@ -176,6 +182,8 @@ namespace XNOEdit.Managers
             ObjectsPanel?.Render();
             StagesPanel?.Render();
 
+            ViewportPanel?.Render();
+
             RenderLoadingOverlay();
             _alertPanel?.Render(deltaTime);
             Controller?.Render(pass);
@@ -242,6 +250,7 @@ namespace XNOEdit.Managers
 
         public void Dispose()
         {
+            ViewportPanel?.Dispose();
             Controller?.Dispose();
         }
 

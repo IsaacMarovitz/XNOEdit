@@ -27,7 +27,13 @@ namespace XNOEdit.Managers
 
         private IWindow _window;
         private bool _mouseCaptured;
-        private Vector2 _lastMousePosition;
+        private Vector2 _captureStartPosition;
+        private UIManager _uiManager;
+
+        public InputManager(UIManager uiManager)
+        {
+            _uiManager = uiManager;
+        }
 
         public void OnLoad(IWindow window)
         {
@@ -53,6 +59,9 @@ namespace XNOEdit.Managers
 
         private void KeyDown(IKeyboard keyboard, Key key, int keyCode)
         {
+            if (ImGui.GetIO().WantCaptureKeyboard)
+                return;
+
             var toggle = SettingsToggle.None;
 
             switch (key)
@@ -83,44 +92,39 @@ namespace XNOEdit.Managers
             if (!_mouseCaptured) return;
 
             var lookSensitivity = 0.1f;
-            if (_lastMousePosition == default)
-            {
-                _lastMousePosition = position;
-            }
-            else
-            {
-                var xOffset = (position.X - _lastMousePosition.X) * lookSensitivity;
-                var yOffset = (position.Y - _lastMousePosition.Y) * lookSensitivity;
-                _lastMousePosition = position;
 
+            var xOffset = (position.X - _captureStartPosition.X) * lookSensitivity;
+            var yOffset = (position.Y - _captureStartPosition.Y) * lookSensitivity;
+
+            mouse.Position = _captureStartPosition;
+
+            if (xOffset != 0 || yOffset != 0)
                 MouseMoveAction?.Invoke(xOffset, yOffset);
-            }
         }
 
         private void OnMouseWheel(IMouse mouse, ScrollWheel scrollWheel)
         {
-            if (!ImGui.GetIO().WantCaptureMouse)
+            if (!_uiManager.ViewportWantsInput)
                 MouseScrollAction?.Invoke(scrollWheel.Y);
         }
 
         private void OnMouseDown(IMouse mouse, MouseButton button)
         {
-            if (button != MouseButton.Left || ImGui.GetIO().WantCaptureMouse)
-            {
+            if (button != MouseButton.Left)
                 return;
-            }
+
+            if (!_uiManager.ViewportWantsInput)
+                return;
 
             _mouseCaptured = true;
-            mouse.Cursor.CursorMode = CursorMode.Raw;
-            _lastMousePosition = default;
+            _captureStartPosition = mouse.Position;
+            mouse.Cursor.CursorMode = CursorMode.Hidden;
         }
 
         private void OnMouseUp(IMouse mouse, MouseButton button)
         {
-            if (button != MouseButton.Left || ImGui.GetIO().WantCaptureMouse)
-            {
+            if (button != MouseButton.Left)
                 return;
-            }
 
             _mouseCaptured = false;
             mouse.Cursor.CursorMode = CursorMode.Normal;

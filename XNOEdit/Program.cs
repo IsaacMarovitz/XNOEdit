@@ -34,7 +34,7 @@ namespace XNOEdit
         private static float _modelRadius = 1.0f;
         private static RenderSettings _settings = new();
         private static readonly UIManager UIManager = new();
-        private static readonly InputManager InputManager = new();
+        private static InputManager _inputManager;
         private static FileLoaderService _fileLoader;
 
         private static Task<XnoLoadResult?>? _pendingXnoLoad;
@@ -77,21 +77,23 @@ namespace XNOEdit
             _grid = new GridRenderer(_wgpu, _device);
             _skybox = new SkyboxRenderer(_wgpu, _device);
 
-            InputManager.OnLoad(_window);
-            InputManager.ResetCameraAction += () =>
+            _inputManager = new InputManager(UIManager);
+
+            _inputManager.OnLoad(_window);
+            _inputManager.ResetCameraAction += () =>
             {
                 UIManager.TriggerAlert(AlertLevel.Info, "Camera Reset");
                 ResetCamera();
             };
-            InputManager.SettingsChangedAction += OnRenderSettingsChanged;
-            InputManager.MouseMoveAction += _camera.OnMouseMove;
-            InputManager.MouseScrollAction += scrollY =>
+            _inputManager.SettingsChangedAction += OnRenderSettingsChanged;
+            _inputManager.MouseMoveAction += _camera.OnMouseMove;
+            _inputManager.MouseScrollAction += scrollY =>
             {
                 _camera.ProcessMouseScroll(scrollY, _settings.CameraSensitivity);
             };
 
-            var imguiController = new ImGuiController(_wgpu, _device, _window, InputManager.Input, 2);
-            UIManager.OnLoad(imguiController);
+            var imguiController = new ImGuiController(_wgpu, _device, _window, _inputManager.Input, 2);
+            UIManager.OnLoad(imguiController, _wgpu, _device);
             UIManager.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
             UIManager.ObjectsPanel.LoadObject += QueueObjectLoad;
@@ -203,8 +205,8 @@ namespace XNOEdit
 
         private static void OnUpdate(double deltaTime)
         {
-            if (!ImGui.GetIO().WantCaptureMouse)
-                _camera?.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime, _settings.CameraSensitivity);
+            if (UIManager.ViewportWantsInput || !ImGui.GetIO().WantCaptureKeyboard)
+                _camera?.ProcessKeyboard(_inputManager.PrimaryKeyboard, (float)deltaTime, _settings.CameraSensitivity);
 
             ProcessPendingLoads();
         }
@@ -362,6 +364,50 @@ namespace XNOEdit
                 return;
             }
 
+            var commandEncoderDesc = new CommandEncoderDescriptor();
+            var encoder = _wgpu.DeviceCreateCommandEncoder(_device, &commandEncoderDesc);
+
+            UIManager.ViewportPanel.PrepareFrame();
+
+            var view = _camera.GetViewMatrix();
+            var projection = _camera.GetProjectionMatrix(UIManager.ViewportPanel.GetAspectRatio());
+
+            var scenePass = UIManager.ViewportPanel.BeginRenderPass(encoder);
+
+            _skybox?.Draw(_queue, scenePass, view, projection,
+                new SkyboxParameters
+                {
+                    SunDirection =  _settings.SunDirection,
+                    SunColor = _settings.SunColor
+                });
+
+            if (_settings.ShowGrid)
+            {
+                _grid?.Draw(_queue, scenePass, view, projection,
+                    new GridParameters
+                    {
+                        Model = Matrix4x4.CreateTranslation(_modelCenter),
+                        Position = _camera.Position,
+                        FadeDistance = _modelRadius * 5.0f
+                    });
+            }
+
+            _scene?.Render(_queue, scenePass, view, projection,
+                new ModelParameters
+                {
+                    SunDirection = _settings.SunDirection,
+                    SunColor = _settings.SunColor,
+                    Position =  _camera.Position,
+                    VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
+                    Wireframe = _settings.WireframeMode,
+                    CullBackfaces =  _settings.BackfaceCulling,
+                    TextureManager = _textureManager,
+                    Lightmap = _settings.Lightmap,
+                });
+
+            _wgpu.RenderPassEncoderEnd(scenePass);
+            _wgpu.RenderPassEncoderRelease(scenePass);
+
             var textureViewDesc = new TextureViewDescriptor
             {
                 Format = _device.GetSurfaceFormat(),
@@ -375,72 +421,26 @@ namespace XNOEdit
 
             var backbuffer = _wgpu.TextureCreateView(surfaceTexture.Texture, &textureViewDesc);
 
-            var size = _window.FramebufferSize;
-            var view = _camera.GetViewMatrix();
-            var projection = _camera.GetProjectionMatrix((float)size.X / size.Y);
-
-            var commandEncoderDesc = new CommandEncoderDescriptor();
-            var encoder = _wgpu.DeviceCreateCommandEncoder(_device, &commandEncoderDesc);
-
-            var colorAttachment = new RenderPassColorAttachment
+            var uiColorAttachment = new RenderPassColorAttachment
             {
                 View = backbuffer,
                 LoadOp = LoadOp.Clear,
                 StoreOp = StoreOp.Store,
-                ClearValue = new Color { R = 1.0, G = 0.0, B = 1.0, A = 1.0 }
+                ClearValue = new Color { R = 0.15, G = 0.15, B = 0.15, A = 1.0 }
             };
 
-            var depthAttachment = new RenderPassDepthStencilAttachment
-            {
-                View = _depthTextureView,
-                DepthLoadOp = LoadOp.Clear,
-                DepthStoreOp = StoreOp.Store,
-                DepthClearValue = 0.0f
-            };
-
-            var renderPassDesc = new RenderPassDescriptor
+            var uiRenderPassDesc = new RenderPassDescriptor
             {
                 ColorAttachmentCount = 1,
-                ColorAttachments = &colorAttachment,
-                DepthStencilAttachment = &depthAttachment
+                ColorAttachments = &uiColorAttachment,
+                DepthStencilAttachment = null
             };
 
-            var pass = _wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
+            var uiPass = _wgpu.CommandEncoderBeginRenderPass(encoder, &uiRenderPassDesc);
 
-            _skybox?.Draw(_queue, pass, view, projection,
-                new SkyboxParameters
-                {
-                    SunDirection =  _settings.SunDirection,
-                    SunColor = _settings.SunColor
-                });
+            UIManager.OnRender(deltaTime, ref _settings, uiPass, _textureManager);
 
-            if (_settings.ShowGrid)
-            {
-                _grid?.Draw(_queue, pass, view, projection,
-                    new GridParameters
-                    {
-                        Model = Matrix4x4.CreateTranslation(_modelCenter),
-                        Position = _camera.Position,
-                        FadeDistance = _modelRadius * 5.0f
-                    });
-            }
-
-            _scene?.Render(_queue, pass, view, projection,
-                new ModelParameters
-                {
-                    SunDirection = _settings.SunDirection,
-                    SunColor = _settings.SunColor,
-                    Position =  _camera.Position,
-                    VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
-                    Wireframe = _settings.WireframeMode,
-                    CullBackfaces =  _settings.BackfaceCulling,
-                    TextureManager = _textureManager,
-                    Lightmap = _settings.Lightmap,
-                });
-
-            UIManager.OnRender(deltaTime, ref _settings, pass, _textureManager);
-
-            _wgpu.RenderPassEncoderEnd(pass);
+            _wgpu.RenderPassEncoderEnd(uiPass);
 
             var commandBuffer = _wgpu.CommandEncoderFinish(encoder, null);
             _wgpu.QueueSubmit(_queue, 1, &commandBuffer);
@@ -449,7 +449,7 @@ namespace XNOEdit
             _wgpu.TextureViewRelease(backbuffer);
             _wgpu.CommandBufferRelease(commandBuffer);
             _wgpu.CommandEncoderRelease(encoder);
-            _wgpu.RenderPassEncoderRelease(pass);
+            _wgpu.RenderPassEncoderRelease(uiPass);
         }
 
         private static void OnFramebufferResize(Vector2D<int> size)
@@ -491,7 +491,7 @@ namespace XNOEdit
             _textureManager?.Dispose();
 
             UIManager?.Dispose();
-            InputManager?.Dispose();
+            _inputManager?.Dispose();
 
             if (_depthTextureView != null)
                 _wgpu.TextureViewRelease(_depthTextureView);

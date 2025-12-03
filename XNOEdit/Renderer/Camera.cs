@@ -9,10 +9,10 @@ namespace XNOEdit.Renderer
         public float NearPlane { get; set; } = 0.1f;
         public float FarPlane { get; set; } = 10000.0f;
 
-        private static float Fov => 60f;
-        private static float MoveSpeed => 2.0f;
-        private static float DollySpeed => 0.5f;
-        private static float LookSensitivity => 2f;
+        private const float HorizontalFov = 90f;
+        private const float MoveSpeed = 2.0f;
+        private const float DollySpeed = 0.5f;
+        private const float LookSensitivity = 2f;
 
         private float _yaw = -90f;
         private float _pitch = 0f;
@@ -33,8 +33,11 @@ namespace XNOEdit.Renderer
 
         public Matrix4x4 GetProjectionMatrix(float aspectRatio)
         {
+            var horizontalFovRad = HorizontalFov * MathF.PI / 180f;
+            var verticalFovRad = 2f * MathF.Atan(MathF.Tan(horizontalFovRad * 0.5f) / aspectRatio);
+
             return CreatePerspectiveReverseZ(
-                Fov * MathF.PI / 180f,
+                verticalFovRad,
                 aspectRatio,
                 NearPlane,
                 FarPlane
