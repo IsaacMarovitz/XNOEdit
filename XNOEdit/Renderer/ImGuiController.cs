@@ -554,7 +554,7 @@ namespace XNOEdit.Renderer
             io.MouseWheel = wheel.Y;
             io.MouseWheelH = wheel.X;
 
-            io.AddInputCharactersUTF8(_pressedChars.ToString());
+            io.AddInputCharactersUTF8(new string(_pressedChars.ToArray()));
 
             _pressedChars.Clear();
 
