@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using Silk.NET.Core.Native;
 using Silk.NET.Input;
 using Silk.NET.WebGPU;
@@ -21,10 +21,7 @@ namespace XNOEdit.Renderer
         private readonly uint _framesInFlight;
 
         private ShaderModule* _shaderModule;
-
-        private Texture* _fontTexture;
         private Sampler* _fontSampler;
-        private TextureView* _fontView;
 
         private BindGroupLayout* _commonBindGroupLayout;
         private BindGroupLayout* _imageBindGroupLayout;
@@ -36,7 +33,9 @@ namespace XNOEdit.Renderer
 
         private WindowRenderBuffers _windowRenderBuffers;
 
-        private readonly Dictionary<nint, nint> _viewsById = [];
+        private readonly Dictionary<nint, IntPtr> _textureBindGroups = [];
+        private readonly Dictionary<nint, IntPtr> _gpuTextures = [];
+
         private readonly List<char> _pressedChars = [];
         private readonly Dictionary<Key, bool> _keyEvents = [];
 
@@ -74,11 +73,6 @@ namespace XNOEdit.Renderer
         {
             var id = (nint)view;
 
-            if (_viewsById.TryGetValue(id, out var ptr))
-            {
-                return;
-            }
-
             BindGroupEntry imageEntry = new()
             {
                 Binding = 0,
@@ -97,17 +91,15 @@ namespace XNOEdit.Renderer
             };
 
             var bindGroup = _wgpu.DeviceCreateBindGroup(_device, in imageDesc);
-            _viewsById[id] = (nint)bindGroup;
+            _textureBindGroups[id] = (IntPtr)bindGroup;
         }
 
         public void UnbindImGuiTextureView(TextureView* view)
         {
-            var id = (nint)view;
-
-            _viewsById.Remove(id, out var ptr);
-
-            if (ptr != IntPtr.Zero)
-                _wgpu.BindGroupRelease((BindGroup*)ptr);
+            if (_textureBindGroups.Remove((IntPtr)view, out var bindGroup))
+            {
+                _wgpu.BindGroupRelease((BindGroup*)bindGroup);
+            }
         }
 
         private void Init()
@@ -115,12 +107,19 @@ namespace XNOEdit.Renderer
             var context = ImGui.CreateContext();
             ImGui.SetCurrentContext(context);
 
+            ImGui.GetIO().DisplaySize = (Vector2)_view.Size;
+            ImGui.GetIO().DisplayFramebufferScale = new Vector2(_view.FramebufferSize.X / _view.Size.X, _view.FramebufferSize.Y / _view.Size.Y);
+
+            _view.Resize += (newSize) => ImGui.GetIO().DisplaySize = (Vector2)newSize;
+
             _inputContext.Keyboards[0].KeyUp += KeyUp;
             _inputContext.Keyboards[0].KeyDown += KeyDown;
             _inputContext.Keyboards[0].KeyChar += KeyChar;
 
+            ImGui.GetIO().BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasTextures;
+
             InitShaders();
-            InitFonts();
+            InitSampler();
             InitBindGroupLayouts();
             InitPipeline();
             InitUniformBuffers();
@@ -152,61 +151,8 @@ namespace XNOEdit.Renderer
             SilkMarshal.Free(shaderName);
         }
 
-        private void InitFonts()
+        private void InitSampler()
         {
-            ImGui.GetIO().Fonts.GetTexDataAsRGBA32(out byte* pixels, out var width, out var height, out var sizePerPixel);
-
-            TextureDescriptor textureDescriptor = new()
-            {
-                Dimension = TextureDimension.Dimension2D,
-                Size = new Extent3D
-                {
-                    Width = (uint)width,
-                    Height = (uint)height,
-                    DepthOrArrayLayers = 1,
-                },
-                SampleCount = 1,
-                Format = TextureFormat.Rgba8Unorm,
-                MipLevelCount = 1,
-                Usage = TextureUsage.CopyDst | TextureUsage.TextureBinding
-            };
-
-            _fontTexture = _wgpu.DeviceCreateTexture(_device, in textureDescriptor);
-
-            TextureViewDescriptor textureViewDescriptor = new()
-            {
-                Dimension = TextureViewDimension.Dimension2D,
-                Format = TextureFormat.Rgba8Unorm,
-                BaseMipLevel = 0,
-                MipLevelCount = 1,
-                BaseArrayLayer = 0,
-                ArrayLayerCount = 1,
-                Aspect = TextureAspect.All
-            };
-
-            _fontView = _wgpu.TextureCreateView(_fontTexture, in textureViewDescriptor);
-
-            ImageCopyTexture imageCopyTexture = new()
-            {
-                Texture = _fontTexture,
-                MipLevel = 0,
-                Aspect = TextureAspect.All,
-            };
-            TextureDataLayout textureDataLayout = new()
-            {
-                Offset = 0,
-                BytesPerRow = (uint)(width * sizePerPixel),
-                RowsPerImage = (uint)height,
-            };
-            Extent3D extent = new()
-            {
-                Height = (uint)height,
-                Width = (uint)width,
-                DepthOrArrayLayers = 1,
-            };
-
-            _wgpu.QueueWriteTexture(_queue, &imageCopyTexture, pixels, (nuint)(width * height * sizePerPixel), in textureDataLayout, in extent);
-
             SamplerDescriptor samplerDescriptor = new()
             {
                 MinFilter = FilterMode.Linear,
@@ -219,8 +165,6 @@ namespace XNOEdit.Renderer
             };
 
             _fontSampler = _wgpu.DeviceCreateSampler(_device, in samplerDescriptor);
-
-            ImGui.GetIO().Fonts.SetTexID((nint)_fontView);
         }
 
         private void InitBindGroupLayouts()
@@ -280,21 +224,21 @@ namespace XNOEdit.Renderer
             vertexAttrib[0] = new VertexAttribute
             {
                 Format = VertexFormat.Float32x3,
-                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.pos)),
+                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Pos)),
                 ShaderLocation = 0
             };
 
             vertexAttrib[1] = new VertexAttribute
             {
                 Format = VertexFormat.Float32x3,
-                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.uv)),
+                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Uv)),
                 ShaderLocation = 1
             };
 
             vertexAttrib[2] = new VertexAttribute
             {
                 Format = VertexFormat.Unorm8x4,
-                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.col)),
+                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Col)),
                 ShaderLocation = 2
             };
 
@@ -366,59 +310,227 @@ namespace XNOEdit.Renderer
             };
 
             _commonBindGroup = _wgpu.DeviceCreateBindGroup(_device, in bgCommonDesc);
+        }
 
-            BindImGuiTextureView(_fontView);
+        private void ProcessTextureRequest(ImTextureDataPtr texture)
+        {
+            switch (texture.Status)
+            {
+                case ImTextureStatus.WantCreate:
+                    CreateTexture(texture);
+                    break;
+                case ImTextureStatus.WantUpdates:
+                    UpdateTexture(texture);
+                    break;
+                case ImTextureStatus.WantDestroy:
+                    DestroyTexture(texture);
+                    break;
+            }
+        }
+
+        private void CreateTexture(ImTextureDataPtr tex)
+        {
+            var width = tex.Width;
+            var height = tex.Height;
+            var pixels = (byte*)tex.GetPixels();
+
+            TextureDescriptor textureDescriptor = new()
+            {
+                Dimension = TextureDimension.Dimension2D,
+                Size = new Extent3D
+                {
+                    Width = (uint)width,
+                    Height = (uint)height,
+                    DepthOrArrayLayers = 1,
+                },
+                SampleCount = 1,
+                Format = TextureFormat.Rgba8Unorm,
+                MipLevelCount = 1,
+                Usage = TextureUsage.CopyDst | TextureUsage.TextureBinding
+            };
+
+            var texture = _wgpu.DeviceCreateTexture(_device, in textureDescriptor);
+
+            TextureViewDescriptor textureViewDescriptor = new()
+            {
+                Dimension = TextureViewDimension.Dimension2D,
+                Format = TextureFormat.Rgba8Unorm,
+                BaseMipLevel = 0,
+                MipLevelCount = 1,
+                BaseArrayLayer = 0,
+                ArrayLayerCount = 1,
+                Aspect = TextureAspect.All
+            };
+
+            var view = _wgpu.TextureCreateView(texture, in textureViewDescriptor);
+
+            ImageCopyTexture imageCopyTexture = new()
+            {
+                Texture = texture,
+                MipLevel = 0,
+                Aspect = TextureAspect.All,
+            };
+
+            TextureDataLayout textureDataLayout = new()
+            {
+                Offset = 0,
+                BytesPerRow = (uint)(width * 4),
+                RowsPerImage = (uint)height,
+            };
+
+            Extent3D extent = new()
+            {
+                Height = (uint)height,
+                Width = (uint)width,
+                DepthOrArrayLayers = 1,
+            };
+
+            _wgpu.QueueWriteTexture(_queue, &imageCopyTexture, pixels, (nuint)(width * height * 4), in textureDataLayout, in extent);
+
+            BindImGuiTextureView(view);
+
+            _gpuTextures[(IntPtr)view] = (IntPtr)texture;
+
+            tex.SetTexID(view);
+            tex.Status = ImTextureStatus.Ok;
+        }
+
+        private void UpdateTexture(ImTextureDataPtr tex)
+        {
+            // For partial updates - usually just recreate for simplicity
+            DestroyTexture(tex);
+            CreateTexture(tex);
+        }
+
+        private void DestroyTexture(ImTextureDataPtr tex)
+        {
+            var id = (nint)tex.TexID;
+
+            if (id != 0)
+            {
+                UnbindImGuiTextureView((TextureView*)id);
+
+                if (_gpuTextures.Remove(id, out var texture))
+                {
+                    _wgpu.TextureViewRelease((TextureView*)id);
+                    _wgpu.TextureDestroy((Texture*)texture);
+                    _wgpu.TextureRelease((Texture*)texture);
+                }
+            }
+
+            tex.SetTexID(null);
+            tex.Status = ImTextureStatus.Destroyed;
         }
 
         private static bool TryMapKeys(Key key, out ImGuiKey imguiKey)
         {
             imguiKey = key switch
             {
-                Key.Backspace => ImGuiKey.Backspace,
                 Key.Tab => ImGuiKey.Tab,
-                Key.Enter => ImGuiKey.Enter,
-                Key.CapsLock => ImGuiKey.CapsLock,
-                Key.Escape => ImGuiKey.Escape,
-                Key.Space => ImGuiKey.Space,
-                Key.PageUp => ImGuiKey.PageUp,
-                Key.PageDown => ImGuiKey.PageDown,
-                Key.End => ImGuiKey.End,
-                Key.Home => ImGuiKey.Home,
                 Key.Left => ImGuiKey.LeftArrow,
                 Key.Right => ImGuiKey.RightArrow,
                 Key.Up => ImGuiKey.UpArrow,
                 Key.Down => ImGuiKey.DownArrow,
-                Key.PrintScreen => ImGuiKey.PrintScreen,
+                Key.PageUp => ImGuiKey.PageUp,
+                Key.PageDown => ImGuiKey.PageDown,
+                Key.Home => ImGuiKey.Home,
+                Key.End => ImGuiKey.End,
                 Key.Insert => ImGuiKey.Insert,
                 Key.Delete => ImGuiKey.Delete,
-                >= Key.Number0 and <= Key.Number9 => ImGuiKey._0 + (key - Key.Number0),
-                >= Key.A and <= Key.Z => ImGuiKey.A + (key - Key.A),
-                >= Key.Keypad0 and <= Key.Keypad9 => ImGuiKey.Keypad0 + (key - Key.Keypad0),
-                Key.KeypadMultiply => ImGuiKey.KeypadMultiply,
-                Key.KeypadAdd => ImGuiKey.KeypadAdd,
-                Key.KeypadSubtract => ImGuiKey.KeypadSubtract,
-                Key.KeypadDecimal => ImGuiKey.KeypadDecimal,
-                Key.KeypadDivide => ImGuiKey.KeypadDivide,
-                Key.KeypadEqual => ImGuiKey.KeypadEqual,
-                >= Key.F1 and <= Key.F1 => ImGuiKey.F1 + (key - Key.F1),
-                Key.NumLock => ImGuiKey.NumLock,
-                Key.ScrollLock => ImGuiKey.ScrollLock,
-                Key.ShiftLeft or Key.ShiftRight => ImGuiKey.ModShift,
-                Key.ControlLeft or Key.ControlRight => ImGuiKey.ModCtrl,
-                Key.SuperLeft or Key.SuperRight => ImGuiKey.ModSuper,
-                Key.AltLeft or Key.AltRight => ImGuiKey.ModAlt,
-                Key.Semicolon => ImGuiKey.Semicolon,
-                Key.Equal => ImGuiKey.Equal,
+                Key.Backspace => ImGuiKey.Backspace,
+                Key.Space => ImGuiKey.Space,
+                Key.Enter => ImGuiKey.Enter,
+                Key.Escape => ImGuiKey.Escape,
+                Key.Apostrophe => ImGuiKey.Apostrophe,
                 Key.Comma => ImGuiKey.Comma,
                 Key.Minus => ImGuiKey.Minus,
                 Key.Period => ImGuiKey.Period,
-                Key.GraveAccent => ImGuiKey.GraveAccent,
-                Key.LeftBracket => ImGuiKey.LeftBracket,
-                Key.RightBracket => ImGuiKey.RightBracket,
-                Key.Apostrophe => ImGuiKey.Apostrophe,
                 Key.Slash => ImGuiKey.Slash,
+                Key.Semicolon => ImGuiKey.Semicolon,
+                Key.Equal => ImGuiKey.Equal,
+                Key.LeftBracket => ImGuiKey.LeftBracket,
                 Key.BackSlash => ImGuiKey.Backslash,
+                Key.RightBracket => ImGuiKey.RightBracket,
+                Key.GraveAccent => ImGuiKey.GraveAccent,
+                Key.CapsLock => ImGuiKey.CapsLock,
+                Key.ScrollLock => ImGuiKey.ScrollLock,
+                Key.NumLock => ImGuiKey.NumLock,
+                Key.PrintScreen => ImGuiKey.PrintScreen,
                 Key.Pause => ImGuiKey.Pause,
+                Key.Keypad0 => ImGuiKey.Keypad0,
+                Key.Keypad1 => ImGuiKey.Keypad1,
+                Key.Keypad2 => ImGuiKey.Keypad2,
+                Key.Keypad3 => ImGuiKey.Keypad3,
+                Key.Keypad4 => ImGuiKey.Keypad4,
+                Key.Keypad5 => ImGuiKey.Keypad5,
+                Key.Keypad6 => ImGuiKey.Keypad6,
+                Key.Keypad7 => ImGuiKey.Keypad7,
+                Key.Keypad8 => ImGuiKey.Keypad8,
+                Key.Keypad9 => ImGuiKey.Keypad9,
+                Key.KeypadDecimal => ImGuiKey.KeypadDecimal,
+                Key.KeypadDivide => ImGuiKey.KeypadDivide,
+                Key.KeypadMultiply => ImGuiKey.KeypadMultiply,
+                Key.KeypadSubtract => ImGuiKey.KeypadSubtract,
+                Key.KeypadAdd => ImGuiKey.KeypadAdd,
+                Key.KeypadEnter => ImGuiKey.KeypadEnter,
+                Key.KeypadEqual => ImGuiKey.KeypadEqual,
+                Key.ControlLeft => ImGuiKey.LeftCtrl,
+                Key.ShiftLeft => ImGuiKey.LeftShift,
+                Key.AltLeft => ImGuiKey.LeftAlt,
+                Key.SuperLeft => ImGuiKey.LeftSuper,
+                Key.ControlRight => ImGuiKey.RightCtrl,
+                Key.ShiftRight => ImGuiKey.RightShift,
+                Key.AltRight => ImGuiKey.RightAlt,
+                Key.SuperRight => ImGuiKey.RightSuper,
+                Key.Menu => ImGuiKey.Menu,
+                Key.Number0 => ImGuiKey.Key0,
+                Key.Number1 => ImGuiKey.Key1,
+                Key.Number2 => ImGuiKey.Key2,
+                Key.Number3 => ImGuiKey.Key3,
+                Key.Number4 => ImGuiKey.Key4,
+                Key.Number5 => ImGuiKey.Key5,
+                Key.Number6 => ImGuiKey.Key6,
+                Key.Number7 => ImGuiKey.Key7,
+                Key.Number8 => ImGuiKey.Key8,
+                Key.Number9 => ImGuiKey.Key9,
+                Key.A => ImGuiKey.A,
+                Key.B => ImGuiKey.B,
+                Key.C => ImGuiKey.C,
+                Key.D => ImGuiKey.D,
+                Key.E => ImGuiKey.E,
+                Key.F => ImGuiKey.F,
+                Key.G => ImGuiKey.G,
+                Key.H => ImGuiKey.H,
+                Key.I => ImGuiKey.I,
+                Key.J => ImGuiKey.J,
+                Key.K => ImGuiKey.K,
+                Key.L => ImGuiKey.L,
+                Key.M => ImGuiKey.M,
+                Key.N => ImGuiKey.N,
+                Key.O => ImGuiKey.O,
+                Key.P => ImGuiKey.P,
+                Key.Q => ImGuiKey.Q,
+                Key.R => ImGuiKey.R,
+                Key.S => ImGuiKey.S,
+                Key.T => ImGuiKey.T,
+                Key.U => ImGuiKey.U,
+                Key.V => ImGuiKey.V,
+                Key.W => ImGuiKey.W,
+                Key.X => ImGuiKey.X,
+                Key.Y => ImGuiKey.Y,
+                Key.Z => ImGuiKey.Z,
+                Key.F1 => ImGuiKey.F1,
+                Key.F2 => ImGuiKey.F2,
+                Key.F3 => ImGuiKey.F3,
+                Key.F4 => ImGuiKey.F4,
+                Key.F5 => ImGuiKey.F5,
+                Key.F6 => ImGuiKey.F6,
+                Key.F7 => ImGuiKey.F7,
+                Key.F8 => ImGuiKey.F8,
+                Key.F9 => ImGuiKey.F9,
+                Key.F10 => ImGuiKey.F10,
+                Key.F11 => ImGuiKey.F11,
+                Key.F12 => ImGuiKey.F12,
                 _ => ImGuiKey.None,
             };
 
@@ -442,7 +554,8 @@ namespace XNOEdit.Renderer
             io.MouseWheel = wheel.Y;
             io.MouseWheelH = wheel.X;
 
-            io.AddInputCharactersUTF8(CollectionsMarshal.AsSpan(_pressedChars));
+            io.AddInputCharactersUTF8(_pressedChars.ToString());
+
             _pressedChars.Clear();
 
             foreach (var evt in _keyEvents)
@@ -481,6 +594,14 @@ namespace XNOEdit.Renderer
                 return;
             }
 
+            for (var i = 0; i < drawData.Textures.Size; i++)
+            {
+                var texture = drawData.Textures[i];
+
+                if (texture.Status != ImTextureStatus.Ok)
+                    ProcessTextureRequest(texture);
+            }
+
             if (_windowRenderBuffers.FrameRenderBuffers == null || _windowRenderBuffers.FrameRenderBuffers.Length == 0)
             {
                 _windowRenderBuffers.Index = 0;
@@ -502,8 +623,8 @@ namespace XNOEdit.Renderer
                 for (var n = 0; n < drawData.CmdListsCount; n++)
                 {
                     var cmdList = drawData.CmdLists[n];
-                    Unsafe.CopyBlock(vtxDst, cmdList.VtxBuffer.Data.ToPointer(), (uint)cmdList.VtxBuffer.Size * (uint)sizeof(ImDrawVert));
-                    Unsafe.CopyBlock(idxDst, cmdList.IdxBuffer.Data.ToPointer(), (uint)cmdList.IdxBuffer.Size * sizeof(ushort));
+                    Unsafe.CopyBlock(vtxDst, cmdList.VtxBuffer.Data, (uint)cmdList.VtxBuffer.Size * (uint)sizeof(ImDrawVert));
+                    Unsafe.CopyBlock(idxDst, cmdList.IdxBuffer.Data, (uint)cmdList.IdxBuffer.Size * sizeof(ushort));
                     vtxDst += cmdList.VtxBuffer.Size;
                     idxDst += cmdList.IdxBuffer.Size;
                 }
@@ -538,6 +659,12 @@ namespace XNOEdit.Renderer
 
             _wgpu.RenderPassEncoderSetViewport(encoder, 0, 0, drawData.FramebufferScale.X * drawData.DisplaySize.X, drawData.FramebufferScale.Y * drawData.DisplaySize.Y, 0, 1);
 
+            if (_textureBindGroups.Count > 0)
+            {
+                uint defaultOffsets = 0;
+                _wgpu.RenderPassEncoderSetBindGroup(encoder, 1, (BindGroup*)_textureBindGroups.Values.First(), 0, in defaultOffsets);
+            }
+
             var vtxOffset = 0;
             var idxOffset = 0;
             for (var n = 0; n < drawData.CmdListsCount; n++)
@@ -546,17 +673,13 @@ namespace XNOEdit.Renderer
                 for (var i = 0; i < cmdList.CmdBuffer.Size; i++)
                 {
                     var cmd = cmdList.CmdBuffer[i];
-                    if (cmd.UserCallback == IntPtr.Zero)
+                    if (cmd.UserCallback != null)
                     {
-                        var texId = cmd.TextureId;
-                        if (texId != IntPtr.Zero)
+                        if (_textureBindGroups.TryGetValue(cmd.GetTexID(), out var value))
                         {
-                            if (_viewsById.TryGetValue(texId, out var value))
-                            {
-                                uint dynamicOffsets = 0;
-                                _wgpu.RenderPassEncoderSetBindGroup(encoder, 1, (BindGroup*)value, 0,
-                                    in dynamicOffsets);
-                            }
+                            uint dynamicOffsets = 0;
+                            _wgpu.RenderPassEncoderSetBindGroup(encoder, 1, (BindGroup*)value, 0,
+                                in dynamicOffsets);
                         }
                     }
 
@@ -624,10 +747,19 @@ namespace XNOEdit.Renderer
                 }
             }
 
-            foreach (var bg in _viewsById)
+            foreach (var bg in _textureBindGroups.Values)
             {
-                _wgpu.BindGroupRelease((BindGroup*)bg.Value);
+                _wgpu.BindGroupRelease((BindGroup*)bg);
             }
+            _textureBindGroups.Clear();
+
+            foreach (var entry in _gpuTextures)
+            {
+                _wgpu.TextureViewRelease((TextureView*)entry.Key);
+                _wgpu.TextureDestroy((Texture*)entry.Value);
+                _wgpu.TextureRelease((Texture*)entry.Value);
+            }
+            _gpuTextures.Clear();
 
             _wgpu.BindGroupRelease(_commonBindGroup);
 
@@ -639,9 +771,6 @@ namespace XNOEdit.Renderer
             _wgpu.BindGroupLayoutRelease(_imageBindGroupLayout);
 
             _wgpu.SamplerRelease(_fontSampler);
-            _wgpu.TextureViewRelease(_fontView);
-            _wgpu.TextureDestroy(_fontTexture);
-            _wgpu.TextureRelease(_fontTexture);
 
             _wgpu.ShaderModuleRelease(_shaderModule);
 

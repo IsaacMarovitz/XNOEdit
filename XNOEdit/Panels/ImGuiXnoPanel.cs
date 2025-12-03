@@ -1,5 +1,5 @@
 using System.Numerics;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
@@ -236,7 +236,8 @@ namespace XNOEdit.Panels
                         ImGui.Text($"Mag Filter: {texture.MagFilter}");
                         ImGui.Text($"Type: {texture.Type}");
 
-                        ImGui.Image(textures.First(x => x.Key == texture.Name).Value, new Vector2(150, 150));
+                        // TODO: Update this
+                        // ImGui.Image(textures.First(x => x.Key == texture.Name).Value, new Vector2(150, 150));
                     }
                 }
 

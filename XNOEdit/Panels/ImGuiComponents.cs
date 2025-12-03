@@ -1,5 +1,4 @@
-using ImGuiNET;
-using Marathon.IO.Types.FileSystem;
+using Hexa.NET.ImGui;
 
 namespace XNOEdit.Panels
 {

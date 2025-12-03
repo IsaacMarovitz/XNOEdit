@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
 using XNOEdit.Managers;
 

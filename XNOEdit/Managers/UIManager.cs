@@ -1,5 +1,5 @@
 using System.Numerics;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Silk.NET.WebGPU;
 using XNOEdit.Logging;
@@ -77,7 +77,7 @@ namespace XNOEdit.Managers
                     ImGui.MenuItem("Vertex Colors", "V", ref settings.VertexColors);
                     ImGui.MenuItem("Backface Culling", "C", ref settings.BackfaceCulling);
                     ImGui.MenuItem("Wireframe", "F", ref settings.WireframeMode);
-                    ImGui.MenuItem("Lightmap", null, ref settings.Lightmap);
+                    ImGui.MenuItem("Lightmap", "", ref settings.Lightmap);
 
                     ImGui.Separator();
 
@@ -94,13 +94,13 @@ namespace XNOEdit.Managers
                 {
                     ImGui.PushItemFlag(ImGuiItemFlags.AutoClosePopups, false);
 
-                    ImGui.MenuItem("XNO", null, ref _xnoWindow);
-                    ImGui.MenuItem("Environment", null, ref _environmentWindow);
+                    ImGui.MenuItem("XNO", "", ref _xnoWindow);
+                    ImGui.MenuItem("Environment", "", ref _environmentWindow);
 
                     ImGui.Separator();
 
                     var debugLogs = Configuration.DebugLogs;
-                    ImGui.MenuItem("Debug Logs", null, ref debugLogs);
+                    ImGui.MenuItem("Debug Logs", "", ref debugLogs);
 
                     if (debugLogs != Configuration.DebugLogs)
                     {
