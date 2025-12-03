@@ -16,15 +16,15 @@ namespace XNOEdit.Managers
 
         public ViewportPanel? ViewportPanel { get; private set; }
         public ImGuiController? Controller { get; private set; }
-        public ImGuiObjectsPanel? ObjectsPanel { get; private set; }
-        public ImGuiXnoPanel? XnoPanel { get; private set; }
-        public ImGuiStagePanel? StagePanel { get; private set; }
-        public ImGuiStagesPanel? StagesPanel { get; private set; }
+        public ObjectsPanel? ObjectsPanel { get; private set; }
+        public XnoPanel? XnoPanel { get; private set; }
+        public StagePanel? StagePanel { get; private set; }
+        public StagesPanel? StagesPanel { get; private set; }
         public LoadProgress? CurrentLoadProgress { get; set; }
 
         public bool ViewportWantsInput => ViewportPanel?.IsHovered ?? false;
 
-        private ImGuiAlertPanel? _alertPanel;
+        private AlertPanel? _alertPanel;
 
         private bool _firstLoop = true;
         private bool _xnoWindow = true;
@@ -35,9 +35,9 @@ namespace XNOEdit.Managers
         public void OnLoad(ImGuiController controller, WebGPU wgpu, WgpuDevice device)
         {
             Controller = controller;
-            _alertPanel = new ImGuiAlertPanel();
-            ObjectsPanel = new ImGuiObjectsPanel();
-            StagesPanel = new ImGuiStagesPanel(this);
+            _alertPanel = new AlertPanel();
+            ObjectsPanel = new ObjectsPanel();
+            StagesPanel = new StagesPanel(this);
             ViewportPanel = new ViewportPanel(wgpu, device, controller);
 
             ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
@@ -55,7 +55,7 @@ namespace XNOEdit.Managers
         public void InitXnoPanel(NinjaNext xno, Action<int, bool> toggleSubobjectVisibility, Action<int, int, bool> toggleMeshSetVisibility)
         {
             StagePanel = null;
-            XnoPanel = new ImGuiXnoPanel(xno);
+            XnoPanel = new XnoPanel(xno);
             XnoPanel.ToggleSubobjectVisibility += toggleSubobjectVisibility;
             XnoPanel.ToggleMeshSetVisibility += toggleMeshSetVisibility;
         }
@@ -63,7 +63,7 @@ namespace XNOEdit.Managers
         public void InitStagePanel(string name, List<NinjaNext> xnos, bool[] visibility, Action<int, bool> toggleXnoVisibility)
         {
             XnoPanel = null;
-            StagePanel = new ImGuiStagePanel(name, xnos, visibility);
+            StagePanel = new StagePanel(name, xnos, visibility);
             StagePanel.ToggleXnoVisibility += toggleXnoVisibility;
         }
 

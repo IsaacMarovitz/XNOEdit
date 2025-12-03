@@ -5,13 +5,13 @@ using XNOEdit.Managers;
 
 namespace XNOEdit.Panels
 {
-    public class ImGuiStagesPanel
+    public class StagesPanel
     {
         public event Action<ArcFile> LoadStage;
 
         private readonly UIManager _uiManager;
 
-        public ImGuiStagesPanel(UIManager uiManager)
+        public StagesPanel(UIManager uiManager)
         {
             _uiManager = uiManager;
         }

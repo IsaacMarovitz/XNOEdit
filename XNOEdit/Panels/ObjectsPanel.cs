@@ -5,7 +5,7 @@ using Marathon.IO.Types.FileSystem;
 
 namespace XNOEdit.Panels
 {
-    public class ImGuiObjectsPanel
+    public class ObjectsPanel
     {
         public event Action<IFile> LoadObject;
         public ObjectPhysicsParameterList ObjectParameters { get; private set; }
@@ -18,7 +18,7 @@ namespace XNOEdit.Panels
 
         private string _searchText = "";
 
-        public ImGuiObjectsPanel()
+        public ObjectsPanel()
         {
             LoadGameFolderResources();
         }

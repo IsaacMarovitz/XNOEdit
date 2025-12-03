@@ -7,7 +7,7 @@ using XNOEdit.Managers;
 
 namespace XNOEdit.Panels
 {
-    public class ImGuiXnoPanel
+    public class XnoPanel
     {
         public event Action<int, bool> ToggleSubobjectVisibility;
         public event Action<int, int, bool> ToggleMeshSetVisibility;
@@ -15,7 +15,7 @@ namespace XNOEdit.Panels
         private readonly NinjaNext _xno;
         private Dictionary<(int subobjectIndex, int? meshSetIndex), bool> _visibilityState = new();
 
-        public ImGuiXnoPanel(NinjaNext xno)
+        public XnoPanel(NinjaNext xno)
         {
             _xno = xno;
         }

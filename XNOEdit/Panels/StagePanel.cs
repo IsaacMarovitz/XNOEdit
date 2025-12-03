@@ -5,9 +5,10 @@ using Marathon.Formats.Ninja.Chunks;
 
 namespace XNOEdit.Panels
 {
-    public class ImGuiStagePanel
+    public class StagePanel
     {
         public event Action<int, bool> ToggleXnoVisibility;
+        public event Action<int, NinjaNext> ViewXno;
 
         private readonly string _name;
         private readonly List<NinjaNext> _xnos;
@@ -16,7 +17,7 @@ namespace XNOEdit.Panels
 
         private readonly Dictionary<int, bool> _visibilityState = new();
 
-        public ImGuiStagePanel(string name, List<NinjaNext> xnos, bool[] visibility)
+        public StagePanel(string name, List<NinjaNext> xnos, bool[] visibility)
         {
             _name = name;
             _xnos = xnos;
@@ -83,7 +84,7 @@ namespace XNOEdit.Panels
 
                 if (ImGui.Button(_xnos[i].Name, new Vector2(ImGui.GetContentRegionAvail().X, 0)))
                 {
-                    // TODO: Allow viewing individual XNO
+                    ViewXno?.Invoke(i, _xnos[i]);
                 }
 
                 ImGui.PopStyleVar();

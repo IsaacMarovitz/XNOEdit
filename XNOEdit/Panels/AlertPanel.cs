@@ -11,7 +11,7 @@ namespace XNOEdit.Panels
         Error,
     }
 
-    public class ImGuiAlertPanel
+    public class AlertPanel
     {
         private const float MessageTime = 2;
         private float _timer = MessageTime;
