@@ -61,7 +61,7 @@ namespace XNOEdit.Managers
             StagePanel.ToggleXnoVisibility += toggleXnoVisibility;
         }
 
-        public unsafe void OnRender(double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, IReadOnlyDictionary<string, IntPtr> textures)
+        public unsafe void OnRender(double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, TextureManager textureManager)
         {
             Controller.Update((float)deltaTime);
 
@@ -142,7 +142,7 @@ namespace XNOEdit.Managers
             if (XnoPanel != null)
             {
                 if (_xnoWindow)
-                    XnoPanel.Render(textures);
+                    XnoPanel.Render(textureManager);
             }
 
             if (StagePanel != null)

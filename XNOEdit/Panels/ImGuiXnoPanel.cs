@@ -3,6 +3,7 @@ using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
+using XNOEdit.Managers;
 
 namespace XNOEdit.Panels
 {
@@ -29,7 +30,7 @@ namespace XNOEdit.Panels
             _visibilityState[(subobjectIndex, meshSetIndex)] = visible;
         }
 
-        public void Render(IReadOnlyDictionary<string, IntPtr> textures)
+        public void Render(TextureManager textureManager)
         {
             ImGui.Begin($"{_xno.Name}###XnoPanel", ImGuiWindowFlags.AlwaysAutoResize);
 
@@ -46,7 +47,7 @@ namespace XNOEdit.Panels
 
                 if (textureListChunk != null)
                 {
-                    RenderTextureChunk(textures, textureListChunk);
+                    RenderTextureChunk(textureManager, textureListChunk);
                 }
 
                 if (effectListChunk != null)
@@ -222,7 +223,7 @@ namespace XNOEdit.Panels
             ImGui.Text($"Z Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.ZCompareFunction)}");
         }
 
-        private void RenderTextureChunk(IReadOnlyDictionary<string, IntPtr> textures, TextureListChunk textureListChunk)
+        private unsafe void RenderTextureChunk(TextureManager textureManager, TextureListChunk textureListChunk)
         {
             if (ImGui.BeginTabItem("Texture List"))
             {
@@ -236,8 +237,11 @@ namespace XNOEdit.Panels
                         ImGui.Text($"Mag Filter: {texture.MagFilter}");
                         ImGui.Text($"Type: {texture.Type}");
 
-                        // TODO: Update this
-                        // ImGui.Image(textures.First(x => x.Key == texture.Name).Value, new Vector2(150, 150));
+                        var textureId = textureManager.GetImGuiId(texture.Name);
+                        if (textureId != 0)
+                        {
+                            // ImGui.Image((void*)textureId, new Vector2(150, 150));
+                        }
                     }
                 }
 

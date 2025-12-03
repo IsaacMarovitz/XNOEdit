@@ -33,11 +33,6 @@ namespace XNOEdit.Services
         public bool IsIndeterminate => Total == 0;
     }
 
-    public record LoadedTexture(
-        string Name,
-        IntPtr View
-    );
-
     public record XnoLoadResult(
         NinjaNext Xno,
         ObjectChunk? ObjectChunk,
@@ -209,7 +204,7 @@ namespace XNOEdit.Services
             }, cancellationToken);
         }
 
-        private List<LoadedTexture> LoadTextures(
+        private unsafe List<LoadedTexture> LoadTextures(
             IFile file,
             TextureListChunk? textureListChunk,
             CancellationToken cancellationToken,
@@ -231,17 +226,15 @@ namespace XNOEdit.Services
                 if (skipNames != null && skipNames.Contains(textureFile.Name))
                     continue;
 
-                var textureView = LoadTexture(textureFile);
-                if (textureView != IntPtr.Zero)
-                {
-                    result.Add(new LoadedTexture(textureFile.Name, textureView));
-                }
+                var pointers = LoadTexture(textureFile);
+                if (pointers.texture != IntPtr.Zero)
+                    result.Add(new LoadedTexture(textureFile.Name, (Texture*)pointers.texture, (TextureView*)pointers.textureView));
             }
 
             return result;
         }
 
-        private IntPtr LoadTexture(IFile file)
+        private (IntPtr texture, IntPtr textureView) LoadTexture(IFile file)
         {
             try
             {
@@ -298,13 +291,13 @@ namespace XNOEdit.Services
                         Aspect = TextureAspect.All
                     };
 
-                    return (IntPtr)_wgpu.TextureCreateView(wgpuTexture, &viewDesc);
+                    return ((IntPtr)wgpuTexture, (IntPtr)_wgpu.TextureCreateView(wgpuTexture, &viewDesc));
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error?.PrintMsg(LogClass.Application, $"Failed to load texture {file.Name}: {ex.Message}");
-                return IntPtr.Zero;
+                return (IntPtr.Zero, IntPtr.Zero);
             }
         }
 

@@ -42,7 +42,7 @@ namespace XNOEdit
         private static Task<ArcLoadResult?>? _pendingArcLoad;
         private static CancellationTokenSource? _loadCts;
 
-        private static readonly Dictionary<string, IntPtr> _textures = new();
+        private static TextureManager _textureManager;
 
         private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
 
@@ -90,11 +90,14 @@ namespace XNOEdit
                 _camera.ProcessMouseScroll(scrollY, _settings.CameraSensitivity);
             };
 
-            UIManager.OnLoad(new ImGuiController(_wgpu, _device, _window, InputManager.Input, 2));
+            var imguiController = new ImGuiController(_wgpu, _device, _window, InputManager.Input, 2);
+            UIManager.OnLoad(imguiController);
             UIManager.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
             UIManager.ObjectsPanel.LoadObject += QueueObjectLoad;
             UIManager.StagesPanel.LoadStage += QueueArcLoad;
+
+            _textureManager = new TextureManager(_wgpu, _device, imguiController);
 
             _fileLoader = new FileLoaderService(_wgpu, _device, (IntPtr)_queue);
 
@@ -280,13 +283,10 @@ namespace XNOEdit
 
                 _window.Title = $"XNOEdit - {result.Xno.Name}";
 
-                ClearTextures();
-
-                // Bind textures to ImGui
+                _textureManager.Clear();
                 foreach (var tex in result.Textures)
                 {
-                    UIManager.Controller.BindImGuiTextureView((TextureView*)tex.View);
-                    _textures.TryAdd(tex.Name, tex.View);
+                    _textureManager.Add(tex.Name, tex.Texture, tex.View);
                 }
 
                 if (result.ObjectChunk.PrimitiveLists.Count == 0)
@@ -326,16 +326,13 @@ namespace XNOEdit
 
         private static void ApplyArcResult(ArcLoadResult result)
         {
-            ClearTextures();
-
-            _window.Title = $"XNOEdit - {result.Name}";
-
-            // Bind textures to ImGui
+            _textureManager.Clear();
             foreach (var tex in result.Textures)
             {
-                UIManager.Controller.BindImGuiTextureView((TextureView*)tex.View);
-                _textures.TryAdd(tex.Name, tex.View);
+                _textureManager.Add(tex.Name, tex.Texture, tex.View);
             }
+
+            _window.Title = $"XNOEdit - {result.Name}";
 
             var renderers = result.Entries.Select(e => e.Renderer).ToArray();
             var xnos = result.Entries.Select(e => e.Xno).ToList();
@@ -437,11 +434,11 @@ namespace XNOEdit
                     VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
                     Wireframe = _settings.WireframeMode,
                     CullBackfaces =  _settings.BackfaceCulling,
-                    Textures = _textures,
+                    TextureManager = _textureManager,
                     Lightmap = _settings.Lightmap,
                 });
 
-            UIManager.OnRender(deltaTime, ref _settings, pass, _textures);
+            UIManager.OnRender(deltaTime, ref _settings, pass, _textureManager);
 
             _wgpu.RenderPassEncoderEnd(pass);
 
@@ -490,7 +487,9 @@ namespace XNOEdit
             _scene?.Dispose();
             _grid?.Dispose();
             _skybox?.Dispose();
-            ClearTextures();
+
+            _textureManager?.Dispose();
+
             UIManager?.Dispose();
             InputManager?.Dispose();
 
@@ -586,16 +585,6 @@ namespace XNOEdit
             CancelPendingLoads();
             var progress = CreateProgressReporter();
             _pendingArcLoad = _fileLoader.ReadArcAsync(arcFile, _shaderArchive, progress, _loadCts!.Token);
-        }
-
-        private static void ClearTextures()
-        {
-            foreach (var texturePtr in _textures.Values)
-            {
-                UIManager.Controller.UnbindImGuiTextureView((TextureView*)texturePtr);
-                _wgpu.TextureViewRelease((TextureView*)texturePtr);
-            }
-            _textures.Clear();
         }
 
         private static void SetModelRadius(float radius)

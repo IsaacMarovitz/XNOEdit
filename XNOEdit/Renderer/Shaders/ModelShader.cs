@@ -42,6 +42,11 @@ namespace XNOEdit.Renderer.Shaders
         private Texture* _defaultTexture;
         private TextureView* _defaultTextureView;
 
+        private BindGroupLayout* _perFrameLayout;
+        private BindGroupLayout* _perMeshLayout;
+        private BindGroupLayout* _textureLayout;
+        private BindGroup* _defaultTextureBindGroup;
+
         public ModelShader(
             WebGPU wgpu,
             WgpuDevice device,
@@ -165,20 +170,20 @@ namespace XNOEdit.Renderer.Shaders
             var perFrameBuilder = new BindGroupBuilder(Wgpu, Device);
             perFrameBuilder.AddUniformBuffer(0, _perFrameUniformBuffer);
 
-            var perFrameLayout = perFrameBuilder.BuildLayout();
+            _perFrameLayout = perFrameBuilder.BuildLayout();
             _perFrameBindGroup = perFrameBuilder.BuildBindGroup();
 
-            RegisterBindGroup(perFrameLayout, _perFrameBindGroup);
+            RegisterBindGroup(_perFrameLayout, _perFrameBindGroup);
 
             // Group 1: Per-mesh uniforms (created per mesh, set once)
             // We only create the layout here; meshes will create their own bind groups
-            var perMeshLayout = CreatePerMeshBindGroupLayout();
-            RegisterBindGroup(perMeshLayout, null); // null bind group - meshes create their own
+            _perMeshLayout = CreatePerMeshBindGroupLayout();
+            RegisterBindGroup(_perMeshLayout, null); // null bind group - meshes create their own
 
             // Group 2: Textures (created per draw call)
-            var textureLayout = CreateTextureBindGroupLayout();
-            var defaultTextureBindGroup = CreateTextureBindGroup(textureLayout, null, null, null, null);
-            RegisterBindGroup(textureLayout, defaultTextureBindGroup);
+            _textureLayout = CreateTextureBindGroupLayout();
+            _defaultTextureBindGroup = CreateTextureBindGroup(_textureLayout, null, null, null, null);
+            RegisterBindGroup(_textureLayout, _defaultTextureBindGroup);
         }
 
         private BindGroupLayout* CreatePerMeshBindGroupLayout()
@@ -407,6 +412,11 @@ namespace XNOEdit.Renderer.Shaders
 
             _perFrameUniformBuffer.Dispose();
             Wgpu.BindGroupRelease(_perFrameBindGroup);
+
+            Wgpu.BindGroupLayoutRelease(_perFrameLayout);
+            Wgpu.BindGroupLayoutRelease(_perMeshLayout);
+            Wgpu.BindGroupLayoutRelease(_textureLayout);
+            Wgpu.BindGroupRelease(_defaultTextureBindGroup);
 
             base.Dispose();
         }

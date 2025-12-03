@@ -73,6 +73,11 @@ namespace XNOEdit.Renderer
         {
             var id = (nint)view;
 
+            if (_textureBindGroups.TryGetValue(id, out var existing))
+            {
+                _wgpu.BindGroupRelease((BindGroup*)existing);
+            }
+
             BindGroupEntry imageEntry = new()
             {
                 Binding = 0,
@@ -392,7 +397,7 @@ namespace XNOEdit.Renderer
             _gpuTextures[(IntPtr)view] = (IntPtr)texture;
 
             tex.SetTexID(view);
-            tex.Status = ImTextureStatus.Ok;
+            tex.SetStatus(ImTextureStatus.Ok);
         }
 
         private void UpdateTexture(ImTextureDataPtr tex)
@@ -419,7 +424,7 @@ namespace XNOEdit.Renderer
             }
 
             tex.SetTexID(null);
-            tex.Status = ImTextureStatus.Destroyed;
+            tex.SetStatus(ImTextureStatus.Destroyed);
         }
 
         private static bool TryMapKeys(Key key, out ImGuiKey imguiKey)
@@ -673,7 +678,7 @@ namespace XNOEdit.Renderer
                 for (var i = 0; i < cmdList.CmdBuffer.Size; i++)
                 {
                     var cmd = cmdList.CmdBuffer[i];
-                    if (cmd.UserCallback != null)
+                    if (cmd.UserCallback == null)
                     {
                         if (_textureBindGroups.TryGetValue(cmd.GetTexID(), out var value))
                         {

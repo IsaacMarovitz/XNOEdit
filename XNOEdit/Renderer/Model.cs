@@ -4,6 +4,7 @@ using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
 using XNOEdit.Logging;
+using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
 
@@ -301,12 +302,12 @@ namespace XNOEdit.Renderer
         public void Draw(
             RenderPassEncoder* passEncoder,
             bool wireframe,
-            IReadOnlyDictionary<string, IntPtr> textures,
+            TextureManager textureManager,
             ModelShader shader)
         {
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(passEncoder, wireframe, textures, shader);
+                mesh.Draw(passEncoder, wireframe, textureManager, shader);
             }
         }
 
@@ -335,6 +336,7 @@ namespace XNOEdit.Renderer
         private TextureSet _textureSet;
         private WgpuBuffer<PerMeshUniforms> _meshUniformBuffer;
         private BindGroup* _meshBindGroup;
+        private BindGroup* _textureBindGroup;
 
         private bool _visible = true;
 
@@ -391,7 +393,7 @@ namespace XNOEdit.Renderer
         public void Draw(
             RenderPassEncoder* passEncoder,
             bool wireframe,
-            IReadOnlyDictionary<string, IntPtr> textures,
+            TextureManager textureManager,
             ModelShader shader)
         {
             if (!_visible) return;
@@ -399,23 +401,18 @@ namespace XNOEdit.Renderer
             _geometry.BindVertexBuffer(passEncoder, 0);
             _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 1, _meshBindGroup, 0, null);
 
-            var mainTexture = ResolveTexture(textures, _textureSet.MainTexture);
-            var blendTexture = ResolveTexture(textures, _textureSet.BlendMap);
-            var normalTexture = ResolveTexture(textures, _textureSet.NormalMap);
-            var lightmapTexture = ResolveTexture(textures, _textureSet.LightMap);
+            var mainTexture = textureManager.GetView(_textureSet.MainTexture);
+            var blendTexture = textureManager.GetView(_textureSet.BlendMap);
+            var normalTexture = textureManager.GetView(_textureSet.NormalMap);
+            var lightmapTexture = textureManager.GetView(_textureSet.LightMap);
 
-            var textureBindGroup = shader.GetTextureBindGroup(
-                mainTexture, blendTexture, normalTexture, lightmapTexture);
-            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 2, textureBindGroup, 0, null);
+            if (_textureBindGroup != null)
+                _wgpu.BindGroupRelease(_textureBindGroup);
+
+            _textureBindGroup = shader.GetTextureBindGroup(mainTexture, blendTexture, normalTexture, lightmapTexture);
+            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 2, _textureBindGroup, 0, null);
 
             _geometry.Draw(passEncoder, wireframe);
-        }
-
-        private static TextureView* ResolveTexture(IReadOnlyDictionary<string, IntPtr> textures, string? name)
-        {
-            if (name != null && textures.TryGetValue(name, out var ptr))
-                return (TextureView*)ptr;
-            return null;
         }
 
         public void Dispose()

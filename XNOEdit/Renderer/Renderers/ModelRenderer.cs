@@ -2,6 +2,7 @@ using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Silk.NET.WebGPU;
+using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
 using XNOEdit.Renderer.Wgpu;
 
@@ -16,7 +17,7 @@ namespace XNOEdit.Renderer.Renderers
         public bool Wireframe;
         public bool CullBackfaces;
         public bool Lightmap;
-        public IReadOnlyDictionary<string, IntPtr> Textures;
+        public TextureManager TextureManager;
     }
 
     public unsafe class ModelRenderer : WgpuRenderer<ModelParameters>
@@ -77,7 +78,7 @@ namespace XNOEdit.Renderer.Renderers
             var pipeline = modelShader.GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
             Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
 
-            _model.Draw(passEncoder, modelParameters.Wireframe, modelParameters.Textures, modelShader);
+            _model.Draw(passEncoder, modelParameters.Wireframe, modelParameters.TextureManager, modelShader);
         }
 
         public override void Dispose()
