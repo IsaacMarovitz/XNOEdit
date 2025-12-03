@@ -468,8 +468,12 @@ namespace XNOEdit
 
             if (_depthTextureView != null)
                 _wgpu.TextureViewRelease(_depthTextureView);
+
             if (_depthTexture != null)
+            {
+                _wgpu.TextureDestroy(_depthTexture);
                 _wgpu.TextureRelease(_depthTexture);
+            }
 
             CreateDepthTexture();
         }
@@ -490,7 +494,10 @@ namespace XNOEdit
                 _wgpu.TextureViewRelease(_depthTextureView);
 
             if (_depthTexture != null)
+            {
+                _wgpu.TextureDestroy(_depthTexture);
                 _wgpu.TextureRelease(_depthTexture);
+            }
 
             if (_queue != null)
                 _wgpu.QueueRelease(_queue);
@@ -596,6 +603,8 @@ namespace XNOEdit
             _camera.FarPlane = Math.Max(radius * 10.0f, 1000.0f);
 
             var gridSize = radius * 4.0f;
+            // TODO: This causes crashes
+            // _grid?.Dispose();
             _grid = new GridRenderer(_wgpu, _device, gridSize);
 
             ResetCamera();

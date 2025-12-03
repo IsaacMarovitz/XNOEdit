@@ -774,6 +774,9 @@ namespace XNOEdit.Renderer
 
             _wgpu.ShaderModuleRelease(_shaderModule);
 
+            if (_queue != null)
+                _wgpu.QueueRelease(_queue);
+
             _inputContext.Keyboards[0].KeyChar -= KeyChar;
             _inputContext.Keyboards[0].KeyUp -= KeyUp;
             _inputContext.Keyboards[0].KeyDown -= KeyDown;

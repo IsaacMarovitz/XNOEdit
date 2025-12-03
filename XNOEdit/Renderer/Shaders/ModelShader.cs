@@ -137,6 +137,7 @@ namespace XNOEdit.Renderer.Shaders
 
             var queue = Wgpu.DeviceGetQueue(Device);
             Wgpu.QueueWriteTexture(queue, &imageCopyTexture, whitePixel, 4, &textureDataLayout, &writeSize);
+            Wgpu.QueueRelease(queue);
 
             var viewDesc = new TextureViewDescriptor
             {
@@ -399,7 +400,10 @@ namespace XNOEdit.Renderer.Shaders
                 Wgpu.TextureViewRelease(_defaultTextureView);
 
             if (_defaultTexture != null)
+            {
+                Wgpu.TextureDestroy(_defaultTexture);
                 Wgpu.TextureRelease(_defaultTexture);
+            }
 
             base.Dispose();
         }

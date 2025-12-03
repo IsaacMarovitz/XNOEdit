@@ -385,6 +385,7 @@ namespace XNOEdit.Renderer
             var queue = wgpu.DeviceGetQueue(device);
             _meshUniformBuffer.UpdateData(queue, in meshUniforms);
             _meshBindGroup = shader.CreatePerMeshBindGroup(_meshUniformBuffer);
+            wgpu.QueueRelease(queue);
         }
 
         public void Draw(
