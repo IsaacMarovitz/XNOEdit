@@ -25,11 +25,11 @@ namespace XNOEdit
         private static Texture* _depthTexture;
         private static TextureView* _depthTextureView;
 
-        private static Camera _camera;
-        private static ArcFile _shaderArchive;
-        private static IScene _scene;
-        private static GridRenderer _grid;
-        private static SkyboxRenderer _skybox;
+        private static Camera? _camera;
+        private static ArcFile? _shaderArchive;
+        private static IScene? _scene;
+        private static GridRenderer? _grid;
+        private static SkyboxRenderer? _skybox;
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
         private static RenderSettings _settings = new();
@@ -201,7 +201,7 @@ namespace XNOEdit
         private static void OnUpdate(double deltaTime)
         {
             if (!ImGui.GetIO().WantCaptureMouse)
-                _camera.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime, _settings.CameraSensitivity);
+                _camera?.ProcessKeyboard(InputManager.PrimaryKeyboard, (float)deltaTime, _settings.CameraSensitivity);
 
             ProcessPendingLoads();
         }
@@ -280,8 +280,6 @@ namespace XNOEdit
 
                 _window.Title = $"XNOEdit - {result.Xno.Name}";
 
-                _scene?.Dispose();
-                _grid?.Dispose();
                 ClearTextures();
 
                 // Bind textures to ImGui
@@ -296,6 +294,7 @@ namespace XNOEdit
                     UIManager.TriggerAlert(AlertLevel.Warning, "XNO has no geometry");
                 }
 
+                _scene?.Dispose();
                 _scene = new ObjectScene(result.Renderer);
 
                 _modelCenter = result.ObjectChunk.Centre;
@@ -327,8 +326,6 @@ namespace XNOEdit
 
         private static void ApplyArcResult(ArcLoadResult result)
         {
-            _scene?.Dispose();
-            _grid?.Dispose();
             ClearTextures();
 
             _window.Title = $"XNOEdit - {result.Name}";
@@ -346,8 +343,10 @@ namespace XNOEdit
 
             UIManager.InitStagePanel(result.Name, xnos, visibility, ToggleXnoVisibility);
 
+            _scene?.Dispose();
             _scene = new StageScene(renderers);
             _modelCenter = Vector3.Zero;
+
             SetModelRadius(result.MaxRadius);
         }
 
@@ -357,6 +356,11 @@ namespace XNOEdit
             _wgpu.SurfaceGetCurrentTexture(_device.GetSurface(), &surfaceTexture);
 
             if (surfaceTexture.Status != SurfaceGetCurrentTextureStatus.Success)
+            {
+                return;
+            }
+
+            if (_camera == null)
             {
                 return;
             }
@@ -406,7 +410,7 @@ namespace XNOEdit
 
             var pass = _wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
 
-            _skybox.Draw(_queue, pass, view, projection,
+            _skybox?.Draw(_queue, pass, view, projection,
                 new SkyboxParameters
                 {
                     SunDirection =  _settings.SunDirection,
@@ -415,7 +419,7 @@ namespace XNOEdit
 
             if (_settings.ShowGrid)
             {
-                _grid.Draw(_queue, pass, view, projection,
+                _grid?.Draw(_queue, pass, view, projection,
                     new GridParameters
                     {
                         Model = Matrix4x4.CreateTranslation(_modelCenter),
@@ -598,13 +602,15 @@ namespace XNOEdit
         {
             _modelRadius = radius;
 
-            _camera.SetModelRadius(radius);
-            _camera.NearPlane = 0.01f;
-            _camera.FarPlane = Math.Max(radius * 10.0f, 1000.0f);
+            if (_camera != null)
+            {
+                _camera.SetModelRadius(radius);
+                _camera.NearPlane = 0.01f;
+                _camera.FarPlane = Math.Max(radius * 10.0f, 1000.0f);
+            }
 
             var gridSize = radius * 4.0f;
-            // TODO: This causes crashes
-            // _grid?.Dispose();
+            _grid?.Dispose();
             _grid = new GridRenderer(_wgpu, _device, gridSize);
 
             ResetCamera();
@@ -613,7 +619,7 @@ namespace XNOEdit
         private static void ResetCamera()
         {
             var distance = Math.Max(_modelRadius * 2.5f, 10.0f);
-            _camera.FrameTarget(_modelCenter, distance);
+            _camera?.FrameTarget(_modelCenter, distance);
         }
     }
 }
