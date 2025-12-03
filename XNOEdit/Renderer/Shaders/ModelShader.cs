@@ -410,14 +410,6 @@ namespace XNOEdit.Renderer.Shaders
                 Wgpu.TextureRelease(_defaultTexture);
             }
 
-            _perFrameUniformBuffer.Dispose();
-            Wgpu.BindGroupRelease(_perFrameBindGroup);
-
-            Wgpu.BindGroupLayoutRelease(_perFrameLayout);
-            Wgpu.BindGroupLayoutRelease(_perMeshLayout);
-            Wgpu.BindGroupLayoutRelease(_textureLayout);
-            Wgpu.BindGroupRelease(_defaultTextureBindGroup);
-
             base.Dispose();
         }
     }
