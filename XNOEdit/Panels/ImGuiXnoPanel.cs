@@ -240,7 +240,7 @@ namespace XNOEdit.Panels
                         var textureId = textureManager.GetImGuiId(texture.Name);
                         if (textureId != 0)
                         {
-                            // ImGui.Image((void*)textureId, new Vector2(150, 150));
+                            ImGui.Image(new ImTextureRef(null, textureId), new Vector2(150, 150));
                         }
                     }
                 }
