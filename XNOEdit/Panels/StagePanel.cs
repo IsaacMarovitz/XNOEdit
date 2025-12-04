@@ -2,25 +2,25 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
+using XNOEdit.Services;
 
 namespace XNOEdit.Panels
 {
     public class StagePanel
     {
-        public event Action<int, bool> ToggleXnoVisibility;
         public event Action<int, NinjaNext> ViewXno;
 
         private readonly string _name;
         private readonly List<NinjaNext> _xnos;
         private readonly int _subobjectCount;
         private readonly int _meshSetCount;
+        private readonly ISceneVisibility _visibility;
 
-        private readonly Dictionary<int, bool> _visibilityState = new();
-
-        public StagePanel(string name, List<NinjaNext> xnos, bool[] visibility)
+        public StagePanel(string name, List<NinjaNext> xnos, ISceneVisibility visibility)
         {
             _name = name;
             _xnos = xnos;
+            _visibility = visibility;
 
             foreach (var xno in _xnos)
             {
@@ -36,22 +36,8 @@ namespace XNOEdit.Panels
                     }
                 }
             }
-
-            for (var i = 0; i < visibility.Length; i++)
-            {
-                _visibilityState[i] = visibility[i];
-            }
         }
 
-        private bool GetVisibility(int xnoIndex)
-        {
-            return !_visibilityState.TryGetValue(xnoIndex, out var visible) || visible;
-        }
-
-        private void SetVisibility(int xnoIndex, bool visible)
-        {
-            _visibilityState[xnoIndex] = visible;
-        }
 
         public void Render()
         {
@@ -67,11 +53,10 @@ namespace XNOEdit.Panels
             {
                 ImGui.PushID(i);
 
-                var visible = GetVisibility(i);
+                var visible = _visibility.GetXnoVisible(i);
                 if (ImGui.Checkbox($"##VisibilityObject{i + 1}", ref visible))
                 {
-                    SetVisibility(i, visible);
-                    ToggleXnoVisibility?.Invoke(i, visible);
+                    _visibility.SetXnoVisible(i, visible);
                 }
 
                 ImGui.SameLine();

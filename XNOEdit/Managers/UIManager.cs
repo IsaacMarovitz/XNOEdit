@@ -21,6 +21,7 @@ namespace XNOEdit.Managers
         public StagePanel? StagePanel { get; private set; }
         public StagesPanel? StagesPanel { get; private set; }
         public LoadProgress? CurrentLoadProgress { get; set; }
+        private ISceneVisibility? _currentVisibility;
 
         public bool ViewportWantsInput => ViewportPanel?.IsHovered ?? false;
 
@@ -52,19 +53,34 @@ namespace XNOEdit.Managers
                 _sunAzimuth += 360.0f;
         }
 
-        public void InitXnoPanel(NinjaNext xno, Action<int, bool> toggleSubobjectVisibility, Action<int, int, bool> toggleMeshSetVisibility)
+        public ObjectSceneVisibility InitXnoPanel(NinjaNext xno)
         {
             StagePanel = null;
-            XnoPanel = new XnoPanel(xno);
-            XnoPanel.ToggleSubobjectVisibility += toggleSubobjectVisibility;
-            XnoPanel.ToggleMeshSetVisibility += toggleMeshSetVisibility;
+
+            var visibility = new ObjectSceneVisibility();
+            _currentVisibility = visibility;
+
+            XnoPanel = new XnoPanel(xno, visibility);
+
+            return visibility;
         }
 
-        public void InitStagePanel(string name, List<NinjaNext> xnos, bool[] visibility, Action<int, bool> toggleXnoVisibility)
+        public StageSceneVisibility InitStagePanel(string name, List<NinjaNext> xnos)
         {
             XnoPanel = null;
+
+            var visibility = new StageSceneVisibility();
+            _currentVisibility = visibility;
+
             StagePanel = new StagePanel(name, xnos, visibility);
-            StagePanel.ToggleXnoVisibility += toggleXnoVisibility;
+            StagePanel.ViewXno += (index, xno) =>
+            {
+                // Key change: shares same visibility instance with xnoIndex
+                XnoPanel = new XnoPanel(xno, visibility, index);
+                ImGui.SetWindowFocus("###XnoPanel");
+            };
+
+            return visibility;
         }
 
         public unsafe void OnRender(double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, TextureManager textureManager)

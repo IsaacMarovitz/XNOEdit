@@ -18,6 +18,11 @@ namespace XNOEdit.Renderer.Scene
             _renderers[xnoIndex]?.Visible = visibility;
         }
 
+        public void SetObjectVisible(int xnoIndex, int objectIndex, int? meshIndex, bool visibility)
+        {
+            _renderers[xnoIndex]?.SetVisible(objectIndex, meshIndex, visibility);
+        }
+
         public unsafe void Render(Queue* queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,

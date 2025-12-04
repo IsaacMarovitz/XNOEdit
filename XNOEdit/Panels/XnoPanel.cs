@@ -4,30 +4,41 @@ using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using XNOEdit.Managers;
+using XNOEdit.Services;
 
 namespace XNOEdit.Panels
 {
     public class XnoPanel
     {
-        public event Action<int, bool> ToggleSubobjectVisibility;
-        public event Action<int, int, bool> ToggleMeshSetVisibility;
-
         private readonly NinjaNext _xno;
-        private Dictionary<(int subobjectIndex, int? meshSetIndex), bool> _visibilityState = new();
+        private readonly ISceneVisibility _visibility;
+        private readonly int _xnoIndex;
 
-        public XnoPanel(NinjaNext xno)
+        public XnoPanel(NinjaNext xno, ISceneVisibility visibility, int xnoIndex = 0)
         {
             _xno = xno;
+            _visibility = visibility;
+            _xnoIndex = xnoIndex;
         }
 
-        private bool GetVisibility(int subobjectIndex, int? meshSetIndex = null)
+        private bool GetSubobjectVisibility(int subobjectIndex)
         {
-            return !_visibilityState.TryGetValue((subobjectIndex, meshSetIndex), out var visible) || visible;
+            return _visibility.GetSubobjectVisible(_xnoIndex, subobjectIndex);
         }
 
-        private void SetVisibility(int subobjectIndex, int? meshSetIndex, bool visible)
+        private void SetSubobjectVisibility(int subobjectIndex, bool visible)
         {
-            _visibilityState[(subobjectIndex, meshSetIndex)] = visible;
+            _visibility.SetSubobjectVisible(_xnoIndex, subobjectIndex, visible);
+        }
+
+        private bool GetMeshSetVisibility(int subobjectIndex, int meshSetIndex)
+        {
+            return _visibility.GetMeshSetVisible(_xnoIndex, subobjectIndex, meshSetIndex);
+        }
+
+        private void SetMeshSetVisibility(int subobjectIndex, int meshSetIndex, bool visible)
+        {
+            _visibility.SetMeshSetVisible(_xnoIndex, subobjectIndex, meshSetIndex, visible);
         }
 
         public void Render(TextureManager textureManager)
@@ -86,11 +97,10 @@ namespace XNOEdit.Panels
                 {
                     ImGui.PushID(i);
 
-                    var visible = GetVisibility(i);
+                    var visible = GetSubobjectVisibility(i);
                     if (ImGui.Checkbox($"##VisibilitySubobject{i + 1}", ref visible))
                     {
-                        SetVisibility(i, null, visible);
-                        ToggleSubobjectVisibility?.Invoke(i, visible);
+                        SetSubobjectVisibility(i, visible);
                     }
 
                     ImGui.SameLine();
@@ -109,11 +119,10 @@ namespace XNOEdit.Panels
                         {
                             ImGui.PushID(j);
 
-                            var visibleMeshSet = GetVisibility(i, j);
+                            var visibleMeshSet = GetMeshSetVisibility(i, j);
                             if (ImGui.Checkbox($"##VisibilityMeshSet{j + 1}", ref visibleMeshSet))
                             {
-                                SetVisibility(i, j, visibleMeshSet);
-                                ToggleMeshSetVisibility?.Invoke(i, j, visibleMeshSet);
+                                SetMeshSetVisibility(i, j, visibleMeshSet);
                             }
 
                             ImGui.SameLine();

@@ -111,30 +111,6 @@ namespace XNOEdit
             }
         }
 
-        private static void ToggleSubobjectVisibility(int objectIndex, bool visibility)
-        {
-            if (_scene is ObjectScene objectScene)
-            {
-                objectScene.SetVisible(objectIndex, null, visibility);
-            }
-        }
-
-        private static void ToggleMeshSetVisibility(int objectIndex, int meshIndex, bool visibility)
-        {
-            if (_scene is ObjectScene objectScene)
-            {
-                objectScene.SetVisible(objectIndex, meshIndex, visibility);
-            }
-        }
-
-        private static void ToggleXnoVisibility(int xnoIndex, bool visibility)
-        {
-            if (_scene is StageScene stageScene)
-            {
-                stageScene.SetVisible(xnoIndex, visibility);
-            }
-        }
-
         private static void InitializeWgpu()
         {
             _wgpu = WebGPU.GetApi();
@@ -281,7 +257,15 @@ namespace XNOEdit
         {
             if (result.ObjectChunk != null && result.Renderer != null)
             {
-                UIManager.InitXnoPanel(result.Xno, ToggleSubobjectVisibility, ToggleMeshSetVisibility);
+                var visibility = UIManager.InitXnoPanel(result.Xno);
+
+                visibility.VisibilityChanged += (objectIndex, meshIndex, visible) =>
+                {
+                    if (_scene is ObjectScene objectScene)
+                    {
+                        objectScene.SetVisible(objectIndex, meshIndex, visible);
+                    }
+                };
 
                 _window.Title = $"XNOEdit - {result.Xno.Name}";
 
@@ -338,9 +322,24 @@ namespace XNOEdit
 
             var renderers = result.Entries.Select(e => e.Renderer).ToArray();
             var xnos = result.Entries.Select(e => e.Xno).ToList();
-            var visibility = result.Entries.Select(e => e.Renderer.Visible).ToArray();
 
-            UIManager.InitStagePanel(result.Name, xnos, visibility, ToggleXnoVisibility);
+            var visibility = UIManager.InitStagePanel(result.Name, xnos);
+
+            visibility.XnoVisibilityChanged += (xnoIndex, visible) =>
+            {
+                if (_scene is StageScene stageScene)
+                {
+                    stageScene.SetVisible(xnoIndex, visible);
+                }
+            };
+
+            visibility.ObjectVisibilityChanged += (xnoIndex, objectIndex, meshIndex, visible) =>
+            {
+                if (_scene is StageScene stageScene)
+                {
+                    stageScene.SetObjectVisible(xnoIndex, objectIndex, meshIndex, visible);
+                }
+            };
 
             _scene?.Dispose();
             _scene = new StageScene(renderers);

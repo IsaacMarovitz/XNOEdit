@@ -104,7 +104,7 @@ namespace XNOEdit.Managers
 
         private void OnMouseWheel(IMouse mouse, ScrollWheel scrollWheel)
         {
-            if (!_uiManager.ViewportWantsInput)
+            if (_uiManager.ViewportWantsInput)
                 MouseScrollAction?.Invoke(scrollWheel.Y);
         }
 
