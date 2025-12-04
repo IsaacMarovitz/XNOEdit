@@ -437,7 +437,9 @@ namespace XNOEdit
 
             var uiPass = _wgpu.CommandEncoderBeginRenderPass(encoder, &uiRenderPassDesc);
 
-            UIManager.OnRender(deltaTime, ref _settings, uiPass, _textureManager);
+            UIManager.OnRender(
+                view, projection,
+                deltaTime, ref _settings, uiPass, _textureManager);
 
             _wgpu.RenderPassEncoderEnd(uiPass);
 

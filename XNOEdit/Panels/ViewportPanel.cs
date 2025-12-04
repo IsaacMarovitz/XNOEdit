@@ -1,5 +1,6 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
+using Hexa.NET.ImGuizmo;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Wgpu;
@@ -159,7 +160,7 @@ namespace XNOEdit.Panels
             return _wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
         }
 
-        public void Render()
+        public void Render(Matrix4x4 view, Matrix4x4 projection, bool renderGuizmos)
         {
             var windowFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoDecoration;
 
@@ -167,14 +168,32 @@ namespace XNOEdit.Panels
 
             if (ImGui.Begin("Viewport", windowFlags))
             {
+                var contentSize = ImGui.GetContentRegionAvail();
+                var windowPos = ImGui.GetWindowPos();
+
+                if (renderGuizmos)
+                {
+                    ImGuizmo.SetDrawlist();
+                    ImGuizmo.SetRect(windowPos.X, windowPos.Y, contentSize.X, contentSize.Y);
+                    ImGuizmo.SetImGuiContext(ImGui.GetCurrentContext());
+                }
+
                 IsHovered = ImGui.IsWindowHovered();
 
                 // Get available content region size and store for next frame's resize
-                var contentSize = ImGui.GetContentRegionAvail();
                 _pendingWidth = (uint)Math.Max(contentSize.X, 1);
                 _pendingHeight = (uint)Math.Max(contentSize.Y, 1);
 
                 ImGui.Image(new ImTextureRef(null, _colorTextureView), ViewportSize);
+
+                if (renderGuizmos)
+                {
+                    const int size = 100;
+                    var leftMost = windowPos.X + contentSize.X - size;
+                    var position = new Vector2(leftMost, windowPos.Y);
+
+                    ImGuizmo.ViewManipulate(ref view, 0, position, new Vector2(size, size), 0);
+                }
             }
 
             ImGui.End();

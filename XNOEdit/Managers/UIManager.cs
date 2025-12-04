@@ -32,6 +32,7 @@ namespace XNOEdit.Managers
         private bool _stageWindow = true;
         private bool _environmentWindow = true;
         private bool _fileBrowser = true;
+        private bool _guizmos = true;
         private float _sunAzimuth;
         private float _sunAltitude;
 
@@ -85,7 +86,9 @@ namespace XNOEdit.Managers
             return visibility;
         }
 
-        public unsafe void OnRender(double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, TextureManager textureManager)
+        public unsafe void OnRender(
+            Matrix4x4 view, Matrix4x4 projection,
+            double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, TextureManager textureManager)
         {
             Controller?.Update((float)deltaTime);
 
@@ -127,6 +130,7 @@ namespace XNOEdit.Managers
                 {
                     ImGui.PushItemFlag(ImGuiItemFlags.AutoClosePopups, false);
 
+                    ImGui.MenuItem("Guizmos", "", ref _guizmos);
                     ImGui.MenuItem("Show Grid", "G", ref settings.ShowGrid);
                     ImGui.MenuItem("Vertex Colors", "V", ref settings.VertexColors);
                     ImGui.MenuItem("Backface Culling", "C", ref settings.BackfaceCulling);
@@ -220,7 +224,7 @@ namespace XNOEdit.Managers
                 StagesPanel?.Render();
             }
 
-            ViewportPanel?.Render();
+            ViewportPanel?.Render(view, projection, _guizmos);
 
             RenderLoadingOverlay();
             _alertPanel?.Render(deltaTime);
