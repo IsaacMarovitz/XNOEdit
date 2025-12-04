@@ -29,7 +29,9 @@ namespace XNOEdit.Managers
 
         private bool _firstLoop = true;
         private bool _xnoWindow = true;
+        private bool _stageWindow = true;
         private bool _environmentWindow = true;
+        private bool _fileBrowser = true;
         private float _sunAzimuth;
         private float _sunAltitude;
 
@@ -146,8 +148,21 @@ namespace XNOEdit.Managers
                 {
                     ImGui.PushItemFlag(ImGuiItemFlags.AutoClosePopups, false);
 
+                    if (ImGui.MenuItem("Reset Layout"))
+                    {
+                        _xnoWindow = true;
+                        _stageWindow = true;
+                        _environmentWindow = true;
+                        _fileBrowser = true;
+                        _firstLoop = true;
+                    }
+
+                    ImGui.Separator();
+
                     ImGui.MenuItem("XNO", "", ref _xnoWindow);
+                    ImGui.MenuItem("Stage", "", ref _stageWindow);
                     ImGui.MenuItem("Environment", "", ref _environmentWindow);
+                    ImGui.MenuItem("File Browser", "", ref _fileBrowser);
 
                     ImGui.Separator();
 
@@ -196,9 +211,14 @@ namespace XNOEdit.Managers
             if (_xnoWindow)
                 XnoPanel?.Render(textureManager);
 
-            StagePanel?.Render();
-            ObjectsPanel?.Render();
-            StagesPanel?.Render();
+            if (_stageWindow)
+                StagePanel?.Render();
+
+            if (_fileBrowser)
+            {
+                ObjectsPanel?.Render();
+                StagesPanel?.Render();
+            }
 
             ViewportPanel?.Render();
 
