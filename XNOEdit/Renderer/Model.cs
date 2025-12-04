@@ -356,8 +356,8 @@ namespace XNOEdit.Renderer
             Subobject = subobject;
             MeshSet = meshSet;
 
-            var stripIndices = primitiveList.IndexIndices.Select(x => (int)x).ToList();
-            _geometry = MeshGeometry.CreateFromTriangleStrip(wgpu, device, sharedVbo, stripIndices, generateWireframe: true);
+            _geometry = MeshGeometry.CreateFromTriangleStrip(
+                wgpu, device, sharedVbo, primitiveList.StripIndices, primitiveList.IndexIndices);
 
             CreateMeshUniforms(wgpu, device, material, shader);
         }

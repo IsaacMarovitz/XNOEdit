@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Wgpu;
 
@@ -25,26 +24,6 @@ namespace XNOEdit.Renderer
             _wgpu = wgpu;
         }
 
-        /// <summary>
-        /// Creates owned vertex and index buffers from vertex/index arrays
-        /// </summary>
-        public static MeshGeometry Create<TVertex>(
-            WebGPU wgpu,
-            Device* device,
-            TVertex[] vertices,
-            ushort[] indices,
-            bool generateWireframe = false) where TVertex : unmanaged
-        {
-            var geometry = new MeshGeometry(wgpu);
-
-            // Convert vertices to float array
-            var floatData = MemoryMarshal.Cast<TVertex, float>(vertices).ToArray();
-            geometry._ownedVertexBuffer = new WgpuBuffer<float>(wgpu, device, floatData, BufferUsage.Vertex);
-
-            geometry.SetIndices(device, indices, generateWireframe);
-
-            return geometry;
-        }
 
         /// <summary>
         /// Creates geometry using a shared vertex buffer with owned index buffer
@@ -53,12 +32,11 @@ namespace XNOEdit.Renderer
             WebGPU wgpu,
             Device* device,
             WgpuBuffer<float> sharedVertexBuffer,
-            ushort[] indices,
-            bool generateWireframe = false)
+            ushort[] indices)
         {
             var geometry = new MeshGeometry(wgpu);
             geometry._sharedVertexBuffer = sharedVertexBuffer;
-            geometry.SetIndices(device, indices, generateWireframe);
+            geometry.SetIndices(device, indices);
             return geometry;
         }
 
@@ -69,63 +47,67 @@ namespace XNOEdit.Renderer
             WebGPU wgpu,
             Device* device,
             WgpuBuffer<float> sharedVertexBuffer,
-            IReadOnlyList<int> stripIndices,
-            bool generateWireframe = true)
+            List<ushort> stripLengths,
+            List<ushort> indices)
         {
-            var triangleIndices = ConvertStripToTriangles(stripIndices);
-            return CreateWithSharedVertices(wgpu, device, sharedVertexBuffer, triangleIndices, generateWireframe);
+            var triangleIndices = ConvertStripsToTriangles(stripLengths, indices);
+            return CreateWithSharedVertices(wgpu, device, sharedVertexBuffer, triangleIndices);
         }
 
-        private void SetIndices(Device* device, ushort[] indices, bool generateWireframe)
+        private void SetIndices(Device* device, ushort[] indices)
         {
             IndexCount = (uint)indices.Length;
             _indexBuffer = new WgpuBuffer<ushort>(_wgpu, device, indices, BufferUsage.Index);
 
-            if (generateWireframe)
-            {
-                var wireframeIndices = GenerateWireframeIndices(indices);
-                WireframeIndexCount = (uint)wireframeIndices.Length;
-                _wireframeIndexBuffer = new WgpuBuffer<ushort>(_wgpu, device, wireframeIndices, BufferUsage.Index);
-            }
+            var wireframeIndices = GenerateWireframeIndices(indices);
+            WireframeIndexCount = (uint)wireframeIndices.Length;
+            _wireframeIndexBuffer = new WgpuBuffer<ushort>(_wgpu, device, wireframeIndices, BufferUsage.Index);
         }
 
         /// <summary>
         /// Converts triangle strip indices to triangle list, handling degenerate triangles
         /// </summary>
-        public static ushort[] ConvertStripToTriangles(IReadOnlyList<int> stripIndices)
+        public static ushort[] ConvertStripsToTriangles(List<ushort> stripLengths, List<ushort> indices)
         {
-            var triangles = new List<int>();
+            var triangles = new List<ushort>();
+            var offset = 0;
 
-            for (var i = 0; i + 2 < stripIndices.Count; i++)
+            foreach (int stripLength in stripLengths)
             {
-                int a = stripIndices[i], b = stripIndices[i + 1], c = stripIndices[i + 2];
+                var count = stripLength - 2;
 
-                // Skip degenerate triangles
-                if (a == b || b == c || c == a)
-                    continue;
+                for (var i = 0; i < count / 2; i++)
+                {
+                    var idx = offset + (i * 2);
 
-                // Handle alternating winding order in strips
-                if (i % 2 == 0)
-                {
-                    triangles.Add(a);
-                    triangles.Add(b);
-                    triangles.Add(c);
+                    // First triangle
+                    triangles.Add(indices[idx]);
+                    triangles.Add(indices[idx + 1]);
+                    triangles.Add(indices[idx + 2]);
+
+                    // Second triangle
+                    triangles.Add(indices[idx + 2]);
+                    triangles.Add(indices[idx + 1]);
+                    triangles.Add(indices[idx + 3]);
                 }
-                else
+
+                // Handle odd remaining triangle
+                if (count % 2 != 0)
                 {
-                    triangles.Add(c);
-                    triangles.Add(b);
-                    triangles.Add(a);
+                    triangles.Add(indices[offset + stripLength - 3]);
+                    triangles.Add(indices[offset + stripLength - 2]);
+                    triangles.Add(indices[offset + stripLength - 1]);
                 }
+
+                offset += stripLength;
             }
 
-            // Fix winding order
-            for (var i = 0; i < triangles.Count; i += 3)
-            {
-                (triangles[i + 1], triangles[i + 2]) = (triangles[i + 2], triangles[i + 1]);
-            }
-
-            return triangles.Select(x => (ushort)x).ToArray();
+            // Filter degenerates
+            return triangles
+                .Chunk(3)
+                .Where(t => t[0] != t[1] && t[0] != t[2] && t[1] != t[2])
+                .SelectMany(t => t)
+                .ToArray();
         }
 
         /// <summary>
@@ -202,15 +184,6 @@ namespace XNOEdit.Renderer
                     _indexBuffer.Size);
                 _wgpu.RenderPassEncoderDrawIndexed(passEncoder, IndexCount, 1, 0, 0, 0);
             }
-        }
-
-        /// <summary>
-        /// Binds and draws in one call
-        /// </summary>
-        public void BindAndDraw(RenderPassEncoder* passEncoder, bool wireframe = false, uint vertexSlot = 0)
-        {
-            BindVertexBuffer(passEncoder, vertexSlot);
-            Draw(passEncoder, wireframe);
         }
 
         public void Dispose()
