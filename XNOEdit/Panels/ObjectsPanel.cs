@@ -126,6 +126,11 @@ namespace XNOEdit.Panels
 
             if (ImGui.BeginTabBar("Tab Bar", ImGuiTabBarFlags.AutoSelectNewTabs))
             {
+                const float searchWidth = 200.0f;
+                ImGui.SameLine(ImGui.GetWindowWidth() - searchWidth - ImGui.GetStyle().WindowPadding.X);
+                ImGui.SetNextItemWidth(searchWidth);
+                ImGui.InputTextWithHint("##search", "Search...", ref _searchText, 256);
+
                 var objectFiles = _objectFiles.Select(x => new ImGuiComponents.File(x.Name, x.Name));
                 ImGuiComponents.RenderFilesList("Objects", objectFiles, x =>
                 {
@@ -155,17 +160,6 @@ namespace XNOEdit.Panels
                 {
                     TriggerFileLoad(x, _setFiles);
                 }, _searchText);
-
-                // Add search bar on the right side of the tab bar
-                ImGui.SameLine();
-                var searchWidth = 200.0f;
-                var availableSpace = ImGui.GetContentRegionAvail().X;
-                if (availableSpace > searchWidth + 10)
-                {
-                    ImGui.SetCursorPosX(ImGui.GetCursorPosX() + availableSpace - searchWidth);
-                    ImGui.SetNextItemWidth(searchWidth);
-                    ImGui.InputTextWithHint("##search", "Search...", ref _searchText, 256);
-                }
 
                 ImGui.EndTabBar();
             }
