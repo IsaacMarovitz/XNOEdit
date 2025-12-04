@@ -170,7 +170,9 @@ namespace XNOEdit.Managers
             if (_environmentWindow)
             {
                 ImGui.Begin("Environment");
-                ImGui.SliderFloat("Camera Sensitivity", ref settings.CameraSensitivity, 0.0f, 1.0f);
+                ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
+                ImGui.Text("Camera Sensitivity");
+                ImGui.SliderFloat("##CameraSensitivity", ref settings.CameraSensitivity, 0.0f, 1.0f);
                 ImGui.SeparatorText("Sun");
                 ImGui.ColorEdit3("Color", ref settings.SunColor, ImGuiColorEditFlags.NoInputs);
 

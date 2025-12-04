@@ -42,6 +42,7 @@ namespace XNOEdit.Panels
         public void Render()
         {
             ImGui.Begin($"{_name}###StagePanel", ImGuiWindowFlags.AlwaysAutoResize);
+            ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
 
             ImGui.Text($"XNO Count: {_xnos.Count}");
             ImGui.Text($"Subobject Count: {_subobjectCount}");

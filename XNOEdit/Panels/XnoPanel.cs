@@ -44,6 +44,7 @@ namespace XNOEdit.Panels
         public void Render(TextureManager textureManager)
         {
             ImGui.Begin($"{_xno.Name}###XnoPanel", ImGuiWindowFlags.AlwaysAutoResize);
+            ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
 
             if (ImGui.BeginTabBar("Tab Bar", ImGuiTabBarFlags.AutoSelectNewTabs))
             {
@@ -213,7 +214,6 @@ namespace XNOEdit.Panels
 
             var alpha = material.Logic.Alpha;
             ImGui.Checkbox("Alpha", ref alpha);
-            ImGui.SameLine();
 
             var zCompare = material.Logic.ZCompare;
             ImGui.Checkbox("Z Compare", ref zCompare);
@@ -242,8 +242,16 @@ namespace XNOEdit.Panels
                     {
                         ImGui.Text($"Bank: {texture.Bank}");
                         ImGui.Text($"Global Index: {texture.GlobalIndex}");
-                        ImGui.Text($"Min Filter: {texture.MinFilter}");
-                        ImGui.Text($"Mag Filter: {texture.MagFilter}");
+
+                        var minFilter = PropertyUtility.MinFilterToString(texture.MinFilter);
+                        ImGui.Text($"Min Filter: {minFilter.Item1}");
+                        ImGui.Text($"Mag Filter: {PropertyUtility.MagFilterToString(texture.MagFilter)}");
+
+                        if (minFilter.Item2 != null)
+                        {
+                            ImGui.Text($"Mipmap Filter: {minFilter.Item2}");
+                        }
+
                         ImGui.Text($"Type: {texture.Type}");
 
                         var textureId = textureManager.GetImGuiId(texture.Name);

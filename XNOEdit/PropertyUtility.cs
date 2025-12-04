@@ -1,6 +1,8 @@
 using System.Numerics;
 using Marathon.Formats.Ninja.Flags;
 using Marathon.IO.Types;
+using BlendOperation = Marathon.Formats.Ninja.Flags.BlendOperation;
+using CompareFunction = Marathon.Formats.Ninja.Flags.CompareFunction;
 
 namespace XNOEdit
 {
@@ -18,7 +20,41 @@ namespace XNOEdit
                 BlendMode.NNE_BLENDMODE_NONE => "None",
                 BlendMode.NNE_BLENDMODE_ADDITIVE => "Additive",
                 BlendMode.NNE_BLENDMODE_SRCALPHA => "Source Alpha",
-                BlendMode.NNE_BLENDMODE_INVSRCALPHA => "Inverse Source Alpha",
+                BlendMode.NNE_BLENDMODE_INVSRCALPHA => "Inv. Source Alpha",
+                _ => "Unknown"
+            };
+        }
+
+        public static (string, string?) MinFilterToString(MinFilter minFilter)
+        {
+            return minFilter switch
+            {
+                MinFilter.NND_MIN_NEAREST => ("Nearest", null),
+                MinFilter.NND_MIN_LINEAR => ("Linear", null),
+                MinFilter.NND_MIN_NEAREST_MIPMAP_NEAREST => ("Nearest", "Nearest"),
+                MinFilter.NND_MIN_NEAREST_MIPMAP_LINEAR => ("Nearest", "Linear"),
+                MinFilter.NND_MIN_LINEAR_MIPMAP_NEAREST => ("Linear", "Nearest"),
+                MinFilter.NND_MIN_LINEAR_MIPMAP_LINEAR => ("Linear", "Linear"),
+                MinFilter.NND_MIN_ANISOTROPIC => ("Anisotropic", null),
+                MinFilter.NND_MIN_ANISOTROPIC_MIPMAP_NEAREST => ("Anisotropic", "Nearest"),
+                MinFilter.NND_MIN_ANISOTROPIC_MIPMAP_LINEAR => ("Anisotropic", "Linear"),
+                MinFilter.NND_MIN_ANISOTROPIC4 => ("Anisotropic 4x", null),
+                MinFilter.NND_MIN_ANISOTROPIC4_MIPMAP_NEAREST => ("Anisotropic 4x", "Nearest"),
+                MinFilter.NND_MIN_ANISOTROPIC4_MIPMAP_LINEAR => ("Anisotropic 4x", "Linear"),
+                MinFilter.NND_MIN_ANISOTROPIC8 => ("Anisotropic 8x", null),
+                MinFilter.NND_MIN_ANISOTROPIC8_MIPMAP_NEAREST => ("Anisotropic 8x", "Nearest"),
+                MinFilter.NND_MIN_ANISOTROPIC8_MIPMAP_LINEAR => ("Anisotropic 8x", "Linear"),
+                _ => ("Unknown", null)
+            };
+        }
+
+        public static string MagFilterToString(MagFilter minFilter)
+        {
+            return minFilter switch
+            {
+                MagFilter.NND_MAG_NEAREST => "Nearest",
+                MagFilter.NND_MAG_LINEAR => "Linear",
+                MagFilter.NND_MAG_ANISOTROPIC => "Anisotropic",
                 _ => "Unknown"
             };
         }
