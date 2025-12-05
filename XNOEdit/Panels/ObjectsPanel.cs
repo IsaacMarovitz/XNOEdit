@@ -10,11 +10,11 @@ namespace XNOEdit.Panels
         public event Action<IFile> LoadObject;
         public ObjectPhysicsParameterList ObjectParameters { get; private set; }
 
-        private List<IFile> _enemyFiles = [];
-        private List<IFile> _humanFiles = [];
-        private List<IFile> _objectFiles = [];
-        private List<IFile> _win32Files = [];
-        private List<IFile> _setFiles = [];
+        private readonly List<IFile> _enemyFiles = [];
+        private readonly List<IFile> _humanFiles = [];
+        private readonly List<IFile> _objectFiles = [];
+        private readonly List<IFile> _win32Files = [];
+        private readonly List<IFile> _setFiles = [];
 
         private string _searchText = "";
 
@@ -25,11 +25,11 @@ namespace XNOEdit.Panels
 
         public void LoadGameFolderResources()
         {
-            _enemyFiles = [];
-            _humanFiles = [];
-            _objectFiles = [];
-            _win32Files = [];
-            _setFiles = [];
+            _enemyFiles.Clear();
+            _humanFiles.Clear();
+            _objectFiles.Clear();
+            _win32Files.Clear();
+            _setFiles.Clear();
 
             var enemyArcPath = Path.Join([
                 Configuration.GameFolder,
