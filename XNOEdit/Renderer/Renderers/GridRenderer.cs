@@ -88,7 +88,7 @@ namespace XNOEdit.Renderer.Renderers
 
         public override void Dispose()
         {
-            _vertexBuffer?.Dispose();
+            _vertexBuffer.Dispose();
 
             base.Dispose();
         }

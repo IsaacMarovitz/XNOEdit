@@ -10,14 +10,12 @@ namespace XNOEdit.Renderer
     {
         private readonly WebGPU _wgpu;
 
-        private WgpuBuffer<float>? _ownedVertexBuffer;
         private WgpuBuffer<float>? _sharedVertexBuffer;
         private WgpuBuffer<ushort>? _indexBuffer;
         private WgpuBuffer<ushort>? _wireframeIndexBuffer;
 
         public uint IndexCount { get; private set; }
         public uint WireframeIndexCount { get; private set; }
-        public bool OwnsVertexBuffer => _ownedVertexBuffer != null;
 
         public MeshGeometry(WebGPU wgpu)
         {
@@ -147,12 +145,12 @@ namespace XNOEdit.Renderer
         /// <summary>
         /// Binds vertex buffer to the render pass
         /// </summary>
-        public void BindVertexBuffer(RenderPassEncoder* passEncoder, uint slot = 0)
+        public void BindVertexBuffer(RenderPassEncoder* passEncoder, uint slot)
         {
-            var buffer = _ownedVertexBuffer ?? _sharedVertexBuffer;
-            if (buffer == null) return;
+            if (_sharedVertexBuffer == null) return;
 
-            _wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, slot, buffer.Handle, 0, buffer.Size);
+            _wgpu.RenderPassEncoderSetVertexBuffer(
+                passEncoder, slot, _sharedVertexBuffer.Handle, 0, _sharedVertexBuffer.Size);
         }
 
         /// <summary>
@@ -188,7 +186,6 @@ namespace XNOEdit.Renderer
 
         public void Dispose()
         {
-            _ownedVertexBuffer?.Dispose();
             _indexBuffer?.Dispose();
             _wireframeIndexBuffer?.Dispose();
             // Don't dispose shared vertex buffer - it's owned elsewhere

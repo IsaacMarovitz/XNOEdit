@@ -83,7 +83,7 @@ namespace XNOEdit.Renderer.Renderers
 
         public override void Dispose()
         {
-            _model?.Dispose();
+            _model.Dispose();
 
             base.Dispose();
         }

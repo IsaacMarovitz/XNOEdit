@@ -35,7 +35,7 @@ namespace XNOEdit.Renderer.Shaders
 
     public unsafe class ModelShader : WgpuShader
     {
-        private WgpuBuffer<PerFrameUniforms> _perFrameUniformBuffer;
+        private WgpuBuffer<PerFrameUniforms>? _perFrameUniformBuffer;
         private BindGroup* _perFrameBindGroup;
 
         private Sampler* _sampler;
@@ -375,7 +375,7 @@ namespace XNOEdit.Renderer.Shaders
 
         public void UpdatePerFrameUniforms(Queue* queue, in PerFrameUniforms uniforms)
         {
-            _perFrameUniformBuffer.UpdateData(queue, in uniforms);
+            _perFrameUniformBuffer?.UpdateData(queue, in uniforms);
         }
 
         public BindGroup* GetTextureBindGroup(
@@ -393,7 +393,7 @@ namespace XNOEdit.Renderer.Shaders
             if (wireframe)
                 return GetPipeline("wireframe");
 
-            return cullBackfaces ? GetPipeline("culled") : GetPipeline("default");
+            return cullBackfaces ? GetPipeline("culled") : GetPipeline();
         }
 
         public override void Dispose()

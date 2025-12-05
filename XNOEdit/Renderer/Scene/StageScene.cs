@@ -15,12 +15,12 @@ namespace XNOEdit.Renderer.Scene
 
         public void SetVisible(int xnoIndex, bool visibility)
         {
-            _renderers[xnoIndex]?.Visible = visibility;
+            _renderers[xnoIndex].Visible = visibility;
         }
 
         public void SetObjectVisible(int xnoIndex, int objectIndex, int? meshIndex, bool visibility)
         {
-            _renderers[xnoIndex]?.SetVisible(objectIndex, meshIndex, visibility);
+            _renderers[xnoIndex].SetVisible(objectIndex, meshIndex, visibility);
         }
 
         public unsafe void Render(Queue* queue,
@@ -31,7 +31,7 @@ namespace XNOEdit.Renderer.Scene
         {
             foreach (var renderer in _renderers)
             {
-                renderer?.Draw(queue, passEncoder, view, projection, modelParameters);
+                renderer.Draw(queue, passEncoder, view, projection, modelParameters);
             }
         }
 
@@ -39,7 +39,7 @@ namespace XNOEdit.Renderer.Scene
         {
             foreach (var renderer in _renderers)
             {
-                renderer?.Dispose();
+                renderer.Dispose();
             }
         }
     }

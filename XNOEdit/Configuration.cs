@@ -6,7 +6,7 @@ namespace XNOEdit
 {
     public class ConfigurationData
     {
-        public string GameFolder { get; set; }
+        public string? GameFolder { get; set; }
         public bool DebugLogs { get; set; }
     }
 
@@ -21,7 +21,7 @@ namespace XNOEdit
         private static readonly Lazy<Configuration> Lazy = new(() => new Configuration());
         private static Configuration Instance => Lazy.Value;
 
-        public static string GameFolder
+        public static string? GameFolder
         {
             get => Instance._data.GameFolder;
             set

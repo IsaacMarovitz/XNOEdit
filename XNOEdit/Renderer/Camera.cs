@@ -15,7 +15,7 @@ namespace XNOEdit.Renderer
         private const float LookSensitivity = 2f;
 
         private float _yaw = -90f;
-        private float _pitch = 0f;
+        private float _pitch;
         private Vector3 _front = new(0.0f, 0.0f, -1.0f);
         private Vector3 _frontHorizontal = new(0.0f, 0.0f, -1.0f);
         private Vector3 _right = Vector3.UnitX;

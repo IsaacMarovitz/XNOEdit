@@ -12,10 +12,10 @@ namespace XNOEdit.Renderer
 {
     public struct TextureSet
     {
-        public string MainTexture;
-        public string BlendMap;
-        public string NormalMap;
-        public string LightMap;
+        public string? MainTexture;
+        public string? BlendMap;
+        public string? NormalMap;
+        public string? LightMap;
         public bool Specular;
     }
 

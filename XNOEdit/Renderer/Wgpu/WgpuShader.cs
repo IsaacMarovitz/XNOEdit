@@ -114,10 +114,10 @@ namespace XNOEdit.Renderer.Wgpu
             WebGPU wgpu,
             Device* device,
             string source,
-            string label = null)
+            string label)
         {
             var src = SilkMarshal.StringToPtr(source);
-            var shaderName = label != null ? SilkMarshal.StringToPtr(label) : (nint)null;
+            var shaderName = SilkMarshal.StringToPtr(label);
 
             try
             {
@@ -143,7 +143,7 @@ namespace XNOEdit.Renderer.Wgpu
             }
         }
 
-        protected void RegisterResource(IDisposable resource)
+        protected void RegisterResource(IDisposable? resource)
         {
             if (resource != null)
                 _resources.Add(resource);
@@ -155,7 +155,7 @@ namespace XNOEdit.Renderer.Wgpu
 
             foreach (var resource in _resources)
             {
-                try { resource?.Dispose(); }
+                try { resource.Dispose(); }
                 catch { /* Swallow */ }
             }
 
@@ -171,13 +171,13 @@ namespace XNOEdit.Renderer.Wgpu
             // Release all bind groups and layouts
             foreach (BindGroup* bindGroup in _bindGroups)
             {
-                if (bindGroup != null)
+                if ((IntPtr)bindGroup != IntPtr.Zero)
                     Wgpu.BindGroupRelease(bindGroup);
             }
 
             foreach (BindGroupLayout* layout in _bindGroupLayouts)
             {
-                if (layout != null)
+                if ((IntPtr)layout != IntPtr.Zero)
                     Wgpu.BindGroupLayoutRelease(layout);
             }
 
@@ -190,7 +190,7 @@ namespace XNOEdit.Renderer.Wgpu
 
     public unsafe class WgpuShader<TUniforms> : WgpuShader where TUniforms : unmanaged
     {
-        protected WgpuBuffer<TUniforms> _uniformBuffer;
+        private WgpuBuffer<TUniforms> _uniformBuffer;
 
         protected WgpuShader(
             WebGPU wgpu,

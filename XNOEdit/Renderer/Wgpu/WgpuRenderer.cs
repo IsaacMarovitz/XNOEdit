@@ -41,7 +41,7 @@ namespace XNOEdit.Renderer.Wgpu
 
         public virtual void Dispose()
         {
-            Shader?.Dispose();
+            Shader.Dispose();
         }
     }
 }

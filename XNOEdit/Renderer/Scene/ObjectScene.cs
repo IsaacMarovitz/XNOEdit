@@ -15,7 +15,7 @@ namespace XNOEdit.Renderer.Scene
 
         public void SetVisible(int objectIndex, int? meshIndex, bool visibility)
         {
-            _renderer?.SetVisible(objectIndex, meshIndex, visibility);
+            _renderer.SetVisible(objectIndex, meshIndex, visibility);
         }
 
         public unsafe void Render(Queue* queue,
@@ -24,12 +24,12 @@ namespace XNOEdit.Renderer.Scene
             Matrix4x4 projection,
             ModelParameters modelParameters)
         {
-            _renderer?.Draw(queue, passEncoder, view, projection, modelParameters);
+            _renderer.Draw(queue, passEncoder, view, projection, modelParameters);
         }
 
         public void Dispose()
         {
-            _renderer?.Dispose();
+            _renderer.Dispose();
         }
     }
 }

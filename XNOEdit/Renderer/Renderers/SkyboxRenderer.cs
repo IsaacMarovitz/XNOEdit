@@ -52,14 +52,14 @@ namespace XNOEdit.Renderer.Renderers
             };
 
             ((SkyboxShader)Shader).UpdateUniforms(queue, in uniforms);
-            Wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline());
+            Wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline("default"));
             Wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
             Wgpu.RenderPassEncoderDraw(passEncoder, 4, 1, 0, 0);
         }
 
         public override void Dispose()
         {
-            _vertexBuffer?.Dispose();
+            _vertexBuffer.Dispose();
 
             base.Dispose();
         }

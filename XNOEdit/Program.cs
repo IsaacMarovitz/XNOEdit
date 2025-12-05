@@ -18,6 +18,8 @@ namespace XNOEdit
 {
     internal static unsafe class Program
     {
+        public static event Action? GameFolderLoaded;
+
         private static IWindow _window;
         private static WebGPU _wgpu;
         private static WgpuDevice _device;
@@ -54,6 +56,8 @@ namespace XNOEdit
                 Title = "XNOEdit",
                 API = GraphicsAPI.None
             };
+
+            GameFolderLoaded += LoadGameFolderResources;
 
             _window = Window.Create(options);
 
@@ -520,7 +524,7 @@ namespace XNOEdit
                     {
                         // We can reasonably assume this is the right folder
                         Configuration.GameFolder = file;
-                        LoadGameFolderResources();
+                        GameFolderLoaded?.Invoke();
                         return;
                     }
                 }

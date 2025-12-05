@@ -10,17 +10,17 @@ namespace XNOEdit.Panels
         public event Action<IFile> LoadObject;
         public ObjectPhysicsParameterList ObjectParameters { get; private set; }
 
-        private List<IFile> _enemyFiles;
-        private List<IFile> _humanFiles;
-        private List<IFile> _objectFiles;
-        private List<IFile> _win32Files;
-        private List<IFile> _setFiles;
+        private List<IFile> _enemyFiles = [];
+        private List<IFile> _humanFiles = [];
+        private List<IFile> _objectFiles = [];
+        private List<IFile> _win32Files = [];
+        private List<IFile> _setFiles = [];
 
         private string _searchText = "";
 
         public ObjectsPanel()
         {
-            LoadGameFolderResources();
+            Program.GameFolderLoaded += LoadGameFolderResources;
         }
 
         public void LoadGameFolderResources()

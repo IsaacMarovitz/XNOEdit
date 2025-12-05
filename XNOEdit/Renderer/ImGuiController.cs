@@ -113,7 +113,9 @@ namespace XNOEdit.Renderer
             ImGui.SetCurrentContext(context);
 
             ImGui.GetIO().DisplaySize = (Vector2)_view.Size;
-            ImGui.GetIO().DisplayFramebufferScale = new Vector2(_view.FramebufferSize.X / _view.Size.X, _view.FramebufferSize.Y / _view.Size.Y);
+            ImGui.GetIO().DisplayFramebufferScale = new Vector2(
+                (int)((float)_view.FramebufferSize.X / _view.Size.X),
+                (int)((float)_view.FramebufferSize.Y / _view.Size.Y));
 
             _view.Resize += (newSize) => ImGui.GetIO().DisplaySize = (Vector2)newSize;
 
@@ -580,7 +582,9 @@ namespace XNOEdit.Renderer
 
             if (windowSize.X > 0 && windowSize.Y > 0)
             {
-                io.DisplayFramebufferScale = new Vector2(_view.FramebufferSize.X / windowSize.X, _view.FramebufferSize.Y / windowSize.Y);
+                io.DisplayFramebufferScale = new Vector2(
+                    (int)((float)_view.FramebufferSize.X / windowSize.X),
+                    (int)((float)_view.FramebufferSize.Y / windowSize.Y));
             }
 
             io.DeltaTime = deltaSeconds;
@@ -622,19 +626,27 @@ namespace XNOEdit.Renderer
                 var indexSize = (ulong)Align(drawData.TotalIdxCount * sizeof(ushort), 4);
                 CreateOrUpdateBuffers(ref frameRenderBuffer, vertSize, indexSize);
 
-                var vtxDst = frameRenderBuffer.VertexBufferMemory.AsPtr<ImDrawVert>();
-                var idxDst = frameRenderBuffer.IndexBufferMemory.AsPtr<ushort>();
-                for (var n = 0; n < drawData.CmdListsCount; n++)
+                if (frameRenderBuffer is {
+                        VertexBufferMemory: not null,
+                        IndexBufferMemory: not null,
+                        VertexBufferGpu: not null,
+                        IndexBufferGpu: not null
+                    })
                 {
-                    var cmdList = drawData.CmdLists[n];
-                    Unsafe.CopyBlock(vtxDst, cmdList.VtxBuffer.Data, (uint)cmdList.VtxBuffer.Size * (uint)sizeof(ImDrawVert));
-                    Unsafe.CopyBlock(idxDst, cmdList.IdxBuffer.Data, (uint)cmdList.IdxBuffer.Size * sizeof(ushort));
-                    vtxDst += cmdList.VtxBuffer.Size;
-                    idxDst += cmdList.IdxBuffer.Size;
-                }
+                    var vtxDst = frameRenderBuffer.VertexBufferMemory.AsPtr<ImDrawVert>();
+                    var idxDst = frameRenderBuffer.IndexBufferMemory.AsPtr<ushort>();
+                    for (var n = 0; n < drawData.CmdListsCount; n++)
+                    {
+                        var cmdList = drawData.CmdLists[n];
+                        Unsafe.CopyBlock(vtxDst, cmdList.VtxBuffer.Data, (uint)cmdList.VtxBuffer.Size * (uint)sizeof(ImDrawVert));
+                        Unsafe.CopyBlock(idxDst, cmdList.IdxBuffer.Data, (uint)cmdList.IdxBuffer.Size * sizeof(ushort));
+                        vtxDst += cmdList.VtxBuffer.Size;
+                        idxDst += cmdList.IdxBuffer.Size;
+                    }
 
-                frameRenderBuffer.VertexBufferGpu.UpdateData(_queue, frameRenderBuffer.VertexBufferMemory);
-                frameRenderBuffer.IndexBufferGpu.UpdateData(_queue, frameRenderBuffer.IndexBufferMemory);
+                    frameRenderBuffer.VertexBufferGpu.UpdateData(_queue, frameRenderBuffer.VertexBufferMemory);
+                    frameRenderBuffer.IndexBufferGpu.UpdateData(_queue, frameRenderBuffer.IndexBufferMemory);
+                }
             }
 
             var io = ImGui.GetIO();
@@ -655,10 +667,16 @@ namespace XNOEdit.Renderer
 
             if (drawData.TotalVtxCount > 0)
             {
-                _wgpu.RenderPassEncoderSetVertexBuffer(encoder, 0, frameRenderBuffer.VertexBufferGpu.Handle, 0, frameRenderBuffer.VertexBufferGpu.Size);
-                _wgpu.RenderPassEncoderSetIndexBuffer(encoder, frameRenderBuffer.IndexBufferGpu.Handle, IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferGpu.Size);
-                uint dynamicOffsets = 0;
-                _wgpu.RenderPassEncoderSetBindGroup(encoder, 0, _commonBindGroup, 0, in dynamicOffsets);
+                if (frameRenderBuffer is {
+                        VertexBufferGpu: not null,
+                        IndexBufferGpu: not null
+                    })
+                {
+                    _wgpu.RenderPassEncoderSetVertexBuffer(encoder, 0, frameRenderBuffer.VertexBufferGpu.Handle, 0, frameRenderBuffer.VertexBufferGpu.Size);
+                    _wgpu.RenderPassEncoderSetIndexBuffer(encoder, frameRenderBuffer.IndexBufferGpu.Handle, IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferGpu.Size);
+                    uint dynamicOffsets = 0;
+                    _wgpu.RenderPassEncoderSetBindGroup(encoder, 0, _commonBindGroup, 0, in dynamicOffsets);
+                }
             }
 
             _wgpu.RenderPassEncoderSetViewport(encoder, 0, 0, drawData.FramebufferScale.X * drawData.DisplaySize.X, drawData.FramebufferScale.Y * drawData.DisplaySize.Y, 0, 1);
@@ -767,7 +785,7 @@ namespace XNOEdit.Renderer
 
             _wgpu.BindGroupRelease(_commonBindGroup);
 
-            _uniformsBuffer?.Dispose();
+            _uniformsBuffer.Dispose();
 
             _wgpu.RenderPipelineRelease(_renderPipeline);
 
@@ -798,17 +816,17 @@ namespace XNOEdit.Renderer
 
         private struct FrameRenderBuffer
         {
-            public WgpuBuffer<byte> VertexBufferGpu;
-            public WgpuBuffer<byte> IndexBufferGpu;
-            public GlobalMemory VertexBufferMemory;
-            public GlobalMemory IndexBufferMemory;
+            public WgpuBuffer<byte>? VertexBufferGpu;
+            public WgpuBuffer<byte>? IndexBufferGpu;
+            public GlobalMemory? VertexBufferMemory;
+            public GlobalMemory? IndexBufferMemory;
         };
 
         private struct WindowRenderBuffers
         {
             public uint Index;
             public uint Count;
-            public FrameRenderBuffer[] FrameRenderBuffers;
+            public FrameRenderBuffer[]? FrameRenderBuffers;
         };
     }
 }
