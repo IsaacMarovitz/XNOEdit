@@ -1,10 +1,11 @@
 ﻿using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
 using Marathon.IO.Types.FileSystem;
-using Silk.NET.Maths;
+using SDL3;
 using Silk.NET.WebGPU;
-using Silk.NET.Windowing;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.Panels;
@@ -20,7 +21,7 @@ namespace XNOEdit
     {
         public static event Action? GameFolderLoaded;
 
-        private static IWindow _window;
+        private static IntPtr _window;
         private static WebGPU _wgpu;
         private static WgpuDevice _device;
         private static Queue* _queue;
@@ -36,7 +37,6 @@ namespace XNOEdit
         private static float _modelRadius = 1.0f;
         private static RenderSettings _settings = new();
         private static readonly UIManager UIManager = new();
-        private static InputManager _inputManager;
         private static FileLoaderService _fileLoader;
 
         private static Task<XnoLoadResult?>? _pendingXnoLoad;
@@ -46,34 +46,38 @@ namespace XNOEdit
 
         private static TextureManager _textureManager;
 
+        private static ulong _previousTick;
+        private static float _deltaTime;
+        private static bool _mouseCaptured;
+        private static Vector2 _captureStartPosition;
         private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
 
-        private static void Main()
+        private static void Main(string[] args)
         {
-            var options = WindowOptions.Default with
-            {
-                Size = new Vector2D<int>(1280, 720),
-                Title = "XNOEdit",
-                API = GraphicsAPI.None
-            };
+            SDL.Init(SDL.InitFlags.Video);
+            SDL.SetAppMetadata("XNOEdit", "1.0.0", "com.isaacmarovitz.xnoedit");
+
+            SDL.RunApp(args.Length, args, MainFunction, IntPtr.Zero);
+        }
+
+        private static int MainFunction(int argc, string[] argv)
+        {
+            return SDL.EnterAppMainCallbacks(argc, argv,
+                AppInit,
+                AppIter,
+                AppEvent,
+                AppQuit);
+        }
+
+        private static SDL.AppResult AppInit(IntPtr appstate, int argc, string[] argv)
+        {
+            _window = SDL.CreateWindow("XNOEdit", 1280, 720,
+                SDL.WindowFlags.HighPixelDensity | SDL.WindowFlags.Resizable);
+
+            SDL.StartTextInput(_window);
 
             GameFolderLoaded += LoadGameFolderResources;
 
-            _window = Window.Create(options);
-
-            _window.Load += OnLoad;
-            _window.Update += OnUpdate;
-            _window.Render += OnRender;
-            _window.FramebufferResize += OnFramebufferResize;
-            _window.Closing += OnClose;
-            _window.FileDrop += OnFileDrop;
-
-            _window.Run();
-            _window.Dispose();
-        }
-
-        private static void OnLoad()
-        {
             InitializeWgpu();
             CreateDepthTexture();
 
@@ -81,22 +85,7 @@ namespace XNOEdit
             _grid = new GridRenderer(_wgpu, _device);
             _skybox = new SkyboxRenderer(_wgpu, _device);
 
-            _inputManager = new InputManager(UIManager);
-
-            _inputManager.OnLoad(_window);
-            _inputManager.ResetCameraAction += () =>
-            {
-                UIManager.TriggerAlert(AlertLevel.Info, "Camera Reset");
-                ResetCamera();
-            };
-            _inputManager.SettingsChangedAction += OnRenderSettingsChanged;
-            _inputManager.MouseMoveAction += _camera.OnMouseMove;
-            _inputManager.MouseScrollAction += scrollY =>
-            {
-                _camera.ProcessMouseScroll(scrollY, _settings.CameraSensitivity);
-            };
-
-            var imguiController = new ImGuiController(_wgpu, _device, _window, _inputManager.Input, 2);
+            var imguiController = new ImGuiController(_wgpu, _device, _window, 2);
             UIManager.OnLoad(imguiController, _wgpu, _device);
             UIManager.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
@@ -113,6 +102,144 @@ namespace XNOEdit
             {
                 LoadGameFolderResources();
             }
+
+            return SDL.AppResult.Continue;
+        }
+
+        private static SDL.AppResult AppIter(IntPtr appstate)
+        {
+            var diff = SDL.GetTicks() - _previousTick;
+            _previousTick = SDL.GetTicks();
+            _deltaTime = Math.Max((float)diff / 1000, 0.000001f);
+
+            if (UIManager.ViewportWantsInput || !ImGui.GetIO().WantCaptureKeyboard)
+                _camera?.ProcessKeyboard(_deltaTime,  _settings.CameraSensitivity);
+
+            ProcessPendingLoads();
+            OnRender(_deltaTime);
+
+            return SDL.AppResult.Continue;
+        }
+
+        private static SDL.AppResult AppEvent(IntPtr appstate, ref SDL.Event @event)
+        {
+            switch (@event.Type)
+            {
+                case (uint)SDL.EventType.WindowResized:
+                    var window = SDL.GetWindowFromEvent(@event);
+                    SDL.GetWindowSizeInPixels(window, out var width, out var height);
+
+                    OnFramebufferResize(new Vector2(width, height));
+                    break;
+                case (uint)SDL.EventType.DropFile:
+                    var span = MemoryMarshal.CreateReadOnlySpanFromNullTerminated((byte*)@event.Drop.Data);
+                    OnFileDrop(Encoding.UTF8.GetString(span));
+                    break;
+                case (uint)SDL.EventType.TextInput:
+                    var input = Encoding.UTF8.GetString((byte*)@event.Text.Text, 32);
+                    UIManager.Controller?.KeyChar(input);
+                    break;
+                case (uint)SDL.EventType.KeyDown:
+                    if (ImGui.GetIO().WantCaptureKeyboard) {
+                        UIManager.Controller?.KeyDown(@event.Key.Key);
+
+                        if (_mouseCaptured)
+                            _camera?.UpdateKeyDown(@event.Key.Key);
+
+                        break;
+                    }
+
+                    if (UIManager.ViewportWantsInput)
+                    {
+                        _camera?.UpdateKeyDown(@event.Key.Key);
+                    }
+                    else if (_camera?.IsKeyDown(@event.Key.Key) ?? false)
+                    {
+                        _camera.UpdateKeyUp(@event.Key.Key);
+                    }
+
+                    var toggle = SettingsToggle.None;
+
+                    switch (@event.Key.Key)
+                    {
+                        case SDL.Keycode.F:
+                            toggle = SettingsToggle.WireframeMode;
+                            break;
+                        case SDL.Keycode.G:
+                            toggle = SettingsToggle.ShowGrid;
+                            break;
+                        case SDL.Keycode.C:
+                            toggle = SettingsToggle.BackfaceCulling;
+                            break;
+                        case SDL.Keycode.V:
+                            toggle = SettingsToggle.VertexColors;
+                            break;
+                        case SDL.Keycode.R:
+                            UIManager.TriggerAlert(AlertLevel.Info, "Camera Reset");
+                            ResetCamera();
+                            break;
+                    }
+
+                    if (toggle != SettingsToggle.None)
+                        OnRenderSettingsChanged(toggle);
+
+                    break;
+                case (uint)SDL.EventType.KeyUp:
+                    _camera?.UpdateKeyUp(@event.Key.Key);
+                    UIManager.Controller?.KeyUp(@event.Key.Key);
+                    break;
+                case (uint)SDL.EventType.MouseMotion:
+                    UIManager.Controller?.UpdateImGuiMouseMove(@event.Motion.X, @event.Motion.Y);
+
+                    if (!_mouseCaptured) break;
+
+                    var lookSensitivity = 0.1f;
+
+                    var xOffset = (@event.Motion.X - _captureStartPosition.X) * lookSensitivity;
+                    var yOffset = (@event.Motion.Y - _captureStartPosition.Y) * lookSensitivity;
+
+                    SDL.WarpMouseInWindow(_window, _captureStartPosition.X, _captureStartPosition.Y);
+
+                    if (xOffset != 0 || yOffset != 0)
+                        _camera?.OnMouseMove(xOffset, yOffset);
+
+                    break;
+                case (uint)SDL.EventType.MouseWheel:
+                    UIManager.Controller?.UpdateImGuiMouseWheel(@event.Wheel.X, @event.Wheel.Y);
+
+                    if (UIManager.ViewportWantsInput)
+                        _camera?.ProcessMouseScroll(@event.Wheel.Y, _settings.CameraSensitivity);
+
+                    break;
+                case (uint)SDL.EventType.MouseButtonDown:
+                    UIManager.Controller?.UpdateImGuiMouseDown(@event.Button.Button);
+
+                    if (@event.Button.Button != SDL.ButtonLeft)
+                        break;
+
+                    if (!UIManager.ViewportWantsInput)
+                        break;
+
+                    _mouseCaptured = true;
+                    _captureStartPosition = new Vector2(@event.Button.X, @event.Button.Y);
+                    SDL.SetWindowRelativeMouseMode(_window, true);
+
+                    break;
+                case (uint)SDL.EventType.MouseButtonUp:
+                    UIManager.Controller?.UpdateImGuiMouseUp(@event.Button.Button);
+
+                    if (@event.Button.Button != SDL.ButtonLeft)
+                        break;
+
+                    _mouseCaptured = false;
+                    SDL.SetWindowRelativeMouseMode(_window, false);
+
+                    break;
+                case (uint)SDL.EventType.WindowCloseRequested:
+                    return SDL.AppResult.Success;
+            }
+
+            return SDL.AppResult.Continue;
         }
 
         private static void InitializeWgpu()
@@ -124,11 +251,11 @@ namespace XNOEdit
 
         private static void CreateDepthTexture()
         {
-            var size = _window.FramebufferSize;
+            SDL.GetWindowSize(_window, out var width, out var height);
 
             var depthTextureDesc = new TextureDescriptor
             {
-                Size = new Extent3D { Width = (uint)size.X, Height = (uint)size.Y, DepthOrArrayLayers = 1 },
+                Size = new Extent3D { Width = (uint)width, Height = (uint)height, DepthOrArrayLayers = 1 },
                 MipLevelCount = 1,
                 SampleCount = 1,
                 Dimension = TextureDimension.Dimension2D,
@@ -181,14 +308,6 @@ namespace XNOEdit
             }
 
             UIManager.TriggerAlert(AlertLevel.Info, alert);
-        }
-
-        private static void OnUpdate(double deltaTime)
-        {
-            if (UIManager.ViewportWantsInput || !ImGui.GetIO().WantCaptureKeyboard)
-                _camera?.ProcessKeyboard(_inputManager.PrimaryKeyboard, (float)deltaTime, _settings.CameraSensitivity);
-
-            ProcessPendingLoads();
         }
 
         private static void ProcessPendingLoads()
@@ -271,7 +390,7 @@ namespace XNOEdit
                     }
                 };
 
-                _window.Title = $"XNOEdit - {result.Xno.Name}";
+                SDL.SetWindowTitle(_window, $"XNOEdit - {result.Xno.Name}");
 
                 _textureManager.Clear();
                 foreach (var tex in result.Textures)
@@ -322,7 +441,7 @@ namespace XNOEdit
                 _textureManager.Add(tex.Name, tex.Texture, tex.View);
             }
 
-            _window.Title = $"XNOEdit - {result.Name}";
+            SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}");
 
             var renderers = result.Entries.Select(e => e.Renderer).ToArray();
             var xnos = result.Entries.Select(e => e.Xno).ToList();
@@ -457,7 +576,7 @@ namespace XNOEdit
             _wgpu.RenderPassEncoderRelease(uiPass);
         }
 
-        private static void OnFramebufferResize(Vector2D<int> size)
+        private static void OnFramebufferResize(Vector2 size)
         {
             var surfaceConfig = new SurfaceConfiguration
             {
@@ -484,8 +603,10 @@ namespace XNOEdit
             CreateDepthTexture();
         }
 
-        private static void OnClose()
+        private static void AppQuit(IntPtr appState, SDL.AppResult result)
         {
+            SDL.DestroyWindow(_window);
+
             _loadCts?.Cancel();
             _loadCts?.Dispose();
 
@@ -496,7 +617,6 @@ namespace XNOEdit
             _textureManager?.Dispose();
 
             UIManager?.Dispose();
-            _inputManager?.Dispose();
 
             if (_depthTextureView != null)
                 _wgpu.TextureViewRelease(_depthTextureView);
@@ -513,21 +633,16 @@ namespace XNOEdit
             _device?.Dispose();
         }
 
-        private static void OnFileDrop(string[] files)
+        private static void OnFileDrop(string file)
         {
-            foreach (var file in files)
+            if (!Directory.Exists(file)) return;
+
+            var defaultXex = Path.Combine(file, "default.xex");
+            if (File.Exists(defaultXex))
             {
-                if (Directory.Exists(file))
-                {
-                    var defaultXex = Path.Combine(file, "default.xex");
-                    if (File.Exists(defaultXex))
-                    {
-                        // We can reasonably assume this is the right folder
-                        Configuration.GameFolder = file;
-                        GameFolderLoaded?.Invoke();
-                        return;
-                    }
-                }
+                // We can reasonably assume this is the right folder
+                Configuration.GameFolder = file;
+                GameFolderLoaded?.Invoke();
             }
         }
 
@@ -552,7 +667,6 @@ namespace XNOEdit
                 UIManager.TriggerAlert(AlertLevel.Warning, $"Unable to load shader.arc: \"{ex.Message}\"");
             }
         }
-
 
         private static void CancelPendingLoads()
         {
@@ -615,5 +729,15 @@ namespace XNOEdit
             var distance = Math.Max(_modelRadius * 2.5f, 10.0f);
             _camera?.FrameTarget(_modelCenter, distance);
         }
+    }
+
+    public enum SettingsToggle
+    {
+        WireframeMode,
+        ShowGrid,
+        BackfaceCulling,
+        VertexColors,
+        Lightmap,
+        None
     }
 }

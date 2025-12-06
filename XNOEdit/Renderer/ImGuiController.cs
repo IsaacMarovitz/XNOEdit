@@ -2,10 +2,9 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Hexa.NET.ImGui;
+using SDL3;
 using Silk.NET.Core.Native;
-using Silk.NET.Input;
 using Silk.NET.WebGPU;
-using Silk.NET.Windowing;
 using XNOEdit.Renderer.Builders;
 using XNOEdit.Renderer.Wgpu;
 
@@ -16,8 +15,7 @@ namespace XNOEdit.Renderer
         private readonly WebGPU _wgpu;
         private readonly WgpuDevice _device;
         private readonly Queue* _queue;
-        private readonly IView _view;
-        private readonly IInputContext _inputContext;
+        private readonly IntPtr _window;
         private readonly uint _framesInFlight;
 
         private ShaderModule* _shaderModule;
@@ -35,21 +33,17 @@ namespace XNOEdit.Renderer
 
         private readonly Dictionary<nint, IntPtr> _textureBindGroups = [];
         private readonly Dictionary<nint, IntPtr> _gpuTextures = [];
-
-        private readonly List<char> _pressedChars = [];
-        private readonly Dictionary<Key, bool> _keyEvents = [];
+        private readonly Dictionary<SDL.Keycode, bool> _keyEvents = [];
 
         public ImGuiController(
             WebGPU wgpu,
             WgpuDevice device,
-            IView view,
-            IInputContext inputContext,
+            IntPtr window,
             uint framesInFlight)
         {
             _wgpu = wgpu;
             _device = device;
-            _view = view;
-            _inputContext = inputContext;
+            _window = window;
             _framesInFlight = framesInFlight;
             _queue = _wgpu.DeviceGetQueue(_device);
 
@@ -112,16 +106,11 @@ namespace XNOEdit.Renderer
             var context = ImGui.CreateContext();
             ImGui.SetCurrentContext(context);
 
-            ImGui.GetIO().DisplaySize = (Vector2)_view.Size;
-            ImGui.GetIO().DisplayFramebufferScale = new Vector2(
-                (int)((float)_view.FramebufferSize.X / _view.Size.X),
-                (int)((float)_view.FramebufferSize.Y / _view.Size.Y));
+            SDL.GetWindowSize(_window, out var logicalWidth, out var localHeight);
+            SDL.GetWindowSizeInPixels(_window, out var width, out var height);
 
-            _view.Resize += (newSize) => ImGui.GetIO().DisplaySize = (Vector2)newSize;
-
-            _inputContext.Keyboards[0].KeyUp += KeyUp;
-            _inputContext.Keyboards[0].KeyDown += KeyDown;
-            _inputContext.Keyboards[0].KeyChar += KeyChar;
+            ImGui.GetIO().DisplaySize = new Vector2(logicalWidth, localHeight);
+            ImGui.GetIO().DisplayFramebufferScale = new Vector2((float)width / logicalWidth, (float)height / localHeight);
 
             ImGui.GetIO().BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasTextures;
 
@@ -428,141 +417,165 @@ namespace XNOEdit.Renderer
             tex.SetStatus(ImTextureStatus.Destroyed);
         }
 
-        private static bool TryMapKeys(Key key, out ImGuiKey imguiKey)
+        private static bool TryMapKeys(SDL.Keycode key, out ImGuiKey imguiKey)
         {
             imguiKey = key switch
             {
-                Key.Tab => ImGuiKey.Tab,
-                Key.Left => ImGuiKey.LeftArrow,
-                Key.Right => ImGuiKey.RightArrow,
-                Key.Up => ImGuiKey.UpArrow,
-                Key.Down => ImGuiKey.DownArrow,
-                Key.PageUp => ImGuiKey.PageUp,
-                Key.PageDown => ImGuiKey.PageDown,
-                Key.Home => ImGuiKey.Home,
-                Key.End => ImGuiKey.End,
-                Key.Insert => ImGuiKey.Insert,
-                Key.Delete => ImGuiKey.Delete,
-                Key.Backspace => ImGuiKey.Backspace,
-                Key.Space => ImGuiKey.Space,
-                Key.Enter => ImGuiKey.Enter,
-                Key.Escape => ImGuiKey.Escape,
-                Key.Apostrophe => ImGuiKey.Apostrophe,
-                Key.Comma => ImGuiKey.Comma,
-                Key.Minus => ImGuiKey.Minus,
-                Key.Period => ImGuiKey.Period,
-                Key.Slash => ImGuiKey.Slash,
-                Key.Semicolon => ImGuiKey.Semicolon,
-                Key.Equal => ImGuiKey.Equal,
-                Key.LeftBracket => ImGuiKey.LeftBracket,
-                Key.BackSlash => ImGuiKey.Backslash,
-                Key.RightBracket => ImGuiKey.RightBracket,
-                Key.GraveAccent => ImGuiKey.GraveAccent,
-                Key.CapsLock => ImGuiKey.CapsLock,
-                Key.ScrollLock => ImGuiKey.ScrollLock,
-                Key.NumLock => ImGuiKey.NumLock,
-                Key.PrintScreen => ImGuiKey.PrintScreen,
-                Key.Pause => ImGuiKey.Pause,
-                Key.Keypad0 => ImGuiKey.Keypad0,
-                Key.Keypad1 => ImGuiKey.Keypad1,
-                Key.Keypad2 => ImGuiKey.Keypad2,
-                Key.Keypad3 => ImGuiKey.Keypad3,
-                Key.Keypad4 => ImGuiKey.Keypad4,
-                Key.Keypad5 => ImGuiKey.Keypad5,
-                Key.Keypad6 => ImGuiKey.Keypad6,
-                Key.Keypad7 => ImGuiKey.Keypad7,
-                Key.Keypad8 => ImGuiKey.Keypad8,
-                Key.Keypad9 => ImGuiKey.Keypad9,
-                Key.KeypadDecimal => ImGuiKey.KeypadDecimal,
-                Key.KeypadDivide => ImGuiKey.KeypadDivide,
-                Key.KeypadMultiply => ImGuiKey.KeypadMultiply,
-                Key.KeypadSubtract => ImGuiKey.KeypadSubtract,
-                Key.KeypadAdd => ImGuiKey.KeypadAdd,
-                Key.KeypadEnter => ImGuiKey.KeypadEnter,
-                Key.KeypadEqual => ImGuiKey.KeypadEqual,
-                Key.ControlLeft => ImGuiKey.LeftCtrl,
-                Key.ShiftLeft => ImGuiKey.LeftShift,
-                Key.AltLeft => ImGuiKey.LeftAlt,
-                Key.SuperLeft => ImGuiKey.LeftSuper,
-                Key.ControlRight => ImGuiKey.RightCtrl,
-                Key.ShiftRight => ImGuiKey.RightShift,
-                Key.AltRight => ImGuiKey.RightAlt,
-                Key.SuperRight => ImGuiKey.RightSuper,
-                Key.Menu => ImGuiKey.Menu,
-                Key.Number0 => ImGuiKey.Key0,
-                Key.Number1 => ImGuiKey.Key1,
-                Key.Number2 => ImGuiKey.Key2,
-                Key.Number3 => ImGuiKey.Key3,
-                Key.Number4 => ImGuiKey.Key4,
-                Key.Number5 => ImGuiKey.Key5,
-                Key.Number6 => ImGuiKey.Key6,
-                Key.Number7 => ImGuiKey.Key7,
-                Key.Number8 => ImGuiKey.Key8,
-                Key.Number9 => ImGuiKey.Key9,
-                Key.A => ImGuiKey.A,
-                Key.B => ImGuiKey.B,
-                Key.C => ImGuiKey.C,
-                Key.D => ImGuiKey.D,
-                Key.E => ImGuiKey.E,
-                Key.F => ImGuiKey.F,
-                Key.G => ImGuiKey.G,
-                Key.H => ImGuiKey.H,
-                Key.I => ImGuiKey.I,
-                Key.J => ImGuiKey.J,
-                Key.K => ImGuiKey.K,
-                Key.L => ImGuiKey.L,
-                Key.M => ImGuiKey.M,
-                Key.N => ImGuiKey.N,
-                Key.O => ImGuiKey.O,
-                Key.P => ImGuiKey.P,
-                Key.Q => ImGuiKey.Q,
-                Key.R => ImGuiKey.R,
-                Key.S => ImGuiKey.S,
-                Key.T => ImGuiKey.T,
-                Key.U => ImGuiKey.U,
-                Key.V => ImGuiKey.V,
-                Key.W => ImGuiKey.W,
-                Key.X => ImGuiKey.X,
-                Key.Y => ImGuiKey.Y,
-                Key.Z => ImGuiKey.Z,
-                Key.F1 => ImGuiKey.F1,
-                Key.F2 => ImGuiKey.F2,
-                Key.F3 => ImGuiKey.F3,
-                Key.F4 => ImGuiKey.F4,
-                Key.F5 => ImGuiKey.F5,
-                Key.F6 => ImGuiKey.F6,
-                Key.F7 => ImGuiKey.F7,
-                Key.F8 => ImGuiKey.F8,
-                Key.F9 => ImGuiKey.F9,
-                Key.F10 => ImGuiKey.F10,
-                Key.F11 => ImGuiKey.F11,
-                Key.F12 => ImGuiKey.F12,
+                SDL.Keycode.Tab => ImGuiKey.Tab,
+                SDL.Keycode.Left => ImGuiKey.LeftArrow,
+                SDL.Keycode.Right => ImGuiKey.RightArrow,
+                SDL.Keycode.Up => ImGuiKey.UpArrow,
+                SDL.Keycode.Down => ImGuiKey.DownArrow,
+                SDL.Keycode.Pageup => ImGuiKey.PageUp,
+                SDL.Keycode.Pagedown => ImGuiKey.PageDown,
+                SDL.Keycode.Home => ImGuiKey.Home,
+                SDL.Keycode.End => ImGuiKey.End,
+                SDL.Keycode.Insert => ImGuiKey.Insert,
+                SDL.Keycode.Delete => ImGuiKey.Delete,
+                SDL.Keycode.Backspace => ImGuiKey.Backspace,
+                SDL.Keycode.Space => ImGuiKey.Space,
+                SDL.Keycode.Return => ImGuiKey.Enter,
+                SDL.Keycode.Escape => ImGuiKey.Escape,
+                SDL.Keycode.Apostrophe => ImGuiKey.Apostrophe,
+                SDL.Keycode.Comma => ImGuiKey.Comma,
+                SDL.Keycode.Minus => ImGuiKey.Minus,
+                SDL.Keycode.Period => ImGuiKey.Period,
+                SDL.Keycode.Slash => ImGuiKey.Slash,
+                SDL.Keycode.Semicolon => ImGuiKey.Semicolon,
+                SDL.Keycode.Equals => ImGuiKey.Equal,
+                SDL.Keycode.LeftBracket => ImGuiKey.LeftBracket,
+                SDL.Keycode.Backslash => ImGuiKey.Backslash,
+                SDL.Keycode.RightBracket => ImGuiKey.RightBracket,
+                SDL.Keycode.Grave => ImGuiKey.GraveAccent,
+                SDL.Keycode.Capslock => ImGuiKey.CapsLock,
+                SDL.Keycode.ScrollLock => ImGuiKey.ScrollLock,
+                SDL.Keycode.NumLockClear => ImGuiKey.NumLock,
+                SDL.Keycode.PrintScreen => ImGuiKey.PrintScreen,
+                SDL.Keycode.Pause => ImGuiKey.Pause,
+                SDL.Keycode.Kp0 => ImGuiKey.Keypad0,
+                SDL.Keycode.Kp1 => ImGuiKey.Keypad1,
+                SDL.Keycode.Kp2 => ImGuiKey.Keypad2,
+                SDL.Keycode.Kp3 => ImGuiKey.Keypad3,
+                SDL.Keycode.Kp4 => ImGuiKey.Keypad4,
+                SDL.Keycode.Kp5 => ImGuiKey.Keypad5,
+                SDL.Keycode.Kp6 => ImGuiKey.Keypad6,
+                SDL.Keycode.Kp7 => ImGuiKey.Keypad7,
+                SDL.Keycode.Kp8 => ImGuiKey.Keypad8,
+                SDL.Keycode.Kp9 => ImGuiKey.Keypad9,
+                SDL.Keycode.KpDecimal => ImGuiKey.KeypadDecimal,
+                SDL.Keycode.KpDivide => ImGuiKey.KeypadDivide,
+                SDL.Keycode.KpMultiply => ImGuiKey.KeypadMultiply,
+                SDL.Keycode.KpMinus => ImGuiKey.KeypadSubtract,
+                SDL.Keycode.KpPlus => ImGuiKey.KeypadAdd,
+                SDL.Keycode.KpEnter => ImGuiKey.KeypadEnter,
+                SDL.Keycode.KpEquals => ImGuiKey.KeypadEqual,
+                SDL.Keycode.LCtrl => ImGuiKey.LeftCtrl,
+                SDL.Keycode.LShift => ImGuiKey.LeftShift,
+                SDL.Keycode.LAlt => ImGuiKey.LeftAlt,
+                SDL.Keycode.LHyper => ImGuiKey.LeftSuper,
+                SDL.Keycode.RCtrl => ImGuiKey.RightCtrl,
+                SDL.Keycode.RShift => ImGuiKey.RightShift,
+                SDL.Keycode.RAlt => ImGuiKey.RightAlt,
+                SDL.Keycode.RHyper => ImGuiKey.RightSuper,
+                SDL.Keycode.Menu => ImGuiKey.Menu,
+                SDL.Keycode.Alpha0 => ImGuiKey.Key0,
+                SDL.Keycode.Alpha1 => ImGuiKey.Key1,
+                SDL.Keycode.Alpha2 => ImGuiKey.Key2,
+                SDL.Keycode.Alpha3 => ImGuiKey.Key3,
+                SDL.Keycode.Alpha4 => ImGuiKey.Key4,
+                SDL.Keycode.Alpha5 => ImGuiKey.Key5,
+                SDL.Keycode.Alpha6 => ImGuiKey.Key6,
+                SDL.Keycode.Alpha7 => ImGuiKey.Key7,
+                SDL.Keycode.Alpha8 => ImGuiKey.Key8,
+                SDL.Keycode.Alpha9 => ImGuiKey.Key9,
+                SDL.Keycode.A => ImGuiKey.A,
+                SDL.Keycode.B => ImGuiKey.B,
+                SDL.Keycode.C => ImGuiKey.C,
+                SDL.Keycode.D => ImGuiKey.D,
+                SDL.Keycode.E => ImGuiKey.E,
+                SDL.Keycode.F => ImGuiKey.F,
+                SDL.Keycode.G => ImGuiKey.G,
+                SDL.Keycode.H => ImGuiKey.H,
+                SDL.Keycode.I => ImGuiKey.I,
+                SDL.Keycode.J => ImGuiKey.J,
+                SDL.Keycode.K => ImGuiKey.K,
+                SDL.Keycode.L => ImGuiKey.L,
+                SDL.Keycode.M => ImGuiKey.M,
+                SDL.Keycode.N => ImGuiKey.N,
+                SDL.Keycode.O => ImGuiKey.O,
+                SDL.Keycode.P => ImGuiKey.P,
+                SDL.Keycode.Q => ImGuiKey.Q,
+                SDL.Keycode.R => ImGuiKey.R,
+                SDL.Keycode.S => ImGuiKey.S,
+                SDL.Keycode.T => ImGuiKey.T,
+                SDL.Keycode.U => ImGuiKey.U,
+                SDL.Keycode.V => ImGuiKey.V,
+                SDL.Keycode.W => ImGuiKey.W,
+                SDL.Keycode.X => ImGuiKey.X,
+                SDL.Keycode.Y => ImGuiKey.Y,
+                SDL.Keycode.Z => ImGuiKey.Z,
+                SDL.Keycode.F1 => ImGuiKey.F1,
+                SDL.Keycode.F2 => ImGuiKey.F2,
+                SDL.Keycode.F3 => ImGuiKey.F3,
+                SDL.Keycode.F4 => ImGuiKey.F4,
+                SDL.Keycode.F5 => ImGuiKey.F5,
+                SDL.Keycode.F6 => ImGuiKey.F6,
+                SDL.Keycode.F7 => ImGuiKey.F7,
+                SDL.Keycode.F8 => ImGuiKey.F8,
+                SDL.Keycode.F9 => ImGuiKey.F9,
+                SDL.Keycode.F10 => ImGuiKey.F10,
+                SDL.Keycode.F11 => ImGuiKey.F11,
+                SDL.Keycode.F12 => ImGuiKey.F12,
                 _ => ImGuiKey.None,
             };
 
             return imguiKey != ImGuiKey.None;
         }
 
-        private void UpdateImGuiInput()
+        public void UpdateImGuiMouseDown(int button)
         {
             var io = ImGui.GetIO();
 
-            var mouseState = _inputContext.Mice[0];
-            _ = _inputContext.Keyboards[0];
+            if (button == SDL.ButtonLeft)
+                io.MouseDown[0] = true;
 
-            io.MouseDown[0] = mouseState.IsButtonPressed(MouseButton.Left);
-            io.MouseDown[1] = mouseState.IsButtonPressed(MouseButton.Right);
-            io.MouseDown[2] = mouseState.IsButtonPressed(MouseButton.Middle);
+            if (button == SDL.ButtonRight)
+                io.MouseDown[1] = true;
 
-            io.MousePos = new Vector2(mouseState.Position.X, mouseState.Position.Y);
+            if (button == SDL.ButtonMiddle)
+                io.MouseDown[2] = true;
+        }
 
-            var wheel = mouseState.ScrollWheels[0];
-            io.MouseWheel = wheel.Y;
-            io.MouseWheelH = wheel.X;
+        public void UpdateImGuiMouseUp(int button)
+        {
+            var io = ImGui.GetIO();
 
-            io.AddInputCharactersUTF8(new string(_pressedChars.ToArray()));
+            if (button == SDL.ButtonLeft)
+                io.MouseDown[0] = false;
 
-            _pressedChars.Clear();
+            if (button == SDL.ButtonRight)
+                io.MouseDown[1] = false;
+
+            if (button == SDL.ButtonMiddle)
+                io.MouseDown[2] = false;
+        }
+
+        public void UpdateImGuiMouseMove(float x, float y)
+        {
+            var io = ImGui.GetIO();
+            io.MousePos = new Vector2(x, y);
+        }
+
+        public void UpdateImGuiMouseWheel(float x, float y)
+        {
+            var io = ImGui.GetIO();
+            io.MouseWheel = y;
+            io.MouseWheelH = x;
+        }
+
+        public void UpdateImGuiInput()
+        {
+            var io = ImGui.GetIO();
 
             foreach (var evt in _keyEvents)
             {
@@ -576,15 +589,15 @@ namespace XNOEdit.Renderer
 
         private void SetPerFrameImGuiData(float deltaSeconds)
         {
-            var io = ImGui.GetIO();
-            var windowSize = _view.Size;
-            io.DisplaySize = new Vector2(windowSize.X, windowSize.Y);
+            SDL.GetWindowSize(_window, out var logicalWidth, out var localHeight);
+            SDL.GetWindowSizeInPixels(_window, out var width, out var height);
 
-            if (windowSize.X > 0 && windowSize.Y > 0)
+            var io = ImGui.GetIO();
+            io.DisplaySize = new Vector2(logicalWidth, localHeight);
+
+            if (logicalWidth > 0 && localHeight > 0)
             {
-                io.DisplayFramebufferScale = new Vector2(
-                    (int)((float)_view.FramebufferSize.X / windowSize.X),
-                    (int)((float)_view.FramebufferSize.Y / windowSize.Y));
+                io.DisplayFramebufferScale = new Vector2((float)width / logicalWidth, (float)height / localHeight);
             }
 
             io.DeltaTime = deltaSeconds;
@@ -711,7 +724,11 @@ namespace XNOEdit.Renderer
                     if (clipMax.X <= clipMin.X || clipMax.Y <= clipMin.Y)
                         continue;
 
-                    _wgpu.RenderPassEncoderSetScissorRect(encoder, (uint)clipMin.X, (uint)clipMin.Y, (uint)Math.Clamp(clipMax.X - clipMin.X, 0, _view.FramebufferSize.X), (uint)Math.Clamp(clipMax.Y - clipMin.Y, 0, _view.FramebufferSize.Y));
+                    SDL.GetWindowSizeInPixels(_window, out var width, out var height);
+
+                    _wgpu.RenderPassEncoderSetScissorRect(encoder, (uint)clipMin.X, (uint)clipMin.Y,
+                        (uint)Math.Clamp(clipMax.X - clipMin.X, 0, width),
+                        (uint)Math.Clamp(clipMax.Y - clipMin.Y, 0, height));
                     _wgpu.RenderPassEncoderDrawIndexed(encoder, cmd.ElemCount, 1, (uint)(idxOffset + cmd.IdxOffset), (int)(vtxOffset + cmd.VtxOffset), 0);
                 }
 
@@ -741,19 +758,20 @@ namespace XNOEdit.Renderer
             }
         }
 
-        private void KeyChar(IKeyboard arg1, char arg2)
+        public void KeyChar(string input)
         {
-            _pressedChars.Add(arg2);
+            var io = ImGui.GetIO();
+            io.AddInputCharactersUTF8(input);
         }
 
-        private void KeyDown(IKeyboard arg1, Key arg2, int arg3)
+        public void KeyDown(SDL.Keycode key)
         {
-            _keyEvents[arg2] = true;
+            _keyEvents[key] = true;
         }
 
-        private void KeyUp(IKeyboard arg1, Key arg2, int arg3)
+        public void KeyUp(SDL.Keycode key)
         {
-            _keyEvents[arg2] = false;
+            _keyEvents[key] = false;
         }
 
         public void Dispose()
@@ -798,10 +816,6 @@ namespace XNOEdit.Renderer
 
             if (_queue != null)
                 _wgpu.QueueRelease(_queue);
-
-            _inputContext.Keyboards[0].KeyChar -= KeyChar;
-            _inputContext.Keyboards[0].KeyUp -= KeyUp;
-            _inputContext.Keyboards[0].KeyDown -= KeyDown;
         }
 
         private static int Align(int size, int align)

@@ -1,6 +1,6 @@
+using SDL3;
 using Silk.NET.WebGPU;
 using Silk.NET.WebGPU.Extensions.WGPU;
-using Silk.NET.Windowing;
 using XNOEdit.Logging;
 
 namespace XNOEdit.Renderer.Wgpu
@@ -16,7 +16,7 @@ namespace XNOEdit.Renderer.Wgpu
 
         public static implicit operator Device*(WgpuDevice device) => device.Device;
 
-        public WgpuDevice(WebGPU wgpu, IWindow window)
+        public WgpuDevice(WebGPU wgpu, IntPtr window)
         {
             _wgpu = wgpu;
 
@@ -32,8 +32,7 @@ namespace XNOEdit.Renderer.Wgpu
             };
 
             _instance = _wgpu.CreateInstance(&instanceDesc);
-
-            _surface = window.CreateWebGPUSurface(_wgpu, _instance);
+            _surface = CreateWebGpuSurface(window, _wgpu, _instance);
 
             var adapterOptions = new RequestAdapterOptions
             {
@@ -88,14 +87,16 @@ namespace XNOEdit.Renderer.Wgpu
                 Device = device;
             }
 
+            SDL.GetWindowSizeInPixels(window, out var width, out var height);
+
             // Configure surface
             var surfaceConfig = new SurfaceConfiguration
             {
                 Device = Device,
                 Format = _surfaceFormat,
                 Usage = TextureUsage.RenderAttachment,
-                Width = (uint)window.FramebufferSize.X,
-                Height = (uint)window.FramebufferSize.Y,
+                Width = (uint)width,
+                Height = (uint)height,
                 PresentMode = PresentMode.Fifo,
                 AlphaMode = CompositeAlphaMode.Auto
             };
@@ -126,6 +127,104 @@ namespace XNOEdit.Renderer.Wgpu
 
             if (_instance != null)
                 _wgpu.InstanceRelease(_instance);
+        }
+
+        private static Surface* CreateWebGpuSurface(IntPtr window, WebGPU wgpu, Instance* instance)
+        {
+            var windowProperties = SDL.GetWindowProperties(window);
+            var descriptor = new SurfaceDescriptor
+            {
+                NextInChain = (ChainedStruct*)IntPtr.Zero
+            };
+
+            var ptr = SDL.GetPointerProperty(windowProperties, SDL.Props.WindowX11DisplayPointer, IntPtr.Zero);
+            if (ptr != IntPtr.Zero)
+            {
+                // Not sure if this is correct
+                var windowNumber = SDL.GetNumberProperty(windowProperties, SDL.Props.WindowX11WindowNumber, 0);
+
+                var xlibDescriptor = new SurfaceDescriptorFromXlibWindow
+                {
+                    Chain = new ChainedStruct
+                    {
+                        Next  = null,
+                        SType = SType.SurfaceDescriptorFromXlibWindow
+                    },
+                    Display = (void*)ptr,
+                    Window  = (ulong)windowNumber
+                };
+
+                descriptor.NextInChain = (ChainedStruct*)&xlibDescriptor;
+            }
+
+            ptr = SDL.GetPointerProperty(windowProperties, SDL.Props.WindowCocoaWindowPointer, IntPtr.Zero);
+            if (ptr != IntPtr.Zero)
+            {
+                // Based on the Veldrid Metal bindings implementation:
+                // https://github.com/veldrid/veldrid/tree/master/src/Veldrid.MetalBindings
+                CAMetalLayer metalLayer = CAMetalLayer.New();
+                NSWindow nsWindow = new(ptr);
+                var contentView = nsWindow.contentView;
+                contentView.wantsLayer = true;
+                contentView.layer = metalLayer.NativePtr;
+
+                var cocoaDescriptor = new SurfaceDescriptorFromMetalLayer
+                {
+                    Chain = new ChainedStruct
+                    {
+                        Next  = null,
+                        SType = SType.SurfaceDescriptorFromMetalLayer
+                    },
+                    Layer = (void*)metalLayer.NativePtr
+                };
+
+                descriptor.NextInChain = (ChainedStruct*)&cocoaDescriptor;
+            }
+
+            ptr = SDL.GetPointerProperty(windowProperties, SDL.Props.WindowWaylandDisplayPointer, IntPtr.Zero);
+            if (ptr != IntPtr.Zero)
+            {
+                var surfacePtr = SDL.GetPointerProperty(windowProperties, SDL.Props.WindowWaylandSurfacePointer, IntPtr.Zero);
+
+                var waylandDescriptor = new SurfaceDescriptorFromWaylandSurface
+                {
+                    Chain = new ChainedStruct
+                    {
+                        Next  = null,
+                        SType = SType.SurfaceDescriptorFromWaylandSurface
+                    },
+                    Display = (void*)ptr,
+                    Surface = (void*)surfacePtr
+                };
+
+                descriptor.NextInChain = (ChainedStruct*)&waylandDescriptor;
+            }
+
+            ptr = SDL.GetPointerProperty(windowProperties, SDL.Props.WindowWin32HWNDPointer, IntPtr.Zero);
+            if (ptr != IntPtr.Zero)
+            {
+                var instancePtr = SDL.GetPointerProperty(windowProperties, SDL.Props.WindowWin32InstancePointer, IntPtr.Zero);
+
+                var win32Descriptor = new SurfaceDescriptorFromWindowsHWND
+                {
+                    Chain = new ChainedStruct
+                    {
+                        Next  = null,
+                        SType = SType.SurfaceDescriptorFromWindowsHwnd
+                    },
+                    Hwnd      = (void*)ptr,
+                    Hinstance = (void*)instancePtr
+                };
+
+                descriptor.NextInChain = (ChainedStruct*)&win32Descriptor;
+            }
+
+            if (descriptor.NextInChain == (void*)IntPtr.Zero)
+            {
+                throw new PlatformNotSupportedException("Cannot init WGPU surface for you platform.");
+            }
+
+            return wgpu.InstanceCreateSurface(instance, descriptor);
         }
     }
 }

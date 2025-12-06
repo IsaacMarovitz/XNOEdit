@@ -1,5 +1,5 @@
 using System.Numerics;
-using Silk.NET.Input;
+using SDL3;
 
 namespace XNOEdit.Renderer
 {
@@ -20,6 +20,8 @@ namespace XNOEdit.Renderer
         private Vector3 _frontHorizontal = new(0.0f, 0.0f, -1.0f);
         private Vector3 _right = Vector3.UnitX;
         private float _modelRadius = 1.0f;
+
+        private readonly Dictionary<SDL.Keycode, bool> _keyEvents = [];
 
         public Camera()
         {
@@ -61,26 +63,42 @@ namespace XNOEdit.Renderer
             _modelRadius = radius;
         }
 
-        public void ProcessKeyboard(IKeyboard keyboard, float deltaTime, float cameraSensitivity)
+        public bool IsKeyDown(SDL.Keycode keyCode)
+        {
+            _keyEvents.TryGetValue(keyCode, out var keyDown);
+            return keyDown;
+        }
+
+        public void UpdateKeyDown(SDL.Keycode keyCode)
+        {
+            _keyEvents[keyCode] = true;
+        }
+
+        public void UpdateKeyUp(SDL.Keycode keyCode)
+        {
+            _keyEvents[keyCode] = false;
+        }
+
+        public void ProcessKeyboard(float deltaTime, float cameraSensitivity)
         {
             var velocity = MoveSpeed * deltaTime * _modelRadius * cameraSensitivity;
 
-            if (keyboard.IsKeyPressed(Key.W))
+            if (IsKeyDown(SDL.Keycode.W))
                 Position += _frontHorizontal * velocity;
 
-            if (keyboard.IsKeyPressed(Key.S))
+            if (IsKeyDown(SDL.Keycode.S))
                 Position -= _frontHorizontal * velocity;
 
-            if (keyboard.IsKeyPressed(Key.A))
+            if (IsKeyDown(SDL.Keycode.A))
                 Position -= _right * velocity;
 
-            if (keyboard.IsKeyPressed(Key.D))
+            if (IsKeyDown(SDL.Keycode.D))
                 Position += _right * velocity;
 
-            if (keyboard.IsKeyPressed(Key.Q))
+            if (IsKeyDown(SDL.Keycode.Q))
                 Position -= Vector3.UnitY * velocity;
 
-            if (keyboard.IsKeyPressed(Key.E))
+            if (IsKeyDown(SDL.Keycode.E))
                 Position += Vector3.UnitY * velocity;
         }
 
