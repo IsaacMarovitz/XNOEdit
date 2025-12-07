@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using Hexa.NET.ImGui;
 using SDL3;
 using Silk.NET.Core.Native;
@@ -33,6 +34,10 @@ namespace XNOEdit.Renderer
 
         private readonly Dictionary<nint, IntPtr> _textureBindGroups = [];
         private readonly Dictionary<nint, IntPtr> _gpuTextures = [];
+
+        private SetClipboardTextDelegate _setClipboardText;
+        private GetClipboardTextDelegate _getClipboardText;
+        private IntPtr _clipboardText;
 
         public ImGuiController(
             WebGPU wgpu,
@@ -111,6 +116,14 @@ namespace XNOEdit.Renderer
             ImGui.GetIO().DisplayFramebufferScale = new Vector2((float)width / logicalWidth, (float)height / localHeight);
 
             ImGui.GetIO().BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasTextures;
+
+            var platformIO = ImGui.GetPlatformIO();
+
+            _setClipboardText = SetClipboardText;
+            _getClipboardText = GetClipboardText;
+
+            platformIO.PlatformSetClipboardTextFn = (void*)Marshal.GetFunctionPointerForDelegate(_setClipboardText);
+            platformIO.PlatformGetClipboardTextFn = (void*)Marshal.GetFunctionPointerForDelegate(_getClipboardText);
 
             InitShaders();
             InitSampler();
@@ -528,6 +541,33 @@ namespace XNOEdit.Renderer
             };
 
             return imguiKey != ImGuiKey.None;
+        }
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate void SetClipboardTextDelegate(ImGuiContext* context, char* text);
+
+        public void SetClipboardText(ImGuiContext* context, char* text)
+        {
+            var span = MemoryMarshal.CreateReadOnlySpanFromNullTerminated((byte*)text);
+            var requestedText = Encoding.UTF8.GetString(span);
+            SDL.SetClipboardText(requestedText);
+        }
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate char* GetClipboardTextDelegate(ImGuiContext* context);
+
+        public char* GetClipboardText(ImGuiContext* context)
+        {
+            if (_clipboardText != IntPtr.Zero)
+                Marshal.ZeroFreeCoTaskMemUTF8(_clipboardText);
+
+            if (SDL.HasClipboardText())
+            {
+                var clipboardText = SDL.GetClipboardText();
+                _clipboardText = Marshal.StringToCoTaskMemUTF8(clipboardText);
+            }
+
+            return (char*)_clipboardText;
         }
 
         public void UpdateImGuiMouse(int button, bool down)
