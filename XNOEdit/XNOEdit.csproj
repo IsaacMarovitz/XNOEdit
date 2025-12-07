@@ -31,6 +31,8 @@
         <EmbeddedResource Include="Shaders\Grid.wgsl" />
         <EmbeddedResource Include="Shaders\Skybox.wgsl" />
         <EmbeddedResource Include="Shaders\ImGui.wgsl" />
+        <EmbeddedResource Include="Fonts\Inter.ttf" />
+        <EmbeddedResource Include="Fonts\FA-Solid.ttf" />
     </ItemGroup>
     
     <ItemGroup>

@@ -3,6 +3,7 @@ using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
+using XNOEdit.Fonts;
 using XNOEdit.Managers;
 using XNOEdit.Services;
 
@@ -73,7 +74,7 @@ namespace XNOEdit.Panels
             ImGui.End();
         }
 
-        private void RenderObjectChunk(ObjectChunk objectChunk, EffectListChunk? effectListChunk)
+        private unsafe void RenderObjectChunk(ObjectChunk objectChunk, EffectListChunk? effectListChunk)
         {
             if (ImGui.BeginTabItem("Object"))
             {
@@ -99,8 +100,9 @@ namespace XNOEdit.Panels
                     ImGui.PushID(i);
 
                     var visible = GetSubobjectVisibility(i);
-                    if (ImGui.Checkbox($"##VisibilitySubobject{i + 1}", ref visible))
+                    if (ImGuiComponents.StyledCheckbox($"##VisibilitySubobject{i + 1}", visible))
                     {
+                        visible = !visible;
                         SetSubobjectVisibility(i, visible);
                     }
 
@@ -121,8 +123,10 @@ namespace XNOEdit.Panels
                             ImGui.PushID(j);
 
                             var visibleMeshSet = GetMeshSetVisibility(i, j);
-                            if (ImGui.Checkbox($"##VisibilityMeshSet{j + 1}", ref visibleMeshSet))
+
+                            if (ImGuiComponents.StyledCheckbox($"##VisibilityMeshSet{j + 1}", visibleMeshSet))
                             {
+                                visibleMeshSet = !visibleMeshSet;
                                 SetMeshSetVisibility(i, j, visibleMeshSet);
                             }
 

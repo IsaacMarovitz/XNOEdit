@@ -69,7 +69,7 @@ namespace XNOEdit
                 AppQuit);
         }
 
-        private static SDL.AppResult AppInit(IntPtr appstate, int argc, string[] argv)
+        private static SDL.AppResult AppInit(IntPtr appState, int argc, string[] argv)
         {
             _window = SDL.CreateWindow("XNOEdit", 1280, 720,
                 SDL.WindowFlags.HighPixelDensity | SDL.WindowFlags.Resizable);
@@ -106,14 +106,14 @@ namespace XNOEdit
             return SDL.AppResult.Continue;
         }
 
-        private static SDL.AppResult AppIter(IntPtr appstate)
+        private static SDL.AppResult AppIter(IntPtr appState)
         {
             var diff = SDL.GetTicks() - _previousTick;
             _previousTick = SDL.GetTicks();
             _deltaTime = Math.Max((float)diff / 1000, 0.000001f);
 
             if (UIManager.ViewportWantsInput || !ImGui.GetIO().WantCaptureKeyboard)
-                _camera?.ProcessKeyboard(_deltaTime,  _settings.CameraSensitivity);
+                _camera?.ProcessKeyboard(_deltaTime, _settings.CameraSensitivity);
 
             ProcessPendingLoads();
             OnRender(_deltaTime);
@@ -121,14 +121,13 @@ namespace XNOEdit
             return SDL.AppResult.Continue;
         }
 
-        private static SDL.AppResult AppEvent(IntPtr appstate, ref SDL.Event @event)
+        private static SDL.AppResult AppEvent(IntPtr appState, ref SDL.Event @event)
         {
             switch (@event.Type)
             {
                 case (uint)SDL.EventType.WindowResized:
                     var window = SDL.GetWindowFromEvent(@event);
                     SDL.GetWindowSizeInPixels(window, out var width, out var height);
-
                     OnFramebufferResize(new Vector2(width, height));
                     break;
                 case (uint)SDL.EventType.DropFile:

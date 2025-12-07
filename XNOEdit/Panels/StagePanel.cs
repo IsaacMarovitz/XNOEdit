@@ -55,8 +55,9 @@ namespace XNOEdit.Panels
                 ImGui.PushID(i);
 
                 var visible = _visibility.GetXnoVisible(i);
-                if (ImGui.Checkbox($"##VisibilityObject{i + 1}", ref visible))
+                if (ImGuiComponents.StyledCheckbox($"##VisibilityObject{i + 1}", visible))
                 {
+                    visible = !visible;
                     _visibility.SetXnoVisible(i, visible);
                 }
 

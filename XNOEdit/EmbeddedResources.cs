@@ -18,6 +18,13 @@ namespace XNOEdit
             return ReadAllText(assembly, path);
         }
 
+        public static byte[] ReadAllBytes(string filename)
+        {
+            var (assembly, path) = ResolveManifestPath(filename);
+
+            return ReadAllBytes(assembly, path);
+        }
+
         public static string ReadAllText(Assembly assembly, string filename)
         {
             using var stream = GetStream(assembly, filename);
@@ -28,6 +35,23 @@ namespace XNOEdit
 
             using var reader = new StreamReader(stream);
             return reader.ReadToEnd();
+        }
+
+        public static byte[] ReadAllBytes(Assembly assembly, string filename)
+        {
+            using var stream = GetStream(assembly, filename);
+            if (stream == null)
+            {
+                throw new FileNotFoundException($"{filename} in {assembly}");
+            }
+
+            byte[] bytes;
+
+            using var memoryStream = new MemoryStream();
+            stream.CopyTo(memoryStream);
+            bytes = memoryStream.ToArray();
+
+            return bytes;
         }
 
         public static Stream GetStream(Assembly assembly, string filename)

@@ -2,6 +2,7 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Silk.NET.WebGPU;
+using XNOEdit.Fonts;
 using XNOEdit.Logging;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
@@ -24,6 +25,7 @@ namespace XNOEdit.Managers
         private ISceneVisibility? _currentVisibility;
 
         public bool ViewportWantsInput => ViewportPanel?.IsHovered ?? false;
+        public ImFontPtr FaFont => _faFont;
 
         private AlertPanel? _alertPanel;
 
@@ -36,7 +38,9 @@ namespace XNOEdit.Managers
         private float _sunAzimuth;
         private float _sunAltitude;
 
-        public void OnLoad(ImGuiController controller, WebGPU wgpu, WgpuDevice device)
+        private ImFontPtr _faFont;
+
+        public unsafe void OnLoad(ImGuiController controller, WebGPU wgpu, WgpuDevice device)
         {
             Controller = controller;
             _alertPanel = new AlertPanel();
@@ -44,7 +48,30 @@ namespace XNOEdit.Managers
             StagesPanel = new StagesPanel(this);
             ViewportPanel = new ViewportPanel(wgpu, device, controller);
 
-            ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
+            var io = ImGui.GetIO();
+            io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
+            io.ConfigDpiScaleFonts = true;
+
+            var interBytes = EmbeddedResources.ReadAllBytes("XNOEdit/Fonts/Inter.ttf");
+            var faBytes = EmbeddedResources.ReadAllBytes("XNOEdit/Fonts/FA-Solid.ttf");
+            ushort[] faRanges = [FontAwesome7.IconMin, FontAwesome7.IconMax, 0];
+
+            fixed (byte* pBytes = interBytes)
+            fixed (byte* pFaBytes = faBytes)
+            fixed (ushort* pFaRanges = faRanges)
+            {
+                var config = ImGui.ImFontConfig();
+                config.FontDataOwnedByAtlas = false;
+
+                var font = io.Fonts.AddFontFromMemoryTTF(pBytes, interBytes.Length, 15f, config);
+                io.FontDefault = font;
+
+                config.GlyphOffset = new Vector2(0, 1);
+                config.MergeMode = true;
+                config.PixelSnapH = true;
+
+                _faFont = io.Fonts.AddFontFromMemoryTTF(pFaBytes, faBytes.Length, 15f, config, (uint*)pFaRanges);
+            }
         }
 
         public void InitSunAngles(RenderSettings settings)
