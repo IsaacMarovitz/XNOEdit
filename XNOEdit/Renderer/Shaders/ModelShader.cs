@@ -62,7 +62,7 @@ namespace XNOEdit.Renderer.Shaders
                     {
                         Topology = PrimitiveTopology.TriangleList,
                         CullMode = CullMode.None,
-                        FrontFace = FrontFace.CW,
+                        FrontFace = FrontFace.Ccw,
                         DepthWrite = true,
                         DepthCompare = CompareFunction.Greater,
                         AlphaBlend = true
@@ -71,7 +71,7 @@ namespace XNOEdit.Renderer.Shaders
                     {
                         Topology = PrimitiveTopology.TriangleList,
                         CullMode = CullMode.Back,
-                        FrontFace = FrontFace.CW,
+                        FrontFace = FrontFace.Ccw,
                         DepthWrite = true,
                         DepthCompare = CompareFunction.Greater,
                         AlphaBlend = true
@@ -80,7 +80,7 @@ namespace XNOEdit.Renderer.Shaders
                     {
                         Topology = PrimitiveTopology.LineList,
                         CullMode = CullMode.None,
-                        FrontFace = FrontFace.CW,
+                        FrontFace = FrontFace.Ccw,
                         DepthWrite = true,
                         DepthCompare = CompareFunction.Greater,
                         AlphaBlend = false
