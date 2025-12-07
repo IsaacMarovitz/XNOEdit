@@ -222,6 +222,7 @@ namespace XNOEdit
                     SDL.SetWindowRelativeMouseMode(_window, false);
 
                     break;
+                case (uint)SDL.EventType.Quit:
                 case (uint)SDL.EventType.WindowCloseRequested:
                     return SDL.AppResult.Success;
             }
@@ -618,6 +619,9 @@ namespace XNOEdit
                 _wgpu.QueueRelease(_queue);
 
             _device?.Dispose();
+
+            SDL.DestroyWindow(_window);
+            SDL.Quit();
         }
 
         private static void OnFileDrop(string file)
