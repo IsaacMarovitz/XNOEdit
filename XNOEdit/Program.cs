@@ -137,56 +137,44 @@ namespace XNOEdit
                     break;
                 case (uint)SDL.EventType.TextInput:
                     var input = Encoding.UTF8.GetString((byte*)@event.Text.Text, 32);
-                    UIManager.Controller?.KeyChar(input);
+                    UIManager.Controller?.UpdateImguiInput(input);
                     break;
                 case (uint)SDL.EventType.KeyDown:
-                    if (ImGui.GetIO().WantCaptureKeyboard) {
-                        UIManager.Controller?.KeyDown(@event.Key.Key);
+                    UIManager.Controller?.UpdateImGuiKey(@event.Key.Key, true);
+                    UIManager.Controller?.UpdateImGuiKeyModifiers(@event.Key.Mod);
 
-                        if (_mouseCaptured)
-                            _camera?.UpdateKeyDown(@event.Key.Key);
-
-                        break;
-                    }
-
-                    if (UIManager.ViewportWantsInput)
-                    {
+                    if ((UIManager.ViewportWantsInput && !ImGui.GetIO().WantCaptureKeyboard) || _mouseCaptured) {
                         _camera?.UpdateKeyDown(@event.Key.Key);
-                    }
-                    else if (_camera?.IsKeyDown(@event.Key.Key) ?? false)
+                    } else if (_camera?.IsKeyDown(@event.Key.Key) ?? false)
                     {
                         _camera.UpdateKeyUp(@event.Key.Key);
                     }
 
-                    var toggle = SettingsToggle.None;
+                    if (ImGui.GetIO().WantCaptureKeyboard) break;
 
-                    switch (@event.Key.Key)
+                    var toggle = @event.Key.Key switch
                     {
-                        case SDL.Keycode.F:
-                            toggle = SettingsToggle.WireframeMode;
-                            break;
-                        case SDL.Keycode.G:
-                            toggle = SettingsToggle.ShowGrid;
-                            break;
-                        case SDL.Keycode.C:
-                            toggle = SettingsToggle.BackfaceCulling;
-                            break;
-                        case SDL.Keycode.V:
-                            toggle = SettingsToggle.VertexColors;
-                            break;
-                        case SDL.Keycode.R:
-                            UIManager.TriggerAlert(AlertLevel.Info, "Camera Reset");
-                            ResetCamera();
-                            break;
-                    }
+                        SDL.Keycode.F => SettingsToggle.WireframeMode,
+                        SDL.Keycode.G => SettingsToggle.ShowGrid,
+                        SDL.Keycode.C => SettingsToggle.BackfaceCulling,
+                        SDL.Keycode.V => SettingsToggle.VertexColors,
+                        _ => SettingsToggle.None
+                    };
 
                     if (toggle != SettingsToggle.None)
                         OnRenderSettingsChanged(toggle);
 
+                    if (@event.Key.Key == SDL.Keycode.R)
+                    {
+                        UIManager.TriggerAlert(AlertLevel.Info, "Camera Reset");
+                        ResetCamera();
+                    }
+
                     break;
                 case (uint)SDL.EventType.KeyUp:
                     _camera?.UpdateKeyUp(@event.Key.Key);
-                    UIManager.Controller?.KeyUp(@event.Key.Key);
+                    UIManager.Controller?.UpdateImGuiKey(@event.Key.Key, false);
+                    UIManager.Controller?.UpdateImGuiKeyModifiers(@event.Key.Mod);
                     break;
                 case (uint)SDL.EventType.MouseMotion:
                     UIManager.Controller?.UpdateImGuiMouseMove(@event.Motion.X, @event.Motion.Y);
@@ -212,7 +200,7 @@ namespace XNOEdit
 
                     break;
                 case (uint)SDL.EventType.MouseButtonDown:
-                    UIManager.Controller?.UpdateImGuiMouseDown(@event.Button.Button);
+                    UIManager.Controller?.UpdateImGuiMouse(@event.Button.Button, true);
 
                     if (@event.Button.Button != SDL.ButtonLeft)
                         break;
@@ -226,7 +214,7 @@ namespace XNOEdit
 
                     break;
                 case (uint)SDL.EventType.MouseButtonUp:
-                    UIManager.Controller?.UpdateImGuiMouseUp(@event.Button.Button);
+                    UIManager.Controller?.UpdateImGuiMouse(@event.Button.Button, false);
 
                     if (@event.Button.Button != SDL.ButtonLeft)
                         break;

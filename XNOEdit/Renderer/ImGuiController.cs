@@ -33,7 +33,6 @@ namespace XNOEdit.Renderer
 
         private readonly Dictionary<nint, IntPtr> _textureBindGroups = [];
         private readonly Dictionary<nint, IntPtr> _gpuTextures = [];
-        private readonly Dictionary<SDL.Keycode, bool> _keyEvents = [];
 
         public ImGuiController(
             WebGPU wgpu,
@@ -53,7 +52,6 @@ namespace XNOEdit.Renderer
         public void Update(float delta)
         {
             SetPerFrameImGuiData(delta);
-            UpdateImGuiInput();
             ImGui.NewFrame();
         }
 
@@ -532,32 +530,44 @@ namespace XNOEdit.Renderer
             return imguiKey != ImGuiKey.None;
         }
 
-        public void UpdateImGuiMouseDown(int button)
+        public void UpdateImGuiMouse(int button, bool down)
         {
             var io = ImGui.GetIO();
 
             if (button == SDL.ButtonLeft)
-                io.MouseDown[0] = true;
+                io.MouseDown[0] = down;
 
             if (button == SDL.ButtonRight)
-                io.MouseDown[1] = true;
+                io.MouseDown[1] = down;
 
             if (button == SDL.ButtonMiddle)
-                io.MouseDown[2] = true;
+                io.MouseDown[2] = down;
         }
 
-        public void UpdateImGuiMouseUp(int button)
+        public void UpdateImGuiKey(SDL.Keycode keycode, bool down)
         {
             var io = ImGui.GetIO();
 
-            if (button == SDL.ButtonLeft)
-                io.MouseDown[0] = false;
+            if (TryMapKeys(keycode, out var imguiKey))
+            {
+                io.AddKeyEvent(imguiKey, down);
+            }
+        }
 
-            if (button == SDL.ButtonRight)
-                io.MouseDown[1] = false;
+        public void UpdateImguiInput(string input)
+        {
+            var io = ImGui.GetIO();
+            io.AddInputCharactersUTF8(input);
+        }
 
-            if (button == SDL.ButtonMiddle)
-                io.MouseDown[2] = false;
+        public void UpdateImGuiKeyModifiers(SDL.Keymod keymod)
+        {
+            var io = ImGui.GetIO();
+
+            io.AddKeyEvent(ImGuiKey.ModCtrl, (keymod & SDL.Keymod.Ctrl) != 0);
+            io.AddKeyEvent(ImGuiKey.ModShift, (keymod & SDL.Keymod.Shift) != 0);
+            io.AddKeyEvent(ImGuiKey.ModAlt, (keymod & SDL.Keymod.Alt) != 0);
+            io.AddKeyEvent(ImGuiKey.ModSuper, (keymod & SDL.Keymod.GUI) != 0);
         }
 
         public void UpdateImGuiMouseMove(float x, float y)
@@ -571,20 +581,6 @@ namespace XNOEdit.Renderer
             var io = ImGui.GetIO();
             io.MouseWheel = y;
             io.MouseWheelH = x;
-        }
-
-        public void UpdateImGuiInput()
-        {
-            var io = ImGui.GetIO();
-
-            foreach (var evt in _keyEvents)
-            {
-                if (TryMapKeys(evt.Key, out var imguiKey))
-                {
-                    io.AddKeyEvent(imguiKey, evt.Value);
-                }
-            }
-            _keyEvents.Clear();
         }
 
         private void SetPerFrameImGuiData(float deltaSeconds)
@@ -756,22 +752,6 @@ namespace XNOEdit.Renderer
                 frameRenderBuffer.IndexBufferGpu = new WgpuBuffer<byte>(_wgpu, _device, BufferUsage.Index | BufferUsage.CopyDst, indexSize);
                 frameRenderBuffer.IndexBufferMemory = GlobalMemory.Allocate((int)indexSize);
             }
-        }
-
-        public void KeyChar(string input)
-        {
-            var io = ImGui.GetIO();
-            io.AddInputCharactersUTF8(input);
-        }
-
-        public void KeyDown(SDL.Keycode key)
-        {
-            _keyEvents[key] = true;
-        }
-
-        public void KeyUp(SDL.Keycode key)
-        {
-            _keyEvents[key] = false;
         }
 
         public void Dispose()
