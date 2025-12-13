@@ -78,6 +78,8 @@ namespace XNOEdit.Services
         {
             return await Task.Run(() =>
             {
+                Logger.Info?.PrintMsg(LogClass.Application, $"Loading XNO: {file.Name}");
+
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report(new LoadProgress(LoadStage.Decompressing, $"Decompressing {file.Name}..."));
 
@@ -118,6 +120,8 @@ namespace XNOEdit.Services
         {
             return await Task.Run(() =>
             {
+                Logger.Info?.PrintMsg(LogClass.Application, $"Loading Mission: {file.Name}");
+
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report(new LoadProgress(LoadStage.Decompressing, $"Decompressing {file.Name}..."));
 
