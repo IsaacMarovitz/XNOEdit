@@ -27,7 +27,8 @@
 
     <ItemGroup>
         <EmbeddedResource Include="Shaders\shader_common.h" />
-        <EmbeddedResource Include="Shaders\BasicModel.wgsl" />
+        <EmbeddedResource Include="Shaders\InstancedModel.wgsl" />
+        <EmbeddedResource Include="Shaders\Model.wgsl" />
         <EmbeddedResource Include="Shaders\Grid.wgsl" />
         <EmbeddedResource Include="Shaders\Skybox.wgsl" />
         <EmbeddedResource Include="Shaders\ImGui.wgsl" />

@@ -20,12 +20,12 @@ namespace XNOEdit.Panels
         private void TriggerFileLoad(ImGuiComponents.File file, ReadOnlyDictionary<string, string> files)
         {
             var arcName = files.FirstOrDefault(x => x.Value == file.Identifier).Value;
-            var arcPath = Path.Join([
+            var arcPath = Path.Join(
                 Configuration.GameFolder,
                 "win32",
                 "archives",
                 $"{arcName}.arc"
-            ]);
+            );
 
             try
             {

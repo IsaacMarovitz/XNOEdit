@@ -324,11 +324,12 @@ namespace XNOEdit.Renderer
             RenderPassEncoder* passEncoder,
             bool wireframe,
             TextureManager textureManager,
-            ModelShader shader)
+            ModelShader shader,
+            int instanceCount = 1)
         {
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(passEncoder, wireframe, textureManager, shader);
+                mesh.Draw(passEncoder, wireframe, textureManager, shader, instanceCount);
             }
         }
 
@@ -414,7 +415,8 @@ namespace XNOEdit.Renderer
             RenderPassEncoder* passEncoder,
             bool wireframe,
             TextureManager textureManager,
-            ModelShader shader)
+            ModelShader shader,
+            int instanceCount = 1)
         {
             if (!Visible) return;
 
@@ -432,7 +434,7 @@ namespace XNOEdit.Renderer
             _textureBindGroup = shader.GetTextureBindGroup(mainTexture, blendTexture, normalTexture, lightmapTexture);
             _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 2, _textureBindGroup, 0, null);
 
-            _geometry.Draw(passEncoder, wireframe);
+            _geometry.Draw(passEncoder, wireframe, instanceCount);
         }
 
         public void Dispose()

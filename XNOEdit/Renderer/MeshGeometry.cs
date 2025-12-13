@@ -156,7 +156,7 @@ namespace XNOEdit.Renderer
         /// <summary>
         /// Draws the geometry (triangles or wireframe)
         /// </summary>
-        public void Draw(RenderPassEncoder* passEncoder, bool wireframe = false)
+        public void Draw(RenderPassEncoder* passEncoder, bool wireframe = false, int instanceCount = 1)
         {
             if (wireframe)
             {
@@ -168,7 +168,7 @@ namespace XNOEdit.Renderer
                     IndexFormat.Uint16,
                     0,
                     _wireframeIndexBuffer.Size);
-                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, WireframeIndexCount, 1, 0, 0, 0);
+                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, WireframeIndexCount, (uint)instanceCount, 0, 0, 0);
             }
             else
             {
@@ -180,7 +180,8 @@ namespace XNOEdit.Renderer
                     IndexFormat.Uint16,
                     0,
                     _indexBuffer.Size);
-                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, IndexCount, 1, 0, 0, 0);
+
+                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, IndexCount, (uint)instanceCount, 0, 0, 0);
             }
         }
 

@@ -10,14 +10,14 @@ namespace XNOEdit.Panels
     public class MissionsPanel
     {
         public const string Name = "Missions";
-        public event Action<IFile> LoadSet;
+        public event Action<IFile> LoadMission;
 
         private class TreeNode
         {
             public string Name { get; }
             public List<TreeNode> Children { get; } = [];
             public FileContainer? Container { get; }
-            public ReadOnlyCollection<string>? MissionSet { get; }
+            public MissionGroup MissionGroup { get; }
 
             // Branch node
             public TreeNode(string name)
@@ -27,11 +27,11 @@ namespace XNOEdit.Panels
             }
 
             // Leaf node
-            public TreeNode(string name, ReadOnlyCollection<string> missionSet)
+            public TreeNode(string name, MissionGroup missionGroup)
             {
                 Name = name;
                 Container = new FileContainer(name);
-                MissionSet = missionSet;
+                MissionGroup = missionGroup;
             }
 
             public TreeNode Add(string name, params TreeNode[] children)
@@ -71,69 +71,66 @@ namespace XNOEdit.Panels
             var root = new TreeNode("Stages");
 
             root.Add("Town",
-                new TreeNode("Castle Town", MissionsMap.TwnAMissions),
-                new TreeNode("New City", MissionsMap.TwnBMissions),
-                new TreeNode("Forest", MissionsMap.TwnCMissions),
-                new TreeNode("Circuit", MissionsMap.TwnDMissions));
+                new TreeNode("Castle Town", MissionsMap.TwnAMissionGroup),
+                new TreeNode("New City", MissionsMap.TwnBMissionGroup),
+                new TreeNode("Forest", MissionsMap.TwnCMissionGroup),
+                new TreeNode("Circuit", MissionsMap.TwnDMissionGroup));
 
             root.Add("Wave Ocean",
-                new TreeNode("Section A", MissionsMap.WvoAMissions),
-                new TreeNode("Section B", MissionsMap.WvoBMissions));
+                new TreeNode("Section A", MissionsMap.WvoAMissionGroup),
+                new TreeNode("Section B", MissionsMap.WvoBMissionGroup));
 
             root.Add("Dusty Desert",
-                new TreeNode("Section A", MissionsMap.DtdAMissions),
-                new TreeNode("Section B", MissionsMap.DtdBMissions));
+                new TreeNode("Section A", MissionsMap.DtdAMissionGroup),
+                new TreeNode("Section B", MissionsMap.DtdBMissionGroup));
 
             root.Add("White Acropolis",
-                new TreeNode("Section A", MissionsMap.WapAMissions),
-                new TreeNode("Section B", MissionsMap.WapBMissions));
+                new TreeNode("Section A", MissionsMap.WapAMissionGroup),
+                new TreeNode("Section B", MissionsMap.WapBMissionGroup));
 
             root.Add("Crisis City",
-                new TreeNode("Section A", MissionsMap.CscAMissions),
-                new TreeNode("Section B", MissionsMap.CscBMissions),
-                new TreeNode("Section C", MissionsMap.CscCMissions),
-                new TreeNode("Section E", MissionsMap.CscEMissions),
-                new TreeNode("Section F", MissionsMap.CscFMissions));
+                new TreeNode("Section A", MissionsMap.CscAMissionGroup),
+                new TreeNode("Section B", MissionsMap.CscBMissionGroup),
+                new TreeNode("Section C", MissionsMap.CscCMissionGroup),
+                new TreeNode("Section E", MissionsMap.CscEMissionGroup),
+                new TreeNode("Section F", MissionsMap.CscFMissionGroup));
 
             root.Add("Flame Core",
-                new TreeNode("Section A", MissionsMap.FlcAMissions),
-                new TreeNode("Section B", MissionsMap.FlcBMissions),
-                new TreeNode("Section C", MissionsMap.FlcCMissions));
+                new TreeNode("Section A", MissionsMap.FlcAMissionGroup),
+                new TreeNode("Section B", MissionsMap.FlcBMissionGroup),
+                new TreeNode("Section C", MissionsMap.FlcCMissionGroup));
 
             root.Add("Radical Train",
-                new TreeNode("Section A", MissionsMap.RctAMissions),
-                new TreeNode("Section B", MissionsMap.RctBMissions));
+                new TreeNode("Section A", MissionsMap.RctAMissionGroup),
+                new TreeNode("Section B", MissionsMap.RctBMissionGroup));
 
             root.Add("Tropical Jungle",
-                new TreeNode("Section A", MissionsMap.TpjAMissions),
-                new TreeNode("Section B", MissionsMap.TpjBMissions),
-                new TreeNode("Section C", MissionsMap.TpjCMissions));
+                new TreeNode("Section A", MissionsMap.TpjAMissionGroup),
+                new TreeNode("Section B", MissionsMap.TpjBMissionGroup),
+                new TreeNode("Section C", MissionsMap.TpjCMissionGroup));
 
             root.Add("Kingdom Valley",
-                new TreeNode("Section A", MissionsMap.KdvAMissions),
-                new TreeNode("Section B", MissionsMap.KdvBMissions),
-                new TreeNode("Section C", MissionsMap.KdvCMissions),
-                new TreeNode("Section D", MissionsMap.KdvDMissions));
+                new TreeNode("Section A", MissionsMap.KdvAMissionGroup),
+                new TreeNode("Section B", MissionsMap.KdvBMissionGroup),
+                new TreeNode("Section C", MissionsMap.KdvCMissionGroup),
+                new TreeNode("Section D", MissionsMap.KdvDMissionGroup));
 
             root.Add("Aquatic Base",
-                new TreeNode("Section A", MissionsMap.AqaAMissions),
-                new TreeNode("Section B", MissionsMap.AqaBMissions));
-
-            root.Add("End of the World",
-                new TreeNode("Section A", MissionsMap.EndAMissions));
+                new TreeNode("Section A", MissionsMap.AqaAMissionGroup),
+                new TreeNode("Section B", MissionsMap.AqaBMissionGroup));
 
             root.Add("Bosses",
-                new TreeNode("Dusty Desert Arena", MissionsMap.Dr1DtdMissions),
-                new TreeNode("White Acropolis Arena", MissionsMap.Dr1WapMissions),
-                new TreeNode("Forest Arena", MissionsMap.Dr2Missions),
-                new TreeNode("Radical Train Arena", MissionsMap.ShadowVsSilverMissions),
-                new TreeNode("Egg Wyvern", MissionsMap.Dr3Missions),
-                new TreeNode("Iblis 1", MissionsMap.FirstIblisMissions),
-                new TreeNode("Iblis 2", MissionsMap.SecondIblisMissions),
-                new TreeNode("Iblis 3", MissionsMap.ThirdIblisMissions),
-                new TreeNode("Mephiles 1", MissionsMap.FirstMefMissions),
-                new TreeNode("Mephiles 2", MissionsMap.SecondMefMissions),
-                new TreeNode("Solaris", MissionsMap.SolarisMissions));
+                new TreeNode("Dusty Desert Arena", MissionsMap.Dr1DtdMissionGroup),
+                new TreeNode("White Acropolis Arena", MissionsMap.Dr1WapMissionGroup),
+                new TreeNode("Forest Arena", MissionsMap.Dr2MissionGroup),
+                new TreeNode("Radical Train Arena", MissionsMap.ShadowVsSilverMissionGroup),
+                new TreeNode("Egg Wyvern", MissionsMap.Dr3MissionGroup),
+                new TreeNode("Iblis 1", MissionsMap.FirstIblisMissionGroup),
+                new TreeNode("Iblis 2", MissionsMap.SecondIblisMissionGroup),
+                new TreeNode("Iblis 3", MissionsMap.ThirdIblisMissionGroup),
+                new TreeNode("Mephiles 1", MissionsMap.FirstMefMissionGroup),
+                new TreeNode("Mephiles 2", MissionsMap.SecondMefMissionGroup),
+                new TreeNode("Solaris", MissionsMap.SolarisMissionGroup));
 
             return root;
         }
@@ -151,7 +148,7 @@ namespace XNOEdit.Panels
             foreach (var node in scriptsArchive.EnumerateFiles("*.set", SearchOption.AllDirectories))
             {
                 var name = Path.GetFileNameWithoutExtension(node.Path);
-                var leaf = leaves.FirstOrDefault(l => l.MissionSet!.Contains(name));
+                var leaf = leaves.FirstOrDefault(l => l.MissionGroup.Missions.Contains(name));
 
                 if (leaf != null)
                     leaf.Container!.Add(node);
@@ -162,7 +159,7 @@ namespace XNOEdit.Panels
 
         private void TriggerFileLoad(ImGuiComponents.File file, ReadOnlyCollection<IFile> files)
         {
-            LoadSet?.Invoke(files.FirstOrDefault(x => x.Name == file.Identifier));
+            LoadMission?.Invoke(files.FirstOrDefault(x => x.Name == file.Identifier));
         }
 
         private void DrawTreeNode(TreeNode node)

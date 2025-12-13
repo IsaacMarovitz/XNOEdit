@@ -4,49 +4,81 @@ namespace XNOEdit
 {
     public static class MissionsMap
     {
-        public static ReadOnlyCollection<string> TwnAMissions => _twnAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> TwnBMissions => _twnBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> TwnCMissions => _twnCMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> TwnDMissions => _twnDMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> EndAMissions => _endAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> WvoAMissions => _wvoAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> WvoBMissions => _wvoBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> DtdAMissions => _dtdAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> DtdBMissions => _dtdBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> CscAMissions => _cscAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> CscBMissions => _cscBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> CscCMissions => _cscCMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> CscEMissions => _cscEMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> CscFMissions => _cscFMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> FlcAMissions => _flcAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> FlcBMissions => _flcBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> FlcCMissions => _flcCMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> TpjAMissions => _tpjAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> TpjBMissions => _tpjBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> TpjCMissions => _tpjCMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> RctAMissions => _rctAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> RctBMissions => _rctBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> AqaAMissions => _aqaAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> AqaBMissions => _aqaBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> KdvAMissions => _kdvAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> KdvBMissions => _kdvBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> KdvCMissions => _kdvCMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> KdvDMissions => _kdvDMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> WapAMissions => _wapAMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> WapBMissions => _wapBMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> Dr1DtdMissions => _dr1DtdMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> Dr1WapMissions => _dr1WapMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> Dr2Missions => _dr2Missions.AsReadOnly();
-        public static ReadOnlyCollection<string> Dr3Missions => _dr3Missions.AsReadOnly();
-        public static ReadOnlyCollection<string> ShadowVsSilverMissions => _shadowVsSilverMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> FirstIblisMissions => _firstIblisMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> SecondIblisMissions => _secondIblisMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> ThirdIblisMissions => _thirdIblisMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> FirstMefMissions => _firstMefMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> SecondMefMissions => _secondMefMissions.AsReadOnly();
-        public static ReadOnlyCollection<string> SolarisMissions => _solarisMissions.AsReadOnly();
+        public static MissionGroup TwnAMissionGroup => new(TwnAMissions, "stage_twn_a");
+        public static MissionGroup TwnBMissionGroup => new(TwnBMissions, "stage_twn_b");
+        public static MissionGroup TwnCMissionGroup => new(TwnCMissions, "stage_twn_c");
+        public static MissionGroup TwnDMissionGroup => new(TwnDMissions, "stage_twn_d");
+        public static MissionGroup WvoAMissionGroup => new(WvoAMissions, "stage_wvo_a");
+        public static MissionGroup WvoBMissionGroup => new(WvoBMissions, "stage_wvo_b");
+        public static MissionGroup DtdAMissionGroup => new(DtdAMissions, "stage_dtd_a");
+        public static MissionGroup DtdBMissionGroup => new(DtdBMissions, "stage_dtd_b");
+        public static MissionGroup CscAMissionGroup => new(CscAMissions, "stage_csc_a");
+        public static MissionGroup CscBMissionGroup => new(CscBMissions, "stage_csc_b");
+        public static MissionGroup CscCMissionGroup => new(CscCMissions, "stage_csc_c");
+        public static MissionGroup CscEMissionGroup => new(CscEMissions, "stage_csc_e");
+        public static MissionGroup CscFMissionGroup => new(CscFMissions, "stage_csc_f");
+        public static MissionGroup FlcAMissionGroup => new(FlcAMissions, "stage_flc_a");
+        public static MissionGroup FlcBMissionGroup => new(FlcBMissions, "stage_flc_b");
+        public static MissionGroup FlcCMissionGroup => new(FlcCMissions, "stage_flc_c");
+        public static MissionGroup TpjAMissionGroup => new(TpjAMissions, "stage_tpj_a");
+        public static MissionGroup TpjBMissionGroup => new(TpjBMissions, "stage_tpj_b");
+        public static MissionGroup TpjCMissionGroup => new(TpjCMissions, "stage_tpj_c");
+        public static MissionGroup RctAMissionGroup => new(RctAMissions, "stage_rct_a");
+        public static MissionGroup RctBMissionGroup => new(RctBMissions, "stage_rct_b");
+        public static MissionGroup AqaAMissionGroup => new(AqaAMissions, "stage_aqa_a");
+        public static MissionGroup AqaBMissionGroup => new(AqaBMissions, "stage_aqa_b");
+        public static MissionGroup KdvAMissionGroup => new(KdvAMissions, "stage_kdv_a");
+        public static MissionGroup KdvBMissionGroup => new(KdvBMissions, "stage_kdv_b");
+        public static MissionGroup KdvCMissionGroup => new(KdvCMissions, "stage_kdv_c");
+        public static MissionGroup KdvDMissionGroup => new(KdvDMissions, "stage_kdv_d");
+        public static MissionGroup WapAMissionGroup => new(WapAMissions, "stage_wap_a");
+        public static MissionGroup WapBMissionGroup => new(WapBMissions, "stage_wap_b");
+        public static MissionGroup Dr1DtdMissionGroup => new(Dr1DtdMissions, "stage_boss_dr1_dtd");
+        public static MissionGroup Dr1WapMissionGroup => new(Dr1WapMissions, "stage_boss_dr1_wap");
+        public static MissionGroup Dr2MissionGroup => new(Dr2Missions, "stage_boss_dr2");
+        public static MissionGroup Dr3MissionGroup => new(Dr3Missions, "stage_boss_dr3");
+        public static MissionGroup ShadowVsSilverMissionGroup => new(ShadowVsSilverMissions, "stage_boss_rct");
+        public static MissionGroup FirstIblisMissionGroup => new(FirstIblisMissions, "stage_csc_iblis01");
+        public static MissionGroup SecondIblisMissionGroup => new(SecondIblisMissions, "stage_boss_iblis02");
+        public static MissionGroup ThirdIblisMissionGroup => new(ThirdIblisMissions, "stage_boss_iblis03");
+        public static MissionGroup FirstMefMissionGroup => new(FirstMefMissions, "stage_boss_mefi01");
+        public static MissionGroup SecondMefMissionGroup => new(SecondMefMissions, "stage_boss_mefi02");
+        public static MissionGroup SolarisMissionGroup => new(SolarisMissions, "stage_boss_solaris");
 
-        private static readonly string[] _twnAMissions =
+        private static readonly MissionGroup[] All;
+
+        static MissionsMap()
+        {
+            All = [
+                TwnAMissionGroup, TwnBMissionGroup, TwnCMissionGroup, TwnDMissionGroup,
+                WvoAMissionGroup, WvoBMissionGroup,
+                DtdAMissionGroup, DtdBMissionGroup,
+                CscAMissionGroup, CscBMissionGroup, CscCMissionGroup, CscEMissionGroup, CscFMissionGroup,
+                FlcAMissionGroup, FlcBMissionGroup, FlcCMissionGroup,
+                TpjAMissionGroup, TpjBMissionGroup, TpjCMissionGroup,
+                RctAMissionGroup, RctBMissionGroup,
+                AqaAMissionGroup, AqaBMissionGroup,
+                KdvAMissionGroup, KdvBMissionGroup, KdvCMissionGroup, KdvDMissionGroup,
+                WapAMissionGroup, WapBMissionGroup,
+                Dr1DtdMissionGroup, Dr1WapMissionGroup, Dr2MissionGroup, Dr3MissionGroup,
+                ShadowVsSilverMissionGroup,
+                FirstIblisMissionGroup, SecondIblisMissionGroup, ThirdIblisMissionGroup,
+                FirstMefMissionGroup, SecondMefMissionGroup,
+                SolarisMissionGroup
+            ];
+        }
+
+        private static MissionGroup? GetGroup(string setName)
+        {
+            return All.FirstOrDefault(g => g.Missions.Contains(setName));
+        }
+
+        public static string? GetTerrainPath(string setName)
+        {
+            return GetGroup(setName)?.Terrain;
+        }
+
+        private static readonly ReadOnlyCollection<string> TwnAMissions =
         [
             "set_mission_0001",
             "set_mission_0004",
@@ -162,7 +194,7 @@ namespace XNOEdit
             "set_silver_vs_sonic",
         ];
 
-        private static readonly string[] _twnBMissions =
+        private static readonly ReadOnlyCollection<string> TwnBMissions =
         [
             "set_twn_b_060228",
             "set_mission_0004b",
@@ -279,7 +311,7 @@ namespace XNOEdit
             "set_mission_1240_00"
         ];
 
-        private static readonly string[] _twnCMissions =
+        private static readonly ReadOnlyCollection<string> TwnCMissions =
         [
             "set_twn_c",
             "set_mission_0008c_01",
@@ -354,7 +386,7 @@ namespace XNOEdit
             "set_mission_1238_01"
         ];
 
-        private static readonly string[] _twnDMissions =
+        private static readonly ReadOnlyCollection<string> TwnDMissions =
         [
             "set_mission_1012_01",
             "set_mission_1108_01",
@@ -362,12 +394,7 @@ namespace XNOEdit
             "set_mission_1130_01"
         ];
 
-        private static readonly string[] _endAMissions =
-        [
-            "set_end_a_sonic",
-        ];
-
-        private static readonly string[] _wvoAMissions =
+        private static readonly ReadOnlyCollection<string> WvoAMissions =
         [
             "set_wvoA_sonic",
             "set_wvoA_sonic_h",
@@ -381,7 +408,7 @@ namespace XNOEdit
             "set_wvo_a_tag"
         ];
 
-        private static readonly string[] _wvoBMissions =
+        private static readonly ReadOnlyCollection<string> WvoBMissions =
         [
             "set_wvoB_sonic",
             "set_wvoB_sonic_h",
@@ -389,7 +416,7 @@ namespace XNOEdit
             "set_wvoB_shadow_h",
         ];
 
-        private static readonly string[] _dtdAMissions =
+        private static readonly ReadOnlyCollection<string> DtdAMissions =
         [
             "set_dtd_a_sonic",
             "set_dtd_a_sonic_h",
@@ -398,7 +425,7 @@ namespace XNOEdit
             "set_end_d_sonic"
         ];
 
-        private static readonly string[] _dtdBMissions =
+        private static readonly ReadOnlyCollection<string> DtdBMissions =
         [
             "set_dtd_b_shadow",
             "set_dtd_b_shadow_h",
@@ -407,7 +434,7 @@ namespace XNOEdit
             "set_dtd_b_tag"
         ];
 
-        private static readonly string[] _cscAMissions =
+        private static readonly ReadOnlyCollection<string> CscAMissions =
         [
             "set_cscA_sonic",
             "set_cscA_sonic_h",
@@ -415,7 +442,7 @@ namespace XNOEdit
             "set_cscA_shadow_h"
         ];
 
-        private static readonly string[] _cscBMissions =
+        private static readonly ReadOnlyCollection<string> CscBMissions =
         [
             "set_cscB_sonic",
             "set_cscB_sonic_h",
@@ -426,7 +453,7 @@ namespace XNOEdit
             "set_csc_b_tag"
         ];
 
-        private static readonly string[] _cscCMissions =
+        private static readonly ReadOnlyCollection<string> CscCMissions =
         [
             "set_cscC_sonic",
             "set_cscC_sonic_h",
@@ -434,13 +461,13 @@ namespace XNOEdit
             "set_cscC_shadow_h"
         ];
 
-        private static readonly string[] _cscEMissions =
+        private static readonly ReadOnlyCollection<string> CscEMissions =
         [
             "set_cscE_sonic",
             "set_cscE_sonic_h"
         ];
 
-        private static readonly string[] _cscFMissions =
+        private static readonly ReadOnlyCollection<string> CscFMissions =
         [
             "set_cscF_shadow",
             "set_cscF_shadow_h",
@@ -451,7 +478,7 @@ namespace XNOEdit
             "set_end_a_sonic"
         ];
 
-        private static readonly string[] _flcAMissions =
+        private static readonly ReadOnlyCollection<string> FlcAMissions =
         [
             "set_flc_a_sonic",
             "set_flc_a_sonic_h",
@@ -463,7 +490,7 @@ namespace XNOEdit
             "set_flc_a_tag"
         ];
 
-        private static readonly string[] _flcBMissions =
+        private static readonly ReadOnlyCollection<string> FlcBMissions =
         [
             "set_flc_b_sonic",
             "set_flc_b_sonic_h",
@@ -473,24 +500,24 @@ namespace XNOEdit
             "set_flc_b_silver_h"
         ];
 
-        private static readonly string[] _flcCMissions =
+        private static readonly ReadOnlyCollection<string> FlcCMissions =
         [
             "set_flc_b_silver",
         ];
 
-        private static readonly string[] _tpjAMissions =
+        private static readonly ReadOnlyCollection<string> TpjAMissions =
         [
             "set_tpjA_sonic",
             "set_tpjA_sonic_h"
         ];
 
-        private static readonly string[] _tpjBMissions =
+        private static readonly ReadOnlyCollection<string> TpjBMissions =
         [
             "set_tpjB_sonic",
             "set_tpjB_sonic_h"
         ];
 
-        private static readonly string[] _tpjCMissions =
+        private static readonly ReadOnlyCollection<string> TpjCMissions =
         [
             "set_tpjC_rouge",
             "set_tpjC_rouge_h",
@@ -499,7 +526,7 @@ namespace XNOEdit
             "set_end_c_sonic"
         ];
 
-        private static readonly string[] _rctAMissions =
+        private static readonly ReadOnlyCollection<string> RctAMissions =
         [
             "set_rctA_sonic",
             "set_rctA_sonic_h",
@@ -509,7 +536,7 @@ namespace XNOEdit
             "set_rctA_silver_h"
         ];
 
-        private static readonly string[] _rctBMissions =
+        private static readonly ReadOnlyCollection<string> RctBMissions =
         [
             "set_rctB_sonic",
             "set_rctB_sonic_h",
@@ -517,7 +544,7 @@ namespace XNOEdit
             "set_rctB_shadow_h"
         ];
 
-        private static readonly string[] _aqaAMissions =
+        private static readonly ReadOnlyCollection<string> AqaAMissions =
         [
             "set_aqaA_sonic",
             "set_aqaA_sonic_h",
@@ -528,7 +555,7 @@ namespace XNOEdit
             "set_aqa_a_tag"
         ];
 
-        private static readonly string[] _aqaBMissions =
+        private static readonly ReadOnlyCollection<string> AqaBMissions =
         [
             "set_aqaB_sonic",
             "set_aqaB_sonic_h",
@@ -538,7 +565,7 @@ namespace XNOEdit
             "set_aqaB_silver_h"
         ];
 
-        private static readonly string[] _kdvAMissions =
+        private static readonly ReadOnlyCollection<string> KdvAMissions =
         [
             "set_kdv_a_sonic",
             "set_kdv_a_sonic_h",
@@ -548,7 +575,7 @@ namespace XNOEdit
             "set_kdv_a_tag"
         ];
 
-        private static readonly string[] _kdvBMissions =
+        private static readonly ReadOnlyCollection<string> KdvBMissions =
         [
             "set_kdv_b_sonic",
             "set_kdv_b_sonic_h",
@@ -558,13 +585,13 @@ namespace XNOEdit
             "set_kdv_b_silver_h"
         ];
 
-        private static readonly string[] _kdvCMissions =
+        private static readonly ReadOnlyCollection<string> KdvCMissions =
         [
             "set_kdv_c_sonic",
             "set_kdv_c_sonic_h"
         ];
 
-        private static readonly string[] _kdvDMissions =
+        private static readonly ReadOnlyCollection<string> KdvDMissions =
         [
             "set_kdv_d_sonic",
             "set_kdv_d_sonic_h",
@@ -574,7 +601,7 @@ namespace XNOEdit
             "set_kdv_d_silver_h"
         ];
 
-        private static readonly string[] _wapAMissions =
+        private static readonly ReadOnlyCollection<string> WapAMissions =
         [
             "set_wap_a_sonic",
             "set_wap_a_sonic_h",
@@ -584,7 +611,7 @@ namespace XNOEdit
             "set_wap_a_silver_h",
         ];
 
-        private static readonly string[] _wapBMissions =
+        private static readonly ReadOnlyCollection<string> WapBMissions =
         [
             "set_wap_b_sonic",
             "set_wap_b_sonic_h",
@@ -596,64 +623,76 @@ namespace XNOEdit
             "set_wap_b_tag"
         ];
 
-        private static readonly string[] _dr1DtdMissions =
+        private static readonly ReadOnlyCollection<string> Dr1DtdMissions =
         [
             "set_eCerberus_sonic",
         ];
 
-        private static readonly string[] _dr1WapMissions =
+        private static readonly ReadOnlyCollection<string> Dr1WapMissions =
         [
             "set_eCerberus_shadow",
             "set_eGenesis_silver"
         ];
 
-        private static readonly string[] _dr2Missions =
+        private static readonly ReadOnlyCollection<string> Dr2Missions =
         [
             "set_eGenesis_sonic"
         ];
 
-        private static readonly string[] _dr3Missions =
+        private static readonly ReadOnlyCollection<string> Dr3Missions =
         [
             "set_ewyvern_sonic"
         ];
 
-        private static readonly string[] _shadowVsSilverMissions =
+        private static readonly ReadOnlyCollection<string> ShadowVsSilverMissions =
         [
             "set_shadow_vs_silver",
             "set_silver_vs_shadow"
         ];
 
-        private static readonly string[] _firstIblisMissions =
+        private static readonly ReadOnlyCollection<string> FirstIblisMissions =
         [
             "set_iblis01_silver",
         ];
 
-        private static readonly string[] _secondIblisMissions =
+        private static readonly ReadOnlyCollection<string> SecondIblisMissions =
         [
             "set_secondiblis_sonic",
             "set_secondiblis_shadow"
         ];
 
-        private static readonly string[] _thirdIblisMissions =
+        private static readonly ReadOnlyCollection<string> ThirdIblisMissions =
         [
             "set_thirdiblis_silver",
         ];
 
-        private static readonly string[] _firstMefMissions =
+        private static readonly ReadOnlyCollection<string> FirstMefMissions =
         [
             "set_firstmefiress_shadow",
             "set_firstmefiress_omega"
         ];
 
-        private static readonly string[] _secondMefMissions =
+        private static readonly ReadOnlyCollection<string> SecondMefMissions =
         [
             "set_secondmefiress_shadow",
         ];
 
-        private static readonly string[] _solarisMissions =
+        private static readonly ReadOnlyCollection<string> SolarisMissions =
         [
             "set_solaris01_super3",
             "set_solaris02_super3"
         ];
+    }
+
+    public struct MissionGroup
+    {
+        public readonly ReadOnlyCollection<string> Missions;
+        public readonly string Terrain;
+
+        public MissionGroup(ReadOnlyCollection<string> missions, string terrain)
+        {
+            Missions = missions;
+            Terrain = terrain;
+        }
     }
 }

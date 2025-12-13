@@ -92,6 +92,12 @@ namespace XNOEdit.Renderer.Wgpu
             }
         }
 
+        public void UpdateData(Queue* queue, int index, in T data)
+        {
+            var offset = (ulong)(index * sizeof(T));
+            UpdateData(queue, in data, offset);
+        }
+
         public BindGroupEntry CreateBindGroupEntry(uint binding, ulong offset = 0, ulong size = 0)
         {
             return new BindGroupEntry

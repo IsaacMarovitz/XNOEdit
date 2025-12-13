@@ -1,8 +1,10 @@
-﻿using System.Numerics;
+﻿using System.Collections.Concurrent;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
+using Marathon.Formats.Ninja.Chunks;
 using Marathon.IO.Types.FileSystem;
 using SDL3;
 using Silk.NET.WebGPU;
@@ -38,12 +40,8 @@ namespace XNOEdit
         private static RenderSettings _settings = new();
         private static readonly UIManager UIManager = new();
         private static FileLoaderService _fileLoader;
-
-        private static Task<XnoLoadResult?>? _pendingXnoLoad;
-        private static Task<SetLoadResult?>? _pendingSetLoad;
-        private static Task<ArcLoadResult?>? _pendingArcLoad;
-        private static CancellationTokenSource? _loadCts;
-
+        private static LoadChain? _loadChain;
+        private static readonly ConcurrentQueue<Action> _mainThreadQueue = new();
         private static TextureManager _textureManager;
 
         private static ulong _previousTick;
@@ -103,10 +101,9 @@ namespace XNOEdit
             UIManager.ResetCameraAction += ResetCamera;
             UIManager.ObjectsPanel?.LoadObject += QueueObjectLoad;
             UIManager.StagesPanel?.LoadStage += QueueArcLoad;
-            UIManager.MissionsPanel?.LoadSet += QueueSetLoad;
+            UIManager.MissionsPanel?.LoadMission += QueueMissionLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, imguiController);
-
             _fileLoader = new FileLoaderService(_wgpu, _device, (IntPtr)_queue);
 
             Logger.SetEnable(LogLevel.Debug, Configuration.DebugLogs);
@@ -128,7 +125,7 @@ namespace XNOEdit
             if (UIManager.ViewportWantsInput || !ImGui.GetIO().WantCaptureKeyboard)
                 _camera?.ProcessKeyboard(_deltaTime, _settings.CameraSensitivity);
 
-            ProcessPendingLoads();
+            ProcessMainThreadQueue();
             OnRender(_deltaTime);
 
             return SDL.AppResult.Continue;
@@ -311,69 +308,16 @@ namespace XNOEdit
             UIManager.TriggerAlert(AlertLevel.Info, alert);
         }
 
-        private static void ProcessPendingLoads()
+        private static void DispatchToMainThread(Action action)
         {
-            if (_pendingXnoLoad is { IsCompleted: true })
-            {
-                try
-                {
-                    var result = _pendingXnoLoad.Result;
-                    if (result != null)
-                        ApplyXnoResult(result);
-                }
-                catch (AggregateException ex)
-                {
-                    var innerEx = ex.InnerException ?? ex;
-                    UIManager.TriggerAlert(AlertLevel.Error, $"Error loading XNO: \"{innerEx.Message}\"");
-                    Logger.Error?.PrintStack(LogClass.Application, "Error loading XNO");
-                }
-                finally
-                {
-                    _pendingXnoLoad = null;
-                    UIManager.CurrentLoadProgress = null;
-                }
-            }
+            _mainThreadQueue.Enqueue(action);
+        }
 
-            if (_pendingSetLoad is { IsCompleted: true })
+        private static void ProcessMainThreadQueue()
+        {
+            while (_mainThreadQueue.TryDequeue(out var action))
             {
-                try
-                {
-                    var result = _pendingSetLoad.Result;
-                    if (result != null)
-                        ApplySetResult(result);
-                }
-                catch (AggregateException ex)
-                {
-                    var innerEx = ex.InnerException ?? ex;
-                    UIManager.TriggerAlert(AlertLevel.Error, $"Error loading SET: \"{innerEx.Message}\"");
-                    Logger.Error?.PrintStack(LogClass.Application, "Error loading SET");
-                }
-                finally
-                {
-                    _pendingSetLoad = null;
-                    UIManager.CurrentLoadProgress = null;
-                }
-            }
-
-            if (_pendingArcLoad is { IsCompleted: true })
-            {
-                try
-                {
-                    var result = _pendingArcLoad.Result;
-                    if (result != null)
-                        ApplyArcResult(result);
-                }
-                catch (AggregateException ex)
-                {
-                    var innerEx = ex.InnerException ?? ex;
-                    UIManager.TriggerAlert(AlertLevel.Error, $"Error loading arc: \"{innerEx.Message}\"");
-                    Logger.Error?.PrintStack(LogClass.Application, "Error loading arc");
-                }
-                finally
-                {
-                    _pendingArcLoad = null;
-                    UIManager.CurrentLoadProgress = null;
-                }
+                action();
             }
         }
 
@@ -418,9 +362,13 @@ namespace XNOEdit
 
         private static void ApplySetResult(SetLoadResult result)
         {
+            if (_scene is not StageScene stageScene)
+                return;
+
             var parameters = UIManager.ObjectsPanel.ObjectParameters.Parameters;
 
-            var objects = new Dictionary<string, List<Vector3>>();
+            // Group instances by model name
+            var instancesByModel = new Dictionary<string, List<InstanceData>>();
 
             foreach (var setObject in result.Set.Objects)
             {
@@ -428,17 +376,71 @@ namespace XNOEdit
                 {
                     var param = parameters.FirstOrDefault(x => x.Name == (string)setObject.Parameters[0].Value);
 
-                    if (param != null)
+                    if (param?.Model == null)
+                        continue;
+
+                    if (!instancesByModel.TryGetValue(param.Model, out var instances))
                     {
-                        objects.TryGetValue(param.Model, out var positions);
-
-                        positions ??= [];
-
-                        positions.Add(setObject.Position);
-                        objects[param.Model] = positions;
+                        instances = [];
+                        instancesByModel[param.Model] = instances;
                     }
+
+                    instances.Add(InstanceData.Create(setObject.Position, setObject.Rotation));
                 }
             }
+
+            if (instancesByModel.Count == 0)
+            {
+                UIManager.TriggerAlert(AlertLevel.Warning, "SET file has no placeable objects");
+                return;
+            }
+
+            // Load models and create instanced renderers
+            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
+            var objectArchive = new ArcFile(objectArcPath);
+
+            var loadedCount = 0;
+            var totalInstances = 0;
+
+            foreach (var (modelName, instances) in instancesByModel)
+            {
+                var modelFile = objectArchive.GetFile($"/win32/{modelName}.xno");
+                if (modelFile == null)
+                {
+                    Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelName}");
+                    continue;
+                }
+
+                XnoLoadResult? xnoResult = null;
+                var task = _fileLoader.ReadXnoAsync(modelFile, _shaderArchive).ContinueWith(x => xnoResult =  x.Result);
+                task.Wait();
+
+                if (xnoResult?.ObjectChunk == null)
+                    continue;
+
+                var renderer = new InstancedModelRenderer(
+                    _wgpu,
+                    _device,
+                    xnoResult.ObjectChunk,
+                    xnoResult.Xno.GetChunk<TextureListChunk>(),
+                    xnoResult.Xno.GetChunk<EffectListChunk>(),
+                    _shaderArchive);
+
+                renderer.SetInstances(instances.ToArray());
+
+                stageScene.AddInstancedRenderer(modelName, renderer);
+
+                // Add textures to texture manager
+                foreach (var tex in xnoResult.Textures)
+                {
+                    _textureManager.Add(tex.Name, tex.Texture, tex.View);
+                }
+
+                loadedCount++;
+                totalInstances += instances.Count;
+            }
+
+            Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
         }
 
         private static void ApplyArcResult(ArcLoadResult result)
@@ -615,8 +617,7 @@ namespace XNOEdit
         {
             SDL.DestroyWindow(_window);
 
-            _loadCts?.Cancel();
-            _loadCts?.Dispose();
+            _loadChain?.Cancel();
 
             _scene?.Dispose();
             _grid?.Dispose();
@@ -661,16 +662,17 @@ namespace XNOEdit
         {
             UIManager.LoadGameFolderResources();
 
-            var shaderArcPath = Path.Join([
+            var shaderArcPath = Path.Join(
                 Configuration.GameFolder,
                 "xenon",
                 "archives",
                 "shader.arc"
-            ]);
+            );
 
             try
             {
                 _shaderArchive = new ArcFile(shaderArcPath);
+                InitializeLoadChain();
                 UIManager.TriggerAlert(AlertLevel.Info, "Loaded shader.arc");
             }
             catch (Exception ex)
@@ -679,43 +681,96 @@ namespace XNOEdit
             }
         }
 
-        private static void CancelPendingLoads()
+        private static void InitializeLoadChain()
         {
-            _loadCts?.Cancel();
-            _loadCts?.Dispose();
-            _loadCts = new CancellationTokenSource();
-            UIManager.CurrentLoadProgress = null;
-        }
+            _loadChain = new LoadChain(_fileLoader, _shaderArchive);
 
-        private static IProgress<LoadProgress> CreateProgressReporter()
-        {
-            return new Progress<LoadProgress>(progress =>
+            _loadChain.ProgressChanged += progress =>
             {
-                UIManager.CurrentLoadProgress = progress;
-            });
+                DispatchToMainThread(() => UIManager.CurrentLoadProgress = progress);
+            };
+
+            _loadChain.StepCompleted += step =>
+            {
+                DispatchToMainThread(() =>
+                {
+                    switch (step)
+                    {
+                        case XnoLoadStep { Result: not null } xnoStep:
+                            ApplyXnoResult(xnoStep.Result);
+                            break;
+                        case ArcLoadStep { Result: not null } arcStep:
+                            ApplyArcResult(arcStep.Result);
+                            break;
+                        case SetLoadStep { Result: not null } setStep:
+                            ApplySetResult(setStep.Result);
+                            break;
+                    }
+                });
+            };
+
+            _loadChain.ChainCompleted += () =>
+            {
+                DispatchToMainThread(() => UIManager.CurrentLoadProgress = null);
+            };
+
+            _loadChain.ChainFailed += ex =>
+            {
+                DispatchToMainThread(() =>
+                {
+                    UIManager.CurrentLoadProgress = null;
+                    UIManager.TriggerAlert(AlertLevel.Error, $"Load failed: \"{ex.Message}\"");
+                    Logger.Error?.PrintStack(LogClass.Application, "Load chain failed");
+                });
+            };
         }
 
         private static void QueueObjectLoad(IFile file)
         {
-            CancelPendingLoads();
-            var progress = CreateProgressReporter();
-
-            _pendingXnoLoad = _fileLoader.ReadXnoAsync(file, _shaderArchive, progress, _loadCts!.Token);
-        }
-
-        private static void QueueSetLoad(IFile file)
-        {
-            CancelPendingLoads();
-            var progress = CreateProgressReporter();
-
-            _pendingSetLoad = _fileLoader.ReadSetAsync(file, progress, _loadCts!.Token);
+            _loadChain?.Clear();
+            _loadChain?.AddXno(file);
+            _loadChain?.Start();
         }
 
         private static void QueueArcLoad(ArcFile arcFile)
         {
-            CancelPendingLoads();
-            var progress = CreateProgressReporter();
-            _pendingArcLoad = _fileLoader.ReadArcAsync(arcFile, _shaderArchive, progress, _loadCts!.Token);
+            _loadChain?.Clear();
+            _loadChain?.AddArc(arcFile);
+            _loadChain?.Start();
+        }
+
+        private static void QueueMissionLoad(IFile setFile)
+        {
+            _loadChain?.Clear();
+
+            var setName = Path.GetFileNameWithoutExtension(setFile.Name);
+            var terrainPath = MissionsMap.GetTerrainPath(setName);
+
+            if (terrainPath != null)
+            {
+                var fullPath = Path.Join(
+                    Configuration.GameFolder,
+                    "win32",
+                    "archives",
+                    $"{terrainPath}.arc"
+                );
+
+                if (File.Exists(fullPath))
+                {
+                    _loadChain?.AddArc(new ArcFile(fullPath));
+                }
+                else
+                {
+                    UIManager.TriggerAlert(AlertLevel.Warning, $"Terrain not found: {fullPath}");
+                }
+            }
+            else
+            {
+                UIManager.TriggerAlert(AlertLevel.Warning, $"No terrain mapping for {setName}");
+            }
+
+            _loadChain?.AddSet(setFile);
+            _loadChain?.Start();
         }
 
         private static void SetModelRadius(float radius)

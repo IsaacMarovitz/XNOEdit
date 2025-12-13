@@ -48,7 +48,7 @@ namespace XNOEdit.Renderer.Renderers
 
         private static ModelShader CreateShader(WebGPU wgpu, WgpuDevice device)
         {
-            return new ModelShader(wgpu, device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/BasicModel.wgsl"));
+            return new ModelShader(wgpu, device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/Model.wgsl"));
         }
 
         public override void Draw(
