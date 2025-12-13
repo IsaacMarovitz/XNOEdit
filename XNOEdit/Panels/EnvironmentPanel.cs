@@ -1,5 +1,6 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
+using XNOEdit.Managers;
 
 namespace XNOEdit.Panels
 {
@@ -7,8 +8,14 @@ namespace XNOEdit.Panels
     {
         public const string Name = "Environment";
 
+        private float _accentHue = 248.8f;
         private float _sunAzimuth;
         private float _sunAltitude;
+
+        public EnvironmentPanel()
+        {
+            UIManager.SetColors(_accentHue);
+        }
 
         public void InitSunAngles(RenderSettings settings)
         {
@@ -41,6 +48,14 @@ namespace XNOEdit.Panels
                     (float)(Math.Cos(altitudeRad) * Math.Cos(azimuthRad)),
                     (float)Math.Sin(altitudeRad),
                     (float)(Math.Cos(altitudeRad) * Math.Sin(azimuthRad)));
+            }
+
+            ImGui.SeparatorText("UI");
+            var editedHue = ImGui.SliderFloat("Accent Hue", ref _accentHue, 0.0f, 360.0f);
+
+            if (editedHue)
+            {
+                UIManager.SetColors(_accentHue);
             }
 
             ImGui.End();
