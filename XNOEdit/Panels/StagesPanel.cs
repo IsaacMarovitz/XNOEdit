@@ -46,19 +46,19 @@ namespace XNOEdit.Panels
             if (ImGui.BeginTabBar("Stages", ImGuiTabBarFlags.AutoSelectNewTabs))
             {
                 var stages = StagesMap.Stages.Select(x => new ImGuiComponents.File(x.Key, x.Value));
-                ImGuiComponents.RenderFilesList("Stages", stages, x =>
+                ImGuiComponents.RenderFilesListTabItem("Stages", stages, x =>
                 {
                     TriggerFileLoad(x, StagesMap.Stages);
                 });
 
                 var bosses = StagesMap.Bosses.Select(x => new ImGuiComponents.File(x.Key, x.Value));
-                ImGuiComponents.RenderFilesList("Bosses", bosses, x =>
+                ImGuiComponents.RenderFilesListTabItem("Bosses", bosses, x =>
                 {
                     TriggerFileLoad(x, StagesMap.Bosses);
                 });
 
                 var events = StagesMap.Events.Select(x => new ImGuiComponents.File(x.Key, x.Value));
-                ImGuiComponents.RenderFilesList("Events", events, x =>
+                ImGuiComponents.RenderFilesListTabItem("Events", events, x =>
                 {
                     TriggerFileLoad(x, StagesMap.Events);
                 });

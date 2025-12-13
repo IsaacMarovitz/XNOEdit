@@ -22,6 +22,7 @@ namespace XNOEdit.Managers
         public XnoPanel? XnoPanel { get; private set; }
         public StagePanel? StagePanel { get; private set; }
         public StagesPanel? StagesPanel { get; private set; }
+        public MissionsPanel? MissionsPanel { get; private set; }
         public LoadProgress? CurrentLoadProgress { get; set; }
         private ISceneVisibility? _currentVisibility;
 
@@ -45,6 +46,7 @@ namespace XNOEdit.Managers
             _alertPanel = new AlertPanel();
             ObjectsPanel = new ObjectsPanel();
             StagesPanel = new StagesPanel(this);
+            MissionsPanel = new MissionsPanel();
             ViewportPanel = new ViewportPanel(wgpu, device, controller);
             EnvironmentPanel = new EnvironmentPanel();
 
@@ -230,6 +232,7 @@ namespace XNOEdit.Managers
                 ImGuiP.DockBuilderDockWindow(StagePanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(ObjectsPanel.Name, bottomDock);
                 ImGuiP.DockBuilderDockWindow(StagesPanel.Name, bottomDock);
+                ImGuiP.DockBuilderDockWindow(MissionsPanel.Name, bottomDock);
 
                 ImGuiP.DockBuilderFinish(dockspaceId);
 
@@ -251,10 +254,12 @@ namespace XNOEdit.Managers
             {
                 ObjectsPanel?.Render();
                 StagesPanel?.Render();
+                MissionsPanel?.Render();
             }
 
             ViewportPanel?.Render(view, projection, _guizmos);
 
+            ImGui.ShowDemoWindow();
             RenderLoadingOverlay();
             _alertPanel?.Render(deltaTime);
             Controller?.Render(pass);
@@ -399,6 +404,7 @@ namespace XNOEdit.Managers
         public void LoadGameFolderResources()
         {
             ObjectsPanel?.LoadGameFolderResources();
+            MissionsPanel?.LoadGameFolderResources();
         }
     }
 }

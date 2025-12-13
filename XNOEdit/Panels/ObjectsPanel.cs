@@ -105,10 +105,10 @@ namespace XNOEdit.Panels
                 ImGui.SetNextItemWidth(searchWidth);
                 ImGui.InputTextWithHint("##search", "Search...", ref _searchText, 256);
 
-                _object.Render(_searchText, TriggerFileLoad);
-                _human.Render(_searchText, TriggerFileLoad);
-                _enemy.Render(_searchText, TriggerFileLoad);
-                _win32.Render(_searchText, TriggerFileLoad);
+                _object.RenderTabItem(_searchText, TriggerFileLoad);
+                _human.RenderTabItem(_searchText, TriggerFileLoad);
+                _enemy.RenderTabItem(_searchText, TriggerFileLoad);
+                _win32.RenderTabItem(_searchText, TriggerFileLoad);
 
                 ImGui.EndTabBar();
             }
