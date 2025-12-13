@@ -162,7 +162,16 @@ namespace XNOEdit.Panels
 
         public void Render(Matrix4x4 view, Matrix4x4 projection, bool renderGuizmos)
         {
-            var windowFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoDecoration;
+            var windowClass = new ImGuiWindowClass
+            {
+                DockNodeFlagsOverrideSet = (ImGuiDockNodeFlags)ImGuiDockNodeFlagsPrivate.NoTabBar
+            };
+
+            var ptr = new ImGuiWindowClassPtr(&windowClass);
+
+            ImGui.SetNextWindowClass(ptr);
+            var windowFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse |
+                              ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoTitleBar;
 
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(0, 0));
 
