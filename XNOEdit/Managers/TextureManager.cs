@@ -24,10 +24,9 @@ namespace XNOEdit.Managers
             if (_disposed)
                 throw new ObjectDisposedException(nameof(TextureManager));
 
-            // Remove existing texture with same name if present
-            if (_textures.TryGetValue(name, out var existing))
+            if (_textures.ContainsKey(name))
             {
-                ReleaseTexture(existing);
+                return;
             }
 
             // Create ImGui bind group for this texture
