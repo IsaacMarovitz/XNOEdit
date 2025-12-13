@@ -173,7 +173,7 @@ namespace XNOEdit.Panels
 
                 if (renderGuizmos)
                 {
-                    ImGuizmo.SetDrawlist();
+                    ImGuizmo.SetDrawlist(ImGui.GetWindowDrawList());
                     ImGuizmo.SetRect(windowPos.X, windowPos.Y, contentSize.X, contentSize.Y);
                     ImGuizmo.SetImGuiContext(ImGui.GetCurrentContext());
                 }
