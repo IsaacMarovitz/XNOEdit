@@ -10,11 +10,10 @@ namespace XNOEdit.Panels
         public event Action<IFile> LoadObject;
         public ObjectPhysicsParameterList ObjectParameters { get; private set; }
 
-        private readonly List<IFile> _enemyFiles = [];
-        private readonly List<IFile> _humanFiles = [];
-        private readonly List<IFile> _objectFiles = [];
-        private readonly List<IFile> _win32Files = [];
-        private readonly List<IFile> _setFiles = [];
+        private readonly FileContainer _enemy = new("Enemy");
+        private readonly FileContainer _human = new("Human");
+        private readonly FileContainer _object = new("Object");
+        private readonly FileContainer _win32 = new("Misc.");
 
         private string _searchText = "";
 
@@ -25,11 +24,10 @@ namespace XNOEdit.Panels
 
         public void LoadGameFolderResources()
         {
-            _enemyFiles.Clear();
-            _humanFiles.Clear();
-            _objectFiles.Clear();
-            _win32Files.Clear();
-            _setFiles.Clear();
+            _enemy.Clear();
+            _human.Clear();
+            _object.Clear();
+            _win32.Clear();
 
             var enemyArcPath = Path.Join([
                 Configuration.GameFolder,
@@ -52,24 +50,11 @@ namespace XNOEdit.Panels
                 "object.arc"
             ]);
 
-            var enemyArchive = new ArcFile(enemyArcPath);
-            foreach (var node in enemyArchive.EnumerateFiles("*.xno", SearchOption.AllDirectories))
-            {
-                _enemyFiles.Add(node);
-            }
-
-            var humanArchive = new ArcFile(humanArcPath);
-            foreach (var node in humanArchive.EnumerateFiles("*.xno", SearchOption.AllDirectories))
-            {
-                _humanFiles.Add(node);
-            }
+            _enemy.AddFromArcPath(enemyArcPath, "*.xno");
+            _human.AddFromArcPath(humanArcPath, "*.xno");
+            _object.AddFromArcPath(objectArcPath, "*.xno");
 
             var objectArchive = new ArcFile(objectArcPath);
-            foreach (var node in objectArchive.EnumerateFiles("*.xno", SearchOption.AllDirectories))
-            {
-                _objectFiles.Add(node);
-            }
-
             var parametersFile = objectArchive.GetFile("/xenon/object/Common.bin");
             ObjectParameters = new ObjectPhysicsParameterList(parametersFile.Decompress());
 
@@ -97,25 +82,12 @@ namespace XNOEdit.Panels
                     if (node.Name.Contains("_EventObject"))
                         continue;
 
-                    _win32Files.Add(node);
+                    _win32.Add(node);
                 }
-            }
-
-            var scriptsArcPath = Path.Join([
-                Configuration.GameFolder,
-                "xenon",
-                "archives",
-                "scripts.arc"
-            ]);
-
-            var scriptsArchive = new ArcFile(scriptsArcPath);
-            foreach (var node in scriptsArchive.EnumerateFiles("*.set", SearchOption.AllDirectories))
-            {
-                _setFiles.Add(node);
             }
         }
 
-        private void TriggerFileLoad(ImGuiComponents.File file, List<IFile> files)
+        private void TriggerFileLoad(ImGuiComponents.File file, IReadOnlyCollection<IFile> files)
         {
             LoadObject?.Invoke(files.FirstOrDefault(x => x.Name == file.Identifier));
         }
@@ -131,35 +103,10 @@ namespace XNOEdit.Panels
                 ImGui.SetNextItemWidth(searchWidth);
                 ImGui.InputTextWithHint("##search", "Search...", ref _searchText, 256);
 
-                var objectFiles = _objectFiles.Select(x => new ImGuiComponents.File(x.Name, x.Name));
-                ImGuiComponents.RenderFilesList("Objects", objectFiles, x =>
-                {
-                   TriggerFileLoad(x, _objectFiles);
-                }, _searchText);
-
-                var humanFiles = _humanFiles.Select(x => new ImGuiComponents.File(x.Name, x.Name));
-                ImGuiComponents.RenderFilesList("Humans", humanFiles, x =>
-                {
-                    TriggerFileLoad(x, _humanFiles);
-                }, _searchText);
-
-                var enemyFiles = _enemyFiles.Select(x => new ImGuiComponents.File(x.Name, x.Name));
-                ImGuiComponents.RenderFilesList("Enemies", enemyFiles, x =>
-                {
-                    TriggerFileLoad(x, _enemyFiles);
-                }, _searchText);
-
-                var win32Files = _win32Files.Select(x => new ImGuiComponents.File(x.Name, x.Name));
-                ImGuiComponents.RenderFilesList("Misc.", win32Files, x =>
-                {
-                    TriggerFileLoad(x, _win32Files);
-                }, _searchText);
-
-                var setFiles = _setFiles.Select(x => new ImGuiComponents.File(x.Name, x.Name));
-                ImGuiComponents.RenderFilesList("Sets", setFiles, x =>
-                {
-                    TriggerFileLoad(x, _setFiles);
-                }, _searchText);
+                _object.Render(_searchText, TriggerFileLoad);
+                _human.Render(_searchText, TriggerFileLoad);
+                _enemy.Render(_searchText, TriggerFileLoad);
+                _win32.Render(_searchText, TriggerFileLoad);
 
                 ImGui.EndTabBar();
             }

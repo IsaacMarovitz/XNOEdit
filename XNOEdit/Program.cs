@@ -57,16 +57,28 @@ namespace XNOEdit
             SDL.Init(SDL.InitFlags.Video);
             SDL.SetAppMetadata("XNOEdit", "1.0.0", "com.isaacmarovitz.xnoedit");
 
-            SDL.RunApp(args.Length, args, MainFunction, IntPtr.Zero);
-        }
+            // Don't use SDL.RunApp
+            // it causes problems for the debugger
+            if (AppInit(IntPtr.Zero, args.Length, args) != SDL.AppResult.Continue)
+                return;
 
-        private static int MainFunction(int argc, string[] argv)
-        {
-            return SDL.EnterAppMainCallbacks(argc, argv,
-                AppInit,
-                AppIter,
-                AppEvent,
-                AppQuit);
+            while (true)
+            {
+                while (SDL.PollEvent(out var @event))
+                {
+                    var result = AppEvent(IntPtr.Zero, ref @event);
+                    if (result != SDL.AppResult.Continue)
+                    {
+                        AppQuit(IntPtr.Zero, result);
+                        return;
+                    }
+                }
+
+                if (AppIter(IntPtr.Zero) != SDL.AppResult.Continue)
+                    break;
+            }
+
+            AppQuit(IntPtr.Zero, SDL.AppResult.Success);
         }
 
         private static SDL.AppResult AppInit(IntPtr appState, int argc, string[] argv)
@@ -89,8 +101,8 @@ namespace XNOEdit
             UIManager.OnLoad(imguiController, _wgpu, _device);
             UIManager.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
-            UIManager.ObjectsPanel.LoadObject += QueueObjectLoad;
-            UIManager.StagesPanel.LoadStage += QueueArcLoad;
+            UIManager.ObjectsPanel?.LoadObject += QueueObjectLoad;
+            UIManager.StagesPanel?.LoadStage += QueueArcLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, imguiController);
 
@@ -407,16 +419,23 @@ namespace XNOEdit
         {
             var parameters = UIManager.ObjectsPanel.ObjectParameters.Parameters;
 
+            var objects = new Dictionary<string, List<Vector3>>();
+
             foreach (var setObject in result.Set.Objects)
             {
                 if (setObject.Type is "objectphysics_item" or "objectphysics")
                 {
                     var param = parameters.FirstOrDefault(x => x.Name == (string)setObject.Parameters[0].Value);
 
-                    if (param == null)
-                        Logger.Debug?.PrintMsg(LogClass.Application, $"Missing Model {setObject.Name} of type {setObject.Type}");
-                    else
-                        Logger.Debug?.PrintMsg(LogClass.Application, $"Model: {param.Model}");
+                    if (param != null)
+                    {
+                        objects.TryGetValue(param.Model, out var positions);
+
+                        positions ??= [];
+
+                        positions.Add(setObject.Position);
+                        objects[param.Model] = positions;
+                    }
                 }
             }
         }
@@ -680,14 +699,15 @@ namespace XNOEdit
             CancelPendingLoads();
             var progress = CreateProgressReporter();
 
-            if (file.Name.EndsWith(".xno"))
-            {
-                _pendingXnoLoad = _fileLoader.ReadXnoAsync(file, _shaderArchive, progress, _loadCts!.Token);
-            }
-            else if (file.Name.EndsWith(".set"))
-            {
-                _pendingSetLoad = _fileLoader.ReadSetAsync(file, progress, _loadCts!.Token);
-            }
+            _pendingXnoLoad = _fileLoader.ReadXnoAsync(file, _shaderArchive, progress, _loadCts!.Token);
+        }
+
+        private static void QueueSetLoad(IFile file)
+        {
+            CancelPendingLoads();
+            var progress = CreateProgressReporter();
+
+            _pendingSetLoad = _fileLoader.ReadSetAsync(file, progress, _loadCts!.Token);
         }
 
         private static void QueueArcLoad(ArcFile arcFile)
