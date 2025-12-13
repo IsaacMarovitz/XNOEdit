@@ -5,6 +5,7 @@ using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
+using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using SDL3;
 using Silk.NET.WebGPU;
@@ -43,6 +44,7 @@ namespace XNOEdit
         private static LoadChain? _loadChain;
         private static readonly ConcurrentQueue<Action> _mainThreadQueue = new();
         private static TextureManager _textureManager;
+        private static readonly List<Actor> _propActors = [];
 
         private static ulong _previousTick;
         private static float _deltaTime;
@@ -365,27 +367,44 @@ namespace XNOEdit
             if (_scene is not StageScene stageScene)
                 return;
 
-            var parameters = UIManager.ObjectsPanel.ObjectParameters.Parameters;
+            var objectParams = UIManager.ObjectsPanel.ObjectParameters.Parameters;
 
             // Group instances by model name
             var instancesByModel = new Dictionary<string, List<InstanceData>>();
 
             foreach (var setObject in result.Set.Objects)
             {
-                if (setObject.Type is "objectphysics_item" or "objectphysics")
+                var actor = _propActors.Find(x => x.Name == setObject.Type);
+
+                if (actor != null)
                 {
-                    var param = parameters.FirstOrDefault(x => x.Name == (string)setObject.Parameters[0].Value);
+                    var objectNameIndex = actor.Parameters.Select((value, index) => new { value, index })
+                        .Where(pair => pair.value.Name == "objectName")
+                        .Select(pair => pair.index + 1)
+                        .FirstOrDefault() - 1;
 
-                    if (param?.Model == null)
-                        continue;
-
-                    if (!instancesByModel.TryGetValue(param.Model, out var instances))
+                    if (objectNameIndex != -1)
                     {
-                        instances = [];
-                        instancesByModel[param.Model] = instances;
-                    }
+                        var modelName = (string)setObject.Parameters[objectNameIndex].Value;
+                        var physicsParam = objectParams.FirstOrDefault(x => x.Name == modelName);
 
-                    instances.Add(InstanceData.Create(setObject.Position, setObject.Rotation));
+                        if (physicsParam != null)
+                        {
+                            Logger.Warning?.PrintMsg(LogClass.Application, physicsParam.Model);
+
+                            if (!instancesByModel.TryGetValue(physicsParam.Model, out var instances))
+                            {
+                                instances = [];
+                                instancesByModel[physicsParam.Model] = instances;
+                            }
+
+                            instances.Add(InstanceData.Create(setObject.Position, setObject.Rotation));
+                        }
+                    }
+                }
+                else
+                {
+                    Logger.Warning?.PrintMsg(LogClass.Application, $"Prop actor of type {setObject.Type} not found");
                 }
             }
 
@@ -668,6 +687,27 @@ namespace XNOEdit
                 "archives",
                 "shader.arc"
             );
+
+            var gameArcPath = Path.Join(
+                Configuration.GameFolder,
+                "xenon",
+                "archives",
+                "game.arc"
+            );
+
+            try
+            {
+                var gameArchive = new ArcFile(gameArcPath);
+                foreach (var file in gameArchive.EnumerateFiles("*.prop", SearchOption.AllDirectories))
+                {
+                    var propLibrary = new PropLibrary(file.Decompress());
+                    _propActors.AddRange(propLibrary.Actors);
+                }
+            }
+            catch (Exception ex)
+            {
+                UIManager.TriggerAlert(AlertLevel.Warning, $"Unable to load prop actors: \"{ex.Message}\"");
+            }
 
             try
             {
