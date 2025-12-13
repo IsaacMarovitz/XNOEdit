@@ -6,6 +6,7 @@ using XNOEdit.Fonts;
 using XNOEdit.Logging;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
+using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Services;
 
@@ -171,11 +172,11 @@ namespace XNOEdit.Managers
             );
         }
 
-        public ObjectSceneVisibility InitXnoPanel(NinjaNext xno)
+        public ObjectSceneVisibility InitXnoPanel(NinjaNext xno, ModelRenderer renderer)
         {
             StagePanel = null;
 
-            var visibility = new ObjectSceneVisibility();
+            var visibility = new ObjectSceneVisibility(renderer);
             _currentVisibility = visibility;
 
             XnoPanel = new XnoPanel(xno, visibility);
@@ -183,11 +184,11 @@ namespace XNOEdit.Managers
             return visibility;
         }
 
-        public StageSceneVisibility InitStagePanel(string name, List<NinjaNext> xnos)
+        public StageSceneVisibility InitStagePanel(string name, List<NinjaNext> xnos, List<ModelRenderer> renderers)
         {
             XnoPanel = null;
 
-            var visibility = new StageSceneVisibility();
+            var visibility = new StageSceneVisibility(renderers);
             _currentVisibility = visibility;
 
             StagePanel = new StagePanel(name, xnos, visibility);

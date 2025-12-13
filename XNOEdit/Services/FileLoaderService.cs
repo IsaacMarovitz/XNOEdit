@@ -188,7 +188,7 @@ namespace XNOEdit.Services
                         // Disable shadow meshes by default
                         if (xno.Name.Contains("sdw"))
                         {
-                            renderer.Visible = false;
+                            renderer.SetVisible(false);
                         }
 
                         entries.Add(new ArcXnoEntry(xno, objectChunk, renderer));

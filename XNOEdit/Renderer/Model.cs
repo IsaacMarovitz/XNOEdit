@@ -43,6 +43,29 @@ namespace XNOEdit.Renderer
             LoadModel(objectChunk, textureListChunk, effectListChunk, shader);
         }
 
+        public bool GetSubobjectVisible(int subobject)
+        {
+            var meshes = _meshes.Where(m => m.Subobject == subobject);
+            return meshes.Any(m => m.Visible);
+        }
+
+        public bool GetMeshSetVisible(int subobject, int meshSet)
+        {
+            var mesh = _meshes.FirstOrDefault(m => m.Subobject == subobject && m.MeshSet == meshSet);
+            return mesh?.Visible ?? true;
+        }
+
+        public bool GetAnyMeshVisible()
+        {
+            return _meshes.Any(m => m.Visible);
+        }
+
+        public void SetAllVisible(bool visible)
+        {
+            foreach (var mesh in _meshes)
+                mesh.SetVisible(visible);
+        }
+
         public void SetVisible(int subobject, int? meshSet, bool visibility)
         {
             foreach (var mesh in _meshes)
@@ -52,9 +75,7 @@ namespace XNOEdit.Renderer
                 if (meshSet != null)
                 {
                     if (mesh.MeshSet == meshSet)
-                    {
                         mesh.SetVisible(visibility);
-                    }
                 }
                 else
                 {
@@ -330,6 +351,7 @@ namespace XNOEdit.Renderer
     {
         public int Subobject { get; private set; }
         public int MeshSet { get; private set; }
+        public bool Visible { get; private set; } = true;
 
         private readonly WebGPU _wgpu;
         private readonly MeshGeometry _geometry;
@@ -337,8 +359,6 @@ namespace XNOEdit.Renderer
         private WgpuBuffer<PerMeshUniforms> _meshUniformBuffer;
         private BindGroup* _meshBindGroup;
         private BindGroup* _textureBindGroup;
-
-        private bool _visible = true;
 
         public ModelMesh(
             WebGPU wgpu,
@@ -364,7 +384,7 @@ namespace XNOEdit.Renderer
 
         public void SetVisible(bool visible)
         {
-            _visible = visible;
+            Visible = visible;
         }
 
         private void CreateMeshUniforms(WebGPU wgpu, Device* device, Material material, ModelShader shader)
@@ -396,7 +416,7 @@ namespace XNOEdit.Renderer
             TextureManager textureManager,
             ModelShader shader)
         {
-            if (!_visible) return;
+            if (!Visible) return;
 
             _geometry.BindVertexBuffer(passEncoder, 0);
             _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 1, _meshBindGroup, 0, null);

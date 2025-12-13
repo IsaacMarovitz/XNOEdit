@@ -15,7 +15,7 @@ namespace XNOEdit.Renderer.Scene
 
         public void SetVisible(int xnoIndex, bool visibility)
         {
-            _renderers[xnoIndex].Visible = visibility;
+            _renderers[xnoIndex].SetVisible(visibility);
         }
 
         public void SetObjectVisible(int xnoIndex, int objectIndex, int? meshIndex, bool visibility)

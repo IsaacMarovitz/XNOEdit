@@ -381,7 +381,7 @@ namespace XNOEdit
         {
             if (result.ObjectChunk != null && result.Renderer != null)
             {
-                var visibility = UIManager.InitXnoPanel(result.Xno);
+                var visibility = UIManager.InitXnoPanel(result.Xno, result.Renderer);
 
                 visibility.VisibilityChanged += (objectIndex, meshIndex, visible) =>
                 {
@@ -454,7 +454,7 @@ namespace XNOEdit
             var renderers = result.Entries.Select(e => e.Renderer).ToArray();
             var xnos = result.Entries.Select(e => e.Xno).ToList();
 
-            var visibility = UIManager.InitStagePanel(result.Name, xnos);
+            var visibility = UIManager.InitStagePanel(result.Name, xnos, renderers.ToList());
 
             visibility.XnoVisibilityChanged += (xnoIndex, visible) =>
             {

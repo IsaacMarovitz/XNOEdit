@@ -1,3 +1,5 @@
+using XNOEdit.Renderer.Renderers;
+
 namespace XNOEdit.Services
 {
     public interface ISceneVisibility
@@ -12,76 +14,83 @@ namespace XNOEdit.Services
 
     public class ObjectSceneVisibility : ISceneVisibility
     {
-        private readonly Dictionary<int, bool> _subobjectVisibility = new();
-        private readonly Dictionary<(int subobject, int meshSet), bool> _meshSetVisibility = new();
+        private readonly ModelRenderer? _renderer;
 
         public event Action<int, int?, bool>? VisibilityChanged;
+
+        public ObjectSceneVisibility(ModelRenderer renderer)
+        {
+            _renderer = renderer;
+        }
 
         public bool GetXnoVisible(int xnoIndex) => true;
         public void SetXnoVisible(int xnoIndex, bool visible) { }
 
         public bool GetSubobjectVisible(int xnoIndex, int subobjectIndex)
         {
-            return !_subobjectVisibility.TryGetValue(subobjectIndex, out var visible) || visible;
+            return _renderer?.GetSubobjectVisible(subobjectIndex) ?? true;
         }
 
         public void SetSubobjectVisible(int xnoIndex, int subobjectIndex, bool visible)
         {
-            _subobjectVisibility[subobjectIndex] = visible;
+            _renderer?.SetVisible(subobjectIndex, null, visible);
             VisibilityChanged?.Invoke(subobjectIndex, null, visible);
         }
 
         public bool GetMeshSetVisible(int xnoIndex, int subobjectIndex, int meshSetIndex)
         {
-            return !_meshSetVisibility.TryGetValue((subobjectIndex, meshSetIndex), out var visible) || visible;
+            return _renderer?.GetMeshSetVisible(subobjectIndex, meshSetIndex) ?? true;
         }
 
         public void SetMeshSetVisible(int xnoIndex, int subobjectIndex, int meshSetIndex, bool visible)
         {
-            _meshSetVisibility[(subobjectIndex, meshSetIndex)] = visible;
+            _renderer?.SetVisible(subobjectIndex, meshSetIndex, visible);
             VisibilityChanged?.Invoke(subobjectIndex, meshSetIndex, visible);
         }
     }
 
     public class StageSceneVisibility : ISceneVisibility
     {
-        private readonly Dictionary<int, bool> _xnoVisibility = new();
-        private readonly Dictionary<(int xno, int subobject), bool> _subobjectVisibility = new();
-        private readonly Dictionary<(int xno, int subobject, int meshSet), bool> _meshSetVisibility = new();
+        private List<ModelRenderer>? _renderers;
 
         public event Action<int, bool>? XnoVisibilityChanged;
         public event Action<int, int, int?, bool>? ObjectVisibilityChanged;
 
+        public StageSceneVisibility(List<ModelRenderer> renderers)
+        {
+            _renderers = renderers;
+        }
+
         public bool GetXnoVisible(int xnoIndex)
         {
-            return !_xnoVisibility.TryGetValue(xnoIndex, out var visible) || visible;
+            return _renderers?[xnoIndex].GetVisible() ?? true;
         }
 
         public void SetXnoVisible(int xnoIndex, bool visible)
         {
-            _xnoVisibility[xnoIndex] = visible;
+            _renderers?[xnoIndex].SetVisible(visible);
             XnoVisibilityChanged?.Invoke(xnoIndex, visible);
         }
 
         public bool GetSubobjectVisible(int xnoIndex, int subobjectIndex)
         {
-            return !_subobjectVisibility.TryGetValue((xnoIndex, subobjectIndex), out var visible) || visible;
+            return _renderers?[xnoIndex].GetSubobjectVisible(subobjectIndex) ?? true;
         }
 
         public void SetSubobjectVisible(int xnoIndex, int subobjectIndex, bool visible)
         {
-            _subobjectVisibility[(xnoIndex, subobjectIndex)] = visible;
+            _renderers?[xnoIndex].SetVisible(subobjectIndex, null, visible);
             ObjectVisibilityChanged?.Invoke(xnoIndex, subobjectIndex, null, visible);
         }
 
         public bool GetMeshSetVisible(int xnoIndex, int subobjectIndex, int meshSetIndex)
         {
-            return !_meshSetVisibility.TryGetValue((xnoIndex, subobjectIndex, meshSetIndex), out var visible) || visible;
+            return _renderers?[xnoIndex].GetMeshSetVisible(subobjectIndex, meshSetIndex) ?? true;
         }
 
         public void SetMeshSetVisible(int xnoIndex, int subobjectIndex, int meshSetIndex, bool visible)
         {
-            _meshSetVisibility[(xnoIndex, subobjectIndex, meshSetIndex)] = visible;
+            _renderers?[xnoIndex].SetVisible(subobjectIndex, meshSetIndex, visible);
             ObjectVisibilityChanged?.Invoke(xnoIndex, subobjectIndex, meshSetIndex, visible);
         }
     }
