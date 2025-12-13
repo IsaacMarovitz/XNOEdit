@@ -9,6 +9,7 @@ namespace XNOEdit.Panels
 {
     public unsafe class ViewportPanel : IDisposable
     {
+        public const string Name = "Viewport";
         public Vector2 ViewportSize { get; private set; } = new(800, 600);
         public bool IsHovered { get; private set; }
 
@@ -175,7 +176,7 @@ namespace XNOEdit.Panels
 
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(0, 0));
 
-            if (ImGui.Begin("Viewport", windowFlags))
+            if (ImGui.Begin(Name, windowFlags))
             {
                 var contentSize = ImGui.GetContentRegionAvail();
                 var windowPos = ImGui.GetWindowPos();

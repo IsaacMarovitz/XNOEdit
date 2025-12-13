@@ -7,6 +7,7 @@ namespace XNOEdit.Panels
 {
     public class StagesPanel
     {
+        public const string Name = "Stages";
         public event Action<ArcFile> LoadStage;
 
         private readonly UIManager _uiManager;
@@ -40,7 +41,7 @@ namespace XNOEdit.Panels
 
         public void Render()
         {
-            ImGui.Begin("Stages", ImGuiWindowFlags.AlwaysAutoResize);
+            ImGui.Begin(Name, ImGuiWindowFlags.AlwaysAutoResize);
 
             if (ImGui.BeginTabBar("Stages", ImGuiTabBarFlags.AutoSelectNewTabs))
             {

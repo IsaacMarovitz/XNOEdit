@@ -7,6 +7,8 @@ namespace XNOEdit.Panels
 {
     public class ObjectsPanel
     {
+        public const string Name = "Objects";
+
         public event Action<IFile> LoadObject;
         public ObjectPhysicsParameterList ObjectParameters { get; private set; }
 
@@ -94,7 +96,7 @@ namespace XNOEdit.Panels
 
         public void Render()
         {
-            ImGui.Begin("Objects", ImGuiWindowFlags.AlwaysAutoResize);
+            ImGui.Begin(Name, ImGuiWindowFlags.AlwaysAutoResize);
 
             if (ImGui.BeginTabBar("Tab Bar", ImGuiTabBarFlags.AutoSelectNewTabs))
             {

@@ -99,10 +99,11 @@ namespace XNOEdit
 
             var imguiController = new ImGuiController(_wgpu, _device, _window, 2);
             UIManager.OnLoad(imguiController, _wgpu, _device);
-            UIManager.InitSunAngles(_settings);
+            UIManager.EnvironmentPanel?.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
             UIManager.ObjectsPanel?.LoadObject += QueueObjectLoad;
             UIManager.StagesPanel?.LoadStage += QueueArcLoad;
+            UIManager.MissionsPanel?.LoadSet += QueueSetLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, imguiController);
 

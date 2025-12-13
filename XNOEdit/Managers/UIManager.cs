@@ -16,6 +16,7 @@ namespace XNOEdit.Managers
         public event Action ResetCameraAction;
 
         public ViewportPanel? ViewportPanel { get; private set; }
+        public EnvironmentPanel? EnvironmentPanel { get; private set; }
         public ImGuiController? Controller { get; private set; }
         public ObjectsPanel? ObjectsPanel { get; private set; }
         public XnoPanel? XnoPanel { get; private set; }
@@ -35,8 +36,6 @@ namespace XNOEdit.Managers
         private bool _environmentWindow = true;
         private bool _fileBrowser = true;
         private bool _guizmos = true;
-        private float _sunAzimuth;
-        private float _sunAltitude;
 
         private ImFontPtr _faFont;
 
@@ -47,6 +46,7 @@ namespace XNOEdit.Managers
             ObjectsPanel = new ObjectsPanel();
             StagesPanel = new StagesPanel(this);
             ViewportPanel = new ViewportPanel(wgpu, device, controller);
+            EnvironmentPanel = new EnvironmentPanel();
 
             var io = ImGui.GetIO();
             io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
@@ -74,15 +74,6 @@ namespace XNOEdit.Managers
             }
         }
 
-        public void InitSunAngles(RenderSettings settings)
-        {
-            _sunAltitude = MathF.Asin(settings.SunDirection.Y) * 180.0f / MathF.PI;
-            _sunAzimuth = MathF.Atan2(settings.SunDirection.Z, settings.SunDirection.X) * 180.0f / MathF.PI;
-
-            if (_sunAzimuth < 0)
-                _sunAzimuth += 360.0f;
-        }
-
         public ObjectSceneVisibility InitXnoPanel(NinjaNext xno)
         {
             StagePanel = null;
@@ -105,9 +96,8 @@ namespace XNOEdit.Managers
             StagePanel = new StagePanel(name, xnos, visibility);
             StagePanel.ViewXno += (index, xno) =>
             {
-                // Key change: shares same visibility instance with xnoIndex
                 XnoPanel = new XnoPanel(xno, visibility, index);
-                ImGui.SetWindowFocus("###XnoPanel");
+                ImGui.SetWindowFocus(XnoPanel.Name);
             };
 
             return visibility;
@@ -139,18 +129,44 @@ namespace XNOEdit.Managers
                 var centralNode = ImGuiP.DockBuilderGetNode(remainingId);
                 centralNode.LocalFlags |= (ImGuiDockNodeFlags)(ImGuiDockNodeFlagsPrivate.CentralNode | ImGuiDockNodeFlagsPrivate.HiddenTabBar) | ImGuiDockNodeFlags.NoUndocking;
 
-                ImGuiP.DockBuilderDockWindow("Viewport", remainingId);
-                ImGuiP.DockBuilderDockWindow("Environment", leftDock);
-                ImGuiP.DockBuilderDockWindow("###XnoPanel", leftDock);
-                ImGuiP.DockBuilderDockWindow("###StagePanel", leftDock);
-                ImGuiP.DockBuilderDockWindow("Objects", bottomDock);
-                ImGuiP.DockBuilderDockWindow("Stages", bottomDock);
+                ImGuiP.DockBuilderDockWindow(ViewportPanel.Name, remainingId);
+                ImGuiP.DockBuilderDockWindow(EnvironmentPanel.Name, leftDock);
+                ImGuiP.DockBuilderDockWindow(XnoPanel.Name, leftDock);
+                ImGuiP.DockBuilderDockWindow(StagePanel.Name, leftDock);
+                ImGuiP.DockBuilderDockWindow(ObjectsPanel.Name, bottomDock);
+                ImGuiP.DockBuilderDockWindow(StagesPanel.Name, bottomDock);
 
                 ImGuiP.DockBuilderFinish(dockspaceId);
 
                 _firstLoop = false;
             }
 
+            RenderMenuBar(ref settings);
+
+            if (_environmentWindow)
+                EnvironmentPanel?.Render(ref settings);
+
+            if (_xnoWindow)
+                XnoPanel?.Render(textureManager);
+
+            if (_stageWindow)
+                StagePanel?.Render();
+
+            if (_fileBrowser)
+            {
+                ObjectsPanel?.Render();
+                StagesPanel?.Render();
+            }
+
+            ViewportPanel?.Render(view, projection, _guizmos);
+
+            RenderLoadingOverlay();
+            _alertPanel?.Render(deltaTime);
+            Controller?.Render(pass);
+        }
+
+        private void RenderMenuBar(ref RenderSettings settings)
+        {
             if (ImGui.BeginMainMenuBar())
             {
                 if (ImGui.BeginMenu("Render"))
@@ -212,50 +228,6 @@ namespace XNOEdit.Managers
 
                 ImGui.EndMainMenuBar();
             }
-
-            if (_environmentWindow)
-            {
-                ImGui.Begin("Environment");
-                ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
-                ImGui.Text("Camera Sensitivity");
-                ImGui.SliderFloat("##CameraSensitivity", ref settings.CameraSensitivity, 0.0f, 1.0f);
-                ImGui.SeparatorText("Sun");
-                ImGui.ColorEdit3("Color", ref settings.SunColor, ImGuiColorEditFlags.NoInputs);
-
-                var editedAzimuth = ImGui.SliderFloat("Azimuth", ref _sunAzimuth, 0.0f, 360.0f, "%.1f°");
-                var editedAltitude = ImGui.SliderFloat("Altitude", ref _sunAltitude, 0.0f, 90.0f, "%.1f°");
-
-                if (editedAzimuth || editedAltitude)
-                {
-                    var azimuthRad = _sunAzimuth * MathF.PI / 180.0f;
-                    var altitudeRad = _sunAltitude * MathF.PI / 180.0f;
-
-                    settings.SunDirection = new Vector3(
-                        (float)(Math.Cos(altitudeRad) * Math.Cos(azimuthRad)),
-                        (float)Math.Sin(altitudeRad),
-                        (float)(Math.Cos(altitudeRad) * Math.Sin(azimuthRad)));
-                }
-
-                ImGui.End();
-            }
-
-            if (_xnoWindow)
-                XnoPanel?.Render(textureManager);
-
-            if (_stageWindow)
-                StagePanel?.Render();
-
-            if (_fileBrowser)
-            {
-                ObjectsPanel?.Render();
-                StagesPanel?.Render();
-            }
-
-            ViewportPanel?.Render(view, projection, _guizmos);
-
-            RenderLoadingOverlay();
-            _alertPanel?.Render(deltaTime);
-            Controller?.Render(pass);
         }
 
         private void RenderLoadingOverlay()

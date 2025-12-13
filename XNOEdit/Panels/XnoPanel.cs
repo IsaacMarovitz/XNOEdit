@@ -3,7 +3,6 @@ using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
-using XNOEdit.Fonts;
 using XNOEdit.Managers;
 using XNOEdit.Services;
 
@@ -11,6 +10,7 @@ namespace XNOEdit.Panels
 {
     public class XnoPanel
     {
+        public const string Name = "XNO";
         private readonly NinjaNext _xno;
         private readonly ISceneVisibility _visibility;
         private readonly int _xnoIndex;
@@ -44,8 +44,11 @@ namespace XNOEdit.Panels
 
         public void Render(TextureManager textureManager)
         {
-            ImGui.Begin($"{_xno.Name}###XnoPanel", ImGuiWindowFlags.AlwaysAutoResize);
+            ImGui.Begin(Name, ImGuiWindowFlags.AlwaysAutoResize);
             ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
+
+            ImGui.Text("File Name:");
+            ImGui.Text(_xno.Name);
 
             if (ImGui.BeginTabBar("Tab Bar", ImGuiTabBarFlags.AutoSelectNewTabs))
             {

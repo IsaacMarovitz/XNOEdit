@@ -8,6 +8,7 @@ namespace XNOEdit.Panels
 {
     public class StagePanel
     {
+        public const string Name = "Stage";
         public event Action<int, NinjaNext> ViewXno;
 
         private readonly string _name;
@@ -41,9 +42,10 @@ namespace XNOEdit.Panels
 
         public void Render()
         {
-            ImGui.Begin($"{_name}###StagePanel", ImGuiWindowFlags.AlwaysAutoResize);
+            ImGui.Begin(Name, ImGuiWindowFlags.AlwaysAutoResize);
             ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
 
+            ImGui.Text($"Name: {_name}");
             ImGui.Text($"XNO Count: {_xnos.Count}");
             ImGui.Text($"Subobject Count: {_subobjectCount}");
             ImGui.Text($"Mesh Set Count: {_meshSetCount}");
