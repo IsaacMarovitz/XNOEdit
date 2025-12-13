@@ -259,7 +259,6 @@ namespace XNOEdit.Managers
 
             ViewportPanel?.Render(view, projection, _guizmos);
 
-            ImGui.ShowDemoWindow();
             RenderLoadingOverlay();
             _alertPanel?.Render(deltaTime);
             Controller?.Render(pass);
