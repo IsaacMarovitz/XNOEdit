@@ -191,7 +191,7 @@ namespace XNOEdit
         private static readonly Dictionary<string, string> WapObjectPackages = new()
         {
             { "wap_brokensnowball", "brokensnowball" },
-            { "wap_conifer", "confier" },
+            { "wap_conifer", "conifer" },
             { "wap_pathsnowball", "pathsnowball" },
             { "wap_searchlight", "searchlight" },
             { "wap_snow", "snow" },
@@ -205,13 +205,18 @@ namespace XNOEdit
             "wvo_waterslider",
             "chainjump",
             "cameraeventbox",
+            "cameraeventcylinder",
             "eventbox",
             "player_start2",
             "amigo_collision",
             "pointsample",
+            "positionSample",
             "common_stopplayercollision",
             "common_water_collision",
-            "common_hint_collision"
+            "common_hint_collision",
+            "common_windcollision_box",
+            "impulsesphere",
+            "snowboardjump"
         ];
     }
 
