@@ -378,6 +378,8 @@ namespace XNOEdit
             var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
             var objectArchive = new ArcFile(objectArcPath);
 
+            HashSet<string> failedTypes = [];
+
             foreach (var setObject in result.Set.Objects)
             {
                 var actor = _propActors.Find(x => x.Name == setObject.Type);
@@ -392,12 +394,29 @@ namespace XNOEdit
                             ?? TryGetModelFromPackage(setObject, objectArchive);
 
                 if (model == null)
+                {
+                    failedTypes.Add(setObject.Type);
                     continue;
+                }
 
-                AddModelInstance(model, setObject.Position, setObject.Rotation, instancesByModel);
+                // TODO: Support multiple models like wvo_revolvingnet
+                var first = model.FirstOrDefault();
+
+                if (first != null)
+                    AddModelInstance(first, setObject.Position, setObject.Rotation, instancesByModel);
             }
 
-            if (instancesByModel.Count == 0)
+            foreach (var type in failedTypes)
+            {
+                Logger.Warning?.PrintMsg(LogClass.Application, $"Model for objects of type {type} not found");
+            }
+
+            if (failedTypes.Count > 0)
+            {
+                UIManager.TriggerAlert(AlertLevel.Warning, "Failed to find model for one of more object types");
+            }
+
+            if (instancesByModel.Count == 0 && failedTypes.Count == 0)
             {
                 UIManager.TriggerAlert(AlertLevel.Warning, "SET file has no placeable objects");
                 return;
@@ -452,7 +471,7 @@ namespace XNOEdit
             Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
         }
 
-        private static string? TryGetModelFromObjectName(StageSetObject setObject, Actor actor, List<ObjectPhysicsParameter> objectParams)
+        private static string[]? TryGetModelFromObjectName(StageSetObject setObject, Actor actor, List<ObjectPhysicsParameter> objectParams)
         {
             var objectNameIndex = actor.Parameters
                 .Select((param, index) => (param, index))
@@ -466,13 +485,16 @@ namespace XNOEdit
             var modelName = (string)setObject.Parameters[objectNameIndex].Value;
             var physicsParam = objectParams.FirstOrDefault(x => x.Name == modelName);
 
-            return physicsParam?.Model;
+            if (physicsParam == null)
+                return null;
+
+            return [physicsParam.Model];
         }
 
-        private static string? TryGetModelFromPackage(StageSetObject setObject, ArcFile objectArchive)
+        private static string[]? TryGetModelFromPackage(StageSetObject setObject, ArcFile objectArchive)
         {
             if (ObjectPackagesMap.GizmoTypes.Contains(setObject.Type))
-                return null;
+                return [];
 
             foreach (var group in ObjectPackagesMap.All)
             {
@@ -490,12 +512,10 @@ namespace XNOEdit
                     var resolver = ResolverForType(setObject.Type);
                     var matches = resolver.ResolveModel(package, setObject);
 
-                    // TODO: Support multiple models like wvo_revolvingnet
-                    return matches.FirstOrDefault();
+                    return matches;
                 }
             }
 
-            Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found for object of type {setObject.Type}");
             return null;
         }
 

@@ -208,6 +208,7 @@ namespace XNOEdit
             "cameraeventcylinder",
             "eventbox",
             "player_start2",
+            "player_goal",
             "amigo_collision",
             "pointsample",
             "positionSample",

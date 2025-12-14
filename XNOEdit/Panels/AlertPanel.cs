@@ -20,7 +20,20 @@ namespace XNOEdit.Panels
 
         public void TriggerAlert(AlertLevel level, string message)
         {
-            Logger.Info?.PrintMsg(LogClass.Application, message);
+            switch (level)
+            {
+                case AlertLevel.Info:
+                    Logger.Info?.PrintMsg(LogClass.Application, message);
+                    break;
+                case AlertLevel.Warning:
+                    Logger.Warning?.PrintMsg(LogClass.Application, message);
+                    break;
+                case AlertLevel.Error:
+                    Logger.Error?.PrintMsg(LogClass.Application, message);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(level), level, null);
+            }
 
             _timer = 0;
             _currentMessage = message;
