@@ -91,9 +91,9 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.tangent = tbn[0];
     out.bitangent = tbn[1];
 
-    out.color = vertex.color;
     out.uv0 = vertex.uv0;
     out.uv1 = vertex.uv1;
+    out.color = mix(vec4<f32>(1.0), vertex.color, per_frame.vertColorStrength);
 
     return out;
 }
