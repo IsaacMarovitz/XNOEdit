@@ -4,7 +4,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
+using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
+using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using SDL3;
@@ -372,6 +374,9 @@ namespace XNOEdit
             // Group instances by model name
             var instancesByModel = new Dictionary<string, List<InstanceData>>();
 
+            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
+            var objectArchive = new ArcFile(objectArcPath);
+
             foreach (var setObject in result.Set.Objects)
             {
                 var actor = _propActors.Find(x => x.Name == setObject.Type);
@@ -390,7 +395,7 @@ namespace XNOEdit
 
                         if (physicsParam != null)
                         {
-                            Logger.Warning?.PrintMsg(LogClass.Application, physicsParam.Model);
+                            Logger.Warning?.PrintMsg(LogClass.Application, $"Loading mode: {physicsParam.Model}");
 
                             if (!instancesByModel.TryGetValue(physicsParam.Model, out var instances))
                             {
@@ -399,6 +404,50 @@ namespace XNOEdit
                             }
 
                             instances.Add(InstanceData.Create(setObject.Position, setObject.Rotation));
+                        }
+                    }
+                    else
+                    {
+                        // Actor type doesn't use objectName.
+                        // Next course of action is to check for a package.
+                        Package? match = null;
+
+                        foreach (var group in ObjectPackagesMap.All)
+                        {
+                            foreach (var package in group.ObjectPackages)
+                            {
+                                if (package.Key == setObject.Type)
+                                {
+                                    var packageFile = objectArchive.GetFile($"/xenon/object/{group.Folder}/{package.Value}.pkg");
+
+                                    if (packageFile != null)
+                                    {
+                                        match = new Package(packageFile.Decompress());
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (match != null)
+                                break;
+                        }
+
+                        if (match != null)
+                        {
+                            var category = match.Categories.FirstOrDefault(x => x.Name == "model");
+
+                            if (category?.Files[0].Name == "model")
+                            {
+                                var xnoLocation = (category.Files[0].Location ?? "").Replace(".xno", "");
+
+                                if (!instancesByModel.TryGetValue(xnoLocation, out var instances))
+                                {
+                                    instances = [];
+                                    instancesByModel[xnoLocation] = instances;
+                                }
+
+                                instances.Add(InstanceData.Create(setObject.Position, setObject.Rotation));
+                            }
                         }
                     }
                 }
@@ -415,9 +464,6 @@ namespace XNOEdit
             }
 
             // Load models and create instanced renderers
-            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
-            var objectArchive = new ArcFile(objectArcPath);
-
             var loadedCount = 0;
             var totalInstances = 0;
 
