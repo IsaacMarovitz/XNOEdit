@@ -381,80 +381,22 @@ namespace XNOEdit
             {
                 var actor = _propActors.Find(x => x.Name == setObject.Type);
 
-                if (actor != null)
-                {
-                    var objectNameIndex = actor.Parameters.Select((value, index) => new { value, index })
-                        .Where(pair => pair.value.Name == "objectName")
-                        .Select(pair => pair.index + 1)
-                        .FirstOrDefault() - 1;
-
-                    if (objectNameIndex != -1)
-                    {
-                        var modelName = (string)setObject.Parameters[objectNameIndex].Value;
-                        var physicsParam = objectParams.FirstOrDefault(x => x.Name == modelName);
-
-                        if (physicsParam != null)
-                        {
-                            Logger.Warning?.PrintMsg(LogClass.Application, $"Loading mode: {physicsParam.Model}");
-
-                            if (!instancesByModel.TryGetValue(physicsParam.Model, out var instances))
-                            {
-                                instances = [];
-                                instancesByModel[physicsParam.Model] = instances;
-                            }
-
-                            instances.Add(InstanceData.Create(setObject.Position, setObject.Rotation));
-                        }
-                    }
-                    else
-                    {
-                        // Actor type doesn't use objectName.
-                        // Next course of action is to check for a package.
-                        Package? match = null;
-
-                        foreach (var group in ObjectPackagesMap.All)
-                        {
-                            foreach (var package in group.ObjectPackages)
-                            {
-                                if (package.Key == setObject.Type)
-                                {
-                                    var packageFile = objectArchive.GetFile($"/xenon/object/{group.Folder}/{package.Value}.pkg");
-
-                                    if (packageFile != null)
-                                    {
-                                        match = new Package(packageFile.Decompress());
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (match != null)
-                                break;
-                        }
-
-                        if (match != null)
-                        {
-                            var category = match.Categories.FirstOrDefault(x => x.Name == "model");
-
-                            if (category?.Files[0].Name == "model")
-                            {
-                                var xnoLocation = (category.Files[0].Location ?? "").Replace(".xno", "");
-
-                                if (!instancesByModel.TryGetValue(xnoLocation, out var instances))
-                                {
-                                    instances = [];
-                                    instancesByModel[xnoLocation] = instances;
-                                }
-
-                                instances.Add(InstanceData.Create(setObject.Position, setObject.Rotation));
-                            }
-                        }
-                    }
-                }
-                else
+                if (actor == null)
                 {
                     Logger.Warning?.PrintMsg(LogClass.Application, $"Prop actor of type {setObject.Type} not found");
+                    continue;
                 }
+
+                var model = TryGetModelFromObjectName(setObject, actor, objectParams)
+                            ?? TryGetModelFromPackage(setObject, objectArchive);
+
+                if (model == null)
+                {
+                    Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found for object of type {setObject.Type}");
+                    continue;
+                }
+
+                AddModelInstance(model, setObject.Position, setObject.Rotation, instancesByModel);
             }
 
             if (instancesByModel.Count == 0)
@@ -506,6 +448,62 @@ namespace XNOEdit
             }
 
             Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
+        }
+
+        private static string? TryGetModelFromObjectName(StageSetObject setObject, Actor actor, List<ObjectPhysicsParameter> objectParams)
+        {
+            var objectNameIndex = actor.Parameters
+                .Select((param, index) => (param, index))
+                .Where(pair => pair.param.Name == "objectName")
+                .Select(pair => pair.index)
+                .FirstOrDefault(-1);
+
+            if (objectNameIndex == -1)
+                return null;
+
+            var modelName = (string)setObject.Parameters[objectNameIndex].Value;
+            var physicsParam = objectParams.FirstOrDefault(x => x.Name == modelName);
+
+            return physicsParam?.Model;
+        }
+
+        private static string? TryGetModelFromPackage(StageSetObject setObject, ArcFile objectArchive)
+        {
+            foreach (var group in ObjectPackagesMap.All)
+            {
+                foreach (var package in group.ObjectPackages)
+                {
+                    if (package.Key != setObject.Type)
+                        continue;
+
+                    var packageFile = objectArchive.GetFile($"/xenon/object/{group.Folder}/{package.Value}.pkg");
+                    if (packageFile == null)
+                        continue;
+
+                    var match = new Package(packageFile.Decompress());
+                    var category = match.Categories.FirstOrDefault(x => x.Name == "model");
+
+                    if (category?.Files[0].Name == "model")
+                        return (category.Files[0].Location ?? "").Replace(".xno", "");
+                }
+            }
+
+            return null;
+        }
+
+        private static void AddModelInstance(
+            string model,
+            Vector3 position,
+            Quaternion rotation,
+            Dictionary<string, List<InstanceData>> instancesByModel)
+        {
+            if (!instancesByModel.TryGetValue(model, out var instances))
+            {
+                instances = [];
+                instancesByModel[model] = instances;
+            }
+
+            instances.Add(InstanceData.Create(position, rotation));
         }
 
         private static void ApplyArcResult(ArcLoadResult result)
