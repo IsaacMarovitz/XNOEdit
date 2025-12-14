@@ -13,6 +13,7 @@ using SDL3;
 using Silk.NET.WebGPU;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
+using XNOEdit.ModelResolver;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
@@ -411,7 +412,11 @@ namespace XNOEdit
 
             foreach (var (modelName, instances) in instancesByModel)
             {
-                var modelFile = objectArchive.GetFile($"/win32/{modelName}.xno");
+                var finalModelName = modelName;
+                if (!Path.HasExtension(finalModelName))
+                    finalModelName += ".xno";
+
+                var modelFile = objectArchive.GetFile($"/win32/{finalModelName}");
                 if (modelFile == null)
                 {
                     Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelName}");
@@ -471,24 +476,36 @@ namespace XNOEdit
         {
             foreach (var group in ObjectPackagesMap.All)
             {
-                foreach (var package in group.ObjectPackages)
+                foreach (var packageName in group.ObjectPackages)
                 {
-                    if (package.Key != setObject.Type)
+                    if (packageName.Key != setObject.Type)
                         continue;
 
-                    var packageFile = objectArchive.GetFile($"/xenon/object/{group.Folder}/{package.Value}.pkg");
+                    var packageFile = objectArchive.GetFile($"/xenon/object/{group.Folder}/{packageName.Value}.pkg");
                     if (packageFile == null)
                         continue;
 
-                    var match = new Package(packageFile.Decompress());
-                    var category = match.Categories.FirstOrDefault(x => x.Name == "model");
+                    var package = new Package(packageFile.Decompress());
 
-                    if (category?.Files[0].Name == "model")
-                        return (category.Files[0].Location ?? "").Replace(".xno", "");
+                    var resolver = ResolverForType(setObject.Type);
+                    var matches = resolver.ResolveModel(package, setObject);
+
+                    // TODO: Support multiple models like wvo_revolvingnet
+                    return matches.FirstOrDefault();
                 }
             }
 
             return null;
+        }
+
+        public static IModelResolver ResolverForType(string type)
+        {
+            return type switch
+            {
+                "common_guillotine" => new GuillotineResolver(),
+                "wvo_revolvingnet" => new RevolvingNetResolver(),
+                _ => new CommonResolver()
+            };
         }
 
         private static void AddModelInstance(
