@@ -392,10 +392,7 @@ namespace XNOEdit
                             ?? TryGetModelFromPackage(setObject, objectArchive);
 
                 if (model == null)
-                {
-                    Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found for object of type {setObject.Type}");
                     continue;
-                }
 
                 AddModelInstance(model, setObject.Position, setObject.Rotation, instancesByModel);
             }
@@ -474,6 +471,9 @@ namespace XNOEdit
 
         private static string? TryGetModelFromPackage(StageSetObject setObject, ArcFile objectArchive)
         {
+            if (ObjectPackagesMap.GizmoTypes.Contains(setObject.Type))
+                return null;
+
             foreach (var group in ObjectPackagesMap.All)
             {
                 foreach (var packageName in group.ObjectPackages)
@@ -495,6 +495,7 @@ namespace XNOEdit
                 }
             }
 
+            Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found for object of type {setObject.Type}");
             return null;
         }
 

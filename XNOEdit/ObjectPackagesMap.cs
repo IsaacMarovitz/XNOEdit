@@ -16,6 +16,7 @@ namespace XNOEdit
         public static PackageGroup TwnObjectPackageGroup => new(TwnObjectPackages, "twn");
         public static PackageGroup WvoObjectPackageGroup => new(WvoObjectPackages, "wvo");
         public static PackageGroup WapObjectPackageGroup => new(WapObjectPackages, "wap");
+        public static ReadOnlyCollection<string> GizmoTypes => _gizmoTypes.AsReadOnly();
 
         public static readonly PackageGroup[] All;
 
@@ -196,6 +197,22 @@ namespace XNOEdit
             { "wap_snow", "snow" },
             { "wap_door", "wapdoor" }
         };
+
+        // These do not have a visual representation
+        // They should be shown as gizmos in a later revision
+        private static readonly string[] _gizmoTypes =
+        [
+            "wvo_waterslider",
+            "chainjump",
+            "cameraeventbox",
+            "eventbox",
+            "player_start2",
+            "amigo_collision",
+            "pointsample",
+            "common_stopplayercollision",
+            "common_water_collision",
+            "common_hint_collision"
+        ];
     }
 
     public struct PackageGroup
