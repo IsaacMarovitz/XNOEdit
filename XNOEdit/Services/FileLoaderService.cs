@@ -152,7 +152,7 @@ namespace XNOEdit.Services
                 var loadedTextureNames = new HashSet<string>();
                 var maxRadius = 0f;
 
-                var name = Path.GetFileName(file.Location);
+                var name = Path.GetFileNameWithoutExtension(file.Location);
                 Logger.Info?.PrintMsg(LogClass.Application, $"Loading ARC: {name}");
 
                 progress?.Report(new LoadProgress(LoadStage.Starting, $"Scanning {name}..."));

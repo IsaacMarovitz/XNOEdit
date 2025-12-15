@@ -9,9 +9,12 @@ namespace XNOEdit.Renderer.Scene
         private readonly ModelRenderer[] _renderers;
         private readonly Dictionary<string, InstancedModelRenderer> _instancedRenderers = [];
 
-        public StageScene(ModelRenderer[] renderers)
+        public string? TerrainName { get; }
+
+        public StageScene(ModelRenderer[] renderers, string? terrainName = null)
         {
             _renderers = renderers;
+            TerrainName = terrainName;
         }
 
         public void AddInstancedRenderer(string name, InstancedModelRenderer renderer)

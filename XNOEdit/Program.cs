@@ -369,6 +369,8 @@ namespace XNOEdit
             if (_scene is not StageScene stageScene)
                 return;
 
+            stageScene.ClearInstancedRenderers();
+
             var objectParams = UIManager.ObjectsPanel.ObjectParameters.Parameters;
 
             // Group instances by model name
@@ -575,7 +577,7 @@ namespace XNOEdit
             };
 
             _scene?.Dispose();
-            _scene = new StageScene(renderers);
+            _scene = new StageScene(renderers, result.Name);
             _modelCenter = Vector3.Zero;
 
             SetModelRadius(result.MaxRadius);
@@ -869,8 +871,20 @@ namespace XNOEdit
             var category = MissionsMap.GetMissionCategory(setName);
             UIManager.SetColors(UIManager.HueForCategory(category));
 
-            if (terrainPath != null)
+            var currentStage = _scene as StageScene;
+            var canReuseTerrain = currentStage?.TerrainName == terrainPath && terrainPath != null;
+
+            if (canReuseTerrain)
             {
+                // Same terrain, just clear objects and load new SET
+                DispatchToMainThread(() =>
+                {
+                    currentStage!.ClearInstancedRenderers();
+                });
+            }
+            else if (terrainPath != null)
+            {
+                // Different terrain, load the arc
                 var fullPath = Path.Join(
                     Configuration.GameFolder,
                     "win32",
@@ -885,10 +899,12 @@ namespace XNOEdit
                 else
                 {
                     UIManager.TriggerAlert(AlertLevel.Warning, $"Failed to find terrain at {terrainPath}.arc");
+                    return;
                 }
             }
             else
             {
+                // No terrain for this mission
                 DispatchToMainThread(() =>
                 {
                     _scene?.Dispose();
