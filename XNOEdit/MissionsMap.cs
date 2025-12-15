@@ -1,4 +1,5 @@
-using System.Collections.ObjectModel;
+using System.Collections.Immutable;
+using XNOEdit.Logging;
 
 namespace XNOEdit
 {
@@ -79,7 +80,7 @@ namespace XNOEdit
             return GetGroup(setName)?.Terrain;
         }
 
-        private static readonly ReadOnlyCollection<string> TwnAMissions =
+        private static readonly ImmutableHashSet<string> TwnAMissions =
         [
             "set_mission_0001",
             "set_mission_0001_01",
@@ -162,13 +163,13 @@ namespace XNOEdit
             "set_mission_1119_01",
             "set_mission_1120_00",
             "set_mission_1120_01",
+            "d1121_00",
             "set_mission_1121_00",
             "set_mission_1121_01",
             "set_mission_1131_00",
             "set_mission_1131_01",
             "set_mission_1132_00",
             "set_mission_1132_01",
-            "set_mission_1220",
             "set_mission_1208_00",
             "set_mission_1208_01",
             "set_mission_1208_02",
@@ -189,18 +190,16 @@ namespace XNOEdit
             "set_mission_1230",
             "set_mission_1301",
             "set_mission_1302",
-            "d1121_00",
             "set_sonic_vs_silver",
             "set_silver_vs_sonic",
             "set_twn_a_060228",
             "set_test_twn_a",
-            "twn_mapA_effects",
-            "dset_twn_a_sonic"
+            "dset_twn_a_sonic",
+            "twn_mapA_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> TwnBMissions =
+        private static readonly ImmutableHashSet<string> TwnBMissions =
         [
-            "set_twn_b_060228",
             "set_mission_0004b",
             "set_mission_0004b_01",
             "set_mission_0004b_02",
@@ -307,12 +306,12 @@ namespace XNOEdit
             "set_mission_1239_00",
             "set_mission_1239_01",
             "set_mission_1240",
-            "set_mission_1240_00"
+            "set_mission_1240_00",
+            "set_twn_b_060228"
         ];
 
-        private static readonly ReadOnlyCollection<string> TwnCMissions =
+        private static readonly ImmutableHashSet<string> TwnCMissions =
         [
-            "set_twn_c",
             "set_mission_0008c",
             "set_mission_0008c_01",
             "set_mission_0010c",
@@ -388,10 +387,11 @@ namespace XNOEdit
             "set_mission_1237_00",
             "set_mission_1237_01",
             "set_mission_1238_00",
-            "set_mission_1238_01"
+            "set_mission_1238_01",
+            "set_twn_c"
         ];
 
-        private static readonly ReadOnlyCollection<string> TwnDMissions =
+        private static readonly ImmutableHashSet<string> TwnDMissions =
         [
             "set_mission_1012_01",
             "set_mission_1108_01",
@@ -400,7 +400,7 @@ namespace XNOEdit
             "set_twn_d"
         ];
 
-        private static readonly ReadOnlyCollection<string> WvoAMissions =
+        private static readonly ImmutableHashSet<string> WvoAMissions =
         [
             "set_wvoA_sonic",
             "set_wvoA_sonic_h",
@@ -410,14 +410,14 @@ namespace XNOEdit
             "set_wvoA_shadow_h",
             "set_wvoA_silver",
             "set_wvoA_silver_h",
-            "set_end_e_sonic",
             "set_wvo_a_tag",
             "set_wvo_a_battle",
+            "set_end_e_sonic",
             "dset_wvo_a_sonic",
             "end_mapE_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> WvoBMissions =
+        private static readonly ImmutableHashSet<string> WvoBMissions =
         [
             "set_wvoB_sonic",
             "set_wvoB_sonic_h",
@@ -426,7 +426,7 @@ namespace XNOEdit
             "dset_wvo_b_sonic"
         ];
 
-        private static readonly ReadOnlyCollection<string> DtdAMissions =
+        private static readonly ImmutableHashSet<string> DtdAMissions =
         [
             "set_dtd_a_sonic",
             "set_dtd_a_sonic_h",
@@ -439,7 +439,7 @@ namespace XNOEdit
             "end_mapD_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> DtdBMissions =
+        private static readonly ImmutableHashSet<string> DtdBMissions =
         [
             "set_dtd_b_sonic",
             "set_dtd_b_shadow",
@@ -452,7 +452,7 @@ namespace XNOEdit
             "dtd_mapB_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> CscAMissions =
+        private static readonly ImmutableHashSet<string> CscAMissions =
         [
             "set_cscA_sonic",
             "set_cscA_sonic_h",
@@ -461,7 +461,7 @@ namespace XNOEdit
             "CSC_mapA_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> CscBMissions =
+        private static readonly ImmutableHashSet<string> CscBMissions =
         [
             "set_cscB_sonic",
             "set_cscB_sonic_h",
@@ -474,7 +474,7 @@ namespace XNOEdit
             "CSC_mapB_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> CscCMissions =
+        private static readonly ImmutableHashSet<string> CscCMissions =
         [
             "set_cscC_sonic",
             "set_cscC_sonic_h",
@@ -485,14 +485,14 @@ namespace XNOEdit
             "CSC_mapC_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> CscEMissions =
+        private static readonly ImmutableHashSet<string> CscEMissions =
         [
             "set_cscE_sonic",
             "set_cscE_sonic_h",
             "set_cscE_sonic_area"
         ];
 
-        private static readonly ReadOnlyCollection<string> CscFMissions =
+        private static readonly ImmutableHashSet<string> CscFMissions =
         [
             "set_cscF_shadow",
             "set_cscF_shadow_h",
@@ -510,7 +510,7 @@ namespace XNOEdit
             "end_mapA_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> FlcAMissions =
+        private static readonly ImmutableHashSet<string> FlcAMissions =
         [
             "set_flc_a_sonic",
             "set_flc_a_sonic_h",
@@ -526,7 +526,7 @@ namespace XNOEdit
             "end_mapB_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> FlcBMissions =
+        private static readonly ImmutableHashSet<string> FlcBMissions =
         [
             "set_flc_b_sonic",
             "set_flc_b_sonic_h",
@@ -538,30 +538,30 @@ namespace XNOEdit
             "flc_mapB_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> FlcCMissions =
+        private static readonly ImmutableHashSet<string> FlcCMissions =
         [
             "set_flc_b_silver",
         ];
 
-        private static readonly ReadOnlyCollection<string> TpjAMissions =
+        private static readonly ImmutableHashSet<string> TpjAMissions =
         [
             "set_tpjA_sonic",
             "set_tpjA_sonic_h",
             "set_tpjA_sonic_area",
-            "tpj_mapA_effects",
-            "dset_tpj_a"
+            "dset_tpj_a",
+            "tpj_mapA_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> TpjBMissions =
+        private static readonly ImmutableHashSet<string> TpjBMissions =
         [
             "set_tpjB_sonic",
             "set_tpjB_sonic_h",
             "set_tpjB_sonic_area",
-            "tpj_mapB_effects",
-            "dset_tpj_b"
+            "dset_tpj_b",
+            "tpj_mapB_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> TpjCMissions =
+        private static readonly ImmutableHashSet<string> TpjCMissions =
         [
             "set_tpjC_rouge",
             "set_tpjC_rouge_h",
@@ -573,7 +573,7 @@ namespace XNOEdit
             "end_mapC_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> RctAMissions =
+        private static readonly ImmutableHashSet<string> RctAMissions =
         [
             "set_rctA_sonic",
             "set_rctA_sonic_h",
@@ -588,7 +588,7 @@ namespace XNOEdit
             "rct_mapA_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> RctBMissions =
+        private static readonly ImmutableHashSet<string> RctBMissions =
         [
             "set_rctB_sonic",
             "set_rctB_sonic_h",
@@ -600,7 +600,7 @@ namespace XNOEdit
             "rct_mapB_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> AqaAMissions =
+        private static readonly ImmutableHashSet<string> AqaAMissions =
         [
             "set_aqaA_sonic",
             "set_aqaA_sonic_h",
@@ -610,11 +610,11 @@ namespace XNOEdit
             "set_aqaA_silver_h",
             "set_aqa_a_tag",
             "set_aqa_a_battle",
-            "aqa_mapA_effects",
-            "d_set_aqaA_sonic"
+            "d_set_aqaA_sonic",
+            "aqa_mapA_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> AqaBMissions =
+        private static readonly ImmutableHashSet<string> AqaBMissions =
         [
             "set_aqaB_sonic",
             "set_aqaB_sonic_h",
@@ -622,12 +622,12 @@ namespace XNOEdit
             "set_aqaB_shadow_h",
             "set_aqaB_silver",
             "set_aqaB_silver_h",
-            "aqa_mapB_effects",
             "d_set_aqaB_sonic",
-            "d_set_aqaB_silver_sonic"
+            "d_set_aqaB_silver_sonic",
+            "aqa_mapB_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> KdvAMissions =
+        private static readonly ImmutableHashSet<string> KdvAMissions =
         [
             "set_kdv_a_sonic",
             "set_kdv_a_sonic_h",
@@ -641,7 +641,7 @@ namespace XNOEdit
             "KDV_mapA_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> KdvBMissions =
+        private static readonly ImmutableHashSet<string> KdvBMissions =
         [
             "set_kdv_b_sonic",
             "set_kdv_b_sonic_h",
@@ -653,7 +653,7 @@ namespace XNOEdit
             "kdv_mapB_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> KdvCMissions =
+        private static readonly ImmutableHashSet<string> KdvCMissions =
         [
             "set_kdv_c_sonic",
             "set_kdv_c_sonic_h",
@@ -661,7 +661,7 @@ namespace XNOEdit
             "KDV_mapC_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> KdvDMissions =
+        private static readonly ImmutableHashSet<string> KdvDMissions =
         [
             "set_kdv_d_sonic",
             "set_kdv_d_sonic_h",
@@ -673,7 +673,7 @@ namespace XNOEdit
             "kdv_mapD_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> WapAMissions =
+        private static readonly ImmutableHashSet<string> WapAMissions =
         [
             "set_wap_a_sonic",
             "set_wap_a_sonic_h",
@@ -686,7 +686,7 @@ namespace XNOEdit
             "wap_mapA_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> WapBMissions =
+        private static readonly ImmutableHashSet<string> WapBMissions =
         [
             "set_wap_b_sonic",
             "set_wap_b_sonic_h",
@@ -701,79 +701,76 @@ namespace XNOEdit
             "end_mapF_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> Dr1DtdMissions =
+        private static readonly ImmutableHashSet<string> Dr1DtdMissions =
         [
             "set_eCerberus_sonic",
         ];
 
-        private static readonly ReadOnlyCollection<string> Dr1WapMissions =
+        private static readonly ImmutableHashSet<string> Dr1WapMissions =
         [
             "set_eCerberus_shadow",
             "set_eGenesis_silver",
             "wap_boss_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> Dr2Missions =
+        private static readonly ImmutableHashSet<string> Dr2Missions =
         [
             "set_eGenesis_sonic"
         ];
 
-        private static readonly ReadOnlyCollection<string> Dr3Missions =
+        private static readonly ImmutableHashSet<string> Dr3Missions =
         [
             "set_ewyvern_sonic"
         ];
 
-        private static readonly ReadOnlyCollection<string> ShadowVsSilverMissions =
+        private static readonly ImmutableHashSet<string> ShadowVsSilverMissions =
         [
             "set_shadow_vs_silver",
             "set_silver_vs_shadow"
         ];
 
-        private static readonly ReadOnlyCollection<string> FirstIblisMissions =
+        private static readonly ImmutableHashSet<string> FirstIblisMissions =
         [
             "set_iblis01_silver",
             "iblis01_map_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> SecondIblisMissions =
+        private static readonly ImmutableHashSet<string> SecondIblisMissions =
         [
             "set_secondiblis_sonic",
             "set_secondiblis_shadow",
             "iblis02_map_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> ThirdIblisMissions =
+        private static readonly ImmutableHashSet<string> ThirdIblisMissions =
         [
             "set_thirdiblis_silver",
             "iblis03_map_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> FirstMefMissions =
+        private static readonly ImmutableHashSet<string> FirstMefMissions =
         [
             "set_firstmefiress_shadow",
             "set_firstmefiress_omega"
         ];
 
-        private static readonly ReadOnlyCollection<string> SecondMefMissions =
+        private static readonly ImmutableHashSet<string> SecondMefMissions =
         [
             "set_secondmefiress_shadow",
             "sendmefi_effects"
         ];
 
-        private static readonly ReadOnlyCollection<string> SolarisMissions =
+        private static readonly ImmutableHashSet<string> SolarisMissions =
         [
             "set_solaris01_super3",
             "set_solaris02_super3"
         ];
 
-        private static readonly ReadOnlyCollection<string> MiscMissions =
+        private static readonly ImmutableHashSet<string> MiscMissions =
         [
-            "set_test002",
-            "set_test002_camera",
             "set_test_player_goal",
             "set_test_player_shadow",
             "set_test_player_silver",
-            "set_test003",
             "set_test_design",
             "set_test_boss",
             "set_test_enemy",
@@ -788,25 +785,87 @@ namespace XNOEdit
             "set_kdv",
             "set_rct",
             "set_rct_area",
-            "set_test_design",
             "set_tps",
             "set_twn",
             "set_wap",
             "set_wvo",
+            "set_test002",
+            "set_test002_camera",
+            "set_test003",
+            // No matching terrain
             "set_dtd_c_sonic",
             "set_cscD_sonic",
             "set_cscD_sonic_h",
             "CSC_mapD_effects",
-            "nakamutest_mapB_effects",
+            "nakamutest_mapB_effects"
         ];
+
+        public static MissionCategory GetMissionCategory(string name)
+        {
+            if (name.Contains("end"))
+                return MissionCategory.Eotw;
+
+            if (name.Contains("super3"))
+                return MissionCategory.Solaris;
+
+            if (name.StartsWith("set_mission_"))
+            {
+                var id = name.Replace("set_mission_", "")[..2];
+
+                switch (id)
+                {
+                    case "00":
+                    case "10":
+                        return MissionCategory.Sonic;
+                    case "01":
+                    case "11":
+                        return MissionCategory.Shadow;
+                    case "02":
+                    case "12":
+                        return MissionCategory.Silver;
+                }
+            }
+
+            string[] ignoreList =
+            [
+                "set_sonic_vs_silver",
+                "set_silver_vs_sonic",
+                "set_shadow_vs_silver",
+                "set_silver_vs_shadow"
+            ];
+
+            if (ignoreList.Contains(name))
+                return MissionCategory.None;
+
+            if (name.Contains("sonic") || name.Contains("tails"))
+                return MissionCategory.Sonic;
+
+            if (name.Contains("shadow") || name.Contains("omega") || name.Contains("rouge"))
+                return MissionCategory.Shadow;
+
+            if (name.Contains("silver"))
+                return MissionCategory.Silver;
+
+            return MissionCategory.None;
+        }
+    }
+
+    public enum MissionCategory
+    {
+        None,
+        Sonic,
+        Shadow,
+        Silver,
+        Eotw,
+        Solaris
     }
 
     public struct MissionGroup
     {
-        public readonly ReadOnlyCollection<string> Missions;
+        public readonly ImmutableHashSet<string> Missions;
         public readonly string? Terrain;
 
-        public MissionGroup(ReadOnlyCollection<string> missions, string? terrain)
+        public MissionGroup(ImmutableHashSet<string> missions, string? terrain)
         {
             Missions = missions;
             Terrain = terrain;

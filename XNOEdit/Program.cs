@@ -866,6 +866,8 @@ namespace XNOEdit
 
             var setName = Path.GetFileNameWithoutExtension(setFile.Name);
             var terrainPath = MissionsMap.GetTerrainPath(setName);
+            var category = MissionsMap.GetMissionCategory(setName);
+            UIManager.SetColors(UIManager.HueForCategory(category));
 
             if (terrainPath != null)
             {

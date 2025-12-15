@@ -8,13 +8,14 @@ namespace XNOEdit.Panels
     {
         public const string Name = "Environment";
 
-        private float _accentHue = 248.8f;
         private float _sunAzimuth;
         private float _sunAltitude;
+        private UIManager _uiManager;
 
-        public EnvironmentPanel()
+        public EnvironmentPanel(UIManager uiManager)
         {
-            UIManager.SetColors(_accentHue);
+            _uiManager = uiManager;
+            uiManager.SetColors(UIManager.ImGuiHue);
         }
 
         public void InitSunAngles(RenderSettings settings)
@@ -51,11 +52,13 @@ namespace XNOEdit.Panels
             }
 
             ImGui.SeparatorText("UI");
-            var editedHue = ImGui.SliderFloat("Accent Hue", ref _accentHue, 0.0f, 360.0f);
+
+            var hue = _uiManager.GetHue();
+            var editedHue = ImGui.SliderFloat("Accent Hue", ref hue, 0.0f, 360.0f);
 
             if (editedHue)
             {
-                UIManager.SetColors(_accentHue);
+                _uiManager.SetColors(hue);
             }
 
             ImGui.End();

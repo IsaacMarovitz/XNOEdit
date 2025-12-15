@@ -14,6 +14,7 @@ namespace XNOEdit.Managers
 {
     public class UIManager : IDisposable
     {
+        public const float ImGuiHue = 248.8f;
         public event Action ResetCameraAction;
 
         public ViewportPanel? ViewportPanel { get; private set; }
@@ -38,6 +39,7 @@ namespace XNOEdit.Managers
         private bool _environmentWindow = true;
         private bool _fileBrowser = true;
         private bool _guizmos = true;
+        private float _hue = 0f;
 
         private ImFontPtr _faFont;
 
@@ -49,7 +51,7 @@ namespace XNOEdit.Managers
             StagesPanel = new StagesPanel(this);
             MissionsPanel = new MissionsPanel();
             ViewportPanel = new ViewportPanel(wgpu, device, controller);
-            EnvironmentPanel = new EnvironmentPanel();
+            EnvironmentPanel = new EnvironmentPanel(this);
 
             var io = ImGui.GetIO();
             io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
@@ -93,47 +95,54 @@ namespace XNOEdit.Managers
             style.TabBarBorderSize = 1.0f;
         }
 
-        public static void SetColors(float hue)
+        public float GetHue()
         {
+            return _hue;
+        }
+
+        public void SetColors(float hue)
+        {
+            _hue = hue;
+
             var colors = ImGui.GetStyle().Colors;
-            colors[(int)ImGuiCol.Border] = OklchToRgba(0.543f, 0.0276f, hue, 0.50f);
-            colors[(int)ImGuiCol.FrameBg] = OklchToRgba(0.409f, 0.0906f, hue, 0.54f);
-            colors[(int)ImGuiCol.FrameBgHovered] = OklchToRgba(0.671f, 0.1685f, hue, 0.40f);
-            colors[(int)ImGuiCol.FrameBgActive] = OklchToRgba(0.671f, 0.1685f, hue, 0.67f);
-            colors[(int)ImGuiCol.TitleBgActive] = OklchToRgba(0.409f, 0.0906f, hue, 1.00f);
-            colors[(int)ImGuiCol.CheckMark] = OklchToRgba(0.671f, 0.1685f, hue, 1.00f);
-            colors[(int)ImGuiCol.SliderGrab] = OklchToRgba(0.615f, 0.1566f, hue, 1.00f);
-            colors[(int)ImGuiCol.SliderGrabActive] = OklchToRgba(0.671f, 0.1685f, hue, 1.00f);
-            colors[(int)ImGuiCol.Button] = OklchToRgba(0.671f, 0.1685f, hue, 0.40f);
-            colors[(int)ImGuiCol.ButtonHovered] = OklchToRgba(0.671f, 0.1685f, hue, 1.00f);
-            colors[(int)ImGuiCol.ButtonActive] = OklchToRgba(0.628f, 0.1953f, hue, 1.00f);
-            colors[(int)ImGuiCol.Header] = OklchToRgba(0.671f, 0.1685f, hue, 0.31f);
-            colors[(int)ImGuiCol.HeaderHovered] = OklchToRgba(0.671f, 0.1685f, hue, 0.80f);
-            colors[(int)ImGuiCol.HeaderActive] = OklchToRgba(0.671f, 0.1685f, hue, 1.00f);
-            colors[(int)ImGuiCol.Separator] = OklchToRgba(0.543f, 0.0276f, hue, 0.50f);
-            colors[(int)ImGuiCol.SeparatorHovered] = OklchToRgba(0.516f, 0.1573f, hue, 0.78f);
-            colors[(int)ImGuiCol.SeparatorActive] = OklchToRgba(0.516f, 0.1573f, hue, 1.00f);
-            colors[(int)ImGuiCol.ResizeGrip] = OklchToRgba(0.671f, 0.1685f, hue, 0.20f);
-            colors[(int)ImGuiCol.ResizeGripHovered] = OklchToRgba(0.671f, 0.1685f, hue, 0.67f);
-            colors[(int)ImGuiCol.ResizeGripActive] = OklchToRgba(0.671f, 0.1685f, hue, 0.95f);
-            colors[(int)ImGuiCol.TabHovered] = OklchToRgba(0.671f, 0.1685f, hue, 0.80f);
-            colors[(int)ImGuiCol.Tab] = OklchToRgba(0.464f, 0.1073f, hue, 0.86f);
-            colors[(int)ImGuiCol.TabSelected] = OklchToRgba(0.517f, 0.1234f, hue, 1.00f);
-            colors[(int)ImGuiCol.TabSelectedOverline] = OklchToRgba(0.671f, 0.1685f, hue, 1.00f);
-            colors[(int)ImGuiCol.TabDimmed] = OklchToRgba(0.215f, 0.0278f, hue, 0.97f);
-            colors[(int)ImGuiCol.TabDimmedSelected] = OklchToRgba(0.378f, 0.0793f, hue, 1.00f);
-            colors[(int)ImGuiCol.DockingPreview] = OklchToRgba(0.671f, 0.1685f, hue, 0.70f);
-            colors[(int)ImGuiCol.PlotLinesHovered] = OklchToRgba(0.712f, 0.1814f, hue, 1.00f);
-            colors[(int)ImGuiCol.PlotHistogram] = OklchToRgba(0.789f, 0.1614f, hue, 1.00f);
-            colors[(int)ImGuiCol.PlotHistogramHovered] = OklchToRgba(0.772f, 0.1738f, hue, 1.00f);
-            colors[(int)ImGuiCol.TableHeaderBg] = OklchToRgba(0.312f, 0.0045f, hue, 1.00f);
-            colors[(int)ImGuiCol.TableBorderStrong] = OklchToRgba(0.432f, 0.0167f, hue, 1.00f);
-            colors[(int)ImGuiCol.TableBorderLight] = OklchToRgba(0.353f, 0.0087f, hue, 1.00f);
-            colors[(int)ImGuiCol.TextLink] = OklchToRgba(0.671f, 0.1685f, hue, 1.00f);
-            colors[(int)ImGuiCol.TextSelectedBg] = OklchToRgba(0.671f, 0.1685f, hue, 0.35f);
-            colors[(int)ImGuiCol.TreeLines] = OklchToRgba(0.543f, 0.0276f, hue, 0.50f);
-            colors[(int)ImGuiCol.DragDropTarget] = OklchToRgba(0.968f, 0.2110f, hue, 0.90f);
-            colors[(int)ImGuiCol.NavCursor] = OklchToRgba(0.671f, 0.1685f, hue, 1.00f);
+            colors[(int)ImGuiCol.Border] = OklchToRgba(0.543f, 0.0276f, _hue, 0.50f);
+            colors[(int)ImGuiCol.FrameBg] = OklchToRgba(0.409f, 0.0906f, _hue, 0.54f);
+            colors[(int)ImGuiCol.FrameBgHovered] = OklchToRgba(0.671f, 0.1685f, _hue, 0.40f);
+            colors[(int)ImGuiCol.FrameBgActive] = OklchToRgba(0.671f, 0.1685f, _hue, 0.67f);
+            colors[(int)ImGuiCol.TitleBgActive] = OklchToRgba(0.409f, 0.0906f, _hue, 1.00f);
+            colors[(int)ImGuiCol.CheckMark] = OklchToRgba(0.671f, 0.1685f, _hue, 1.00f);
+            colors[(int)ImGuiCol.SliderGrab] = OklchToRgba(0.615f, 0.1566f, _hue, 1.00f);
+            colors[(int)ImGuiCol.SliderGrabActive] = OklchToRgba(0.671f, 0.1685f, _hue, 1.00f);
+            colors[(int)ImGuiCol.Button] = OklchToRgba(0.671f, 0.1685f, _hue, 0.40f);
+            colors[(int)ImGuiCol.ButtonHovered] = OklchToRgba(0.671f, 0.1685f, _hue, 1.00f);
+            colors[(int)ImGuiCol.ButtonActive] = OklchToRgba(0.628f, 0.1953f, _hue, 1.00f);
+            colors[(int)ImGuiCol.Header] = OklchToRgba(0.671f, 0.1685f, _hue, 0.31f);
+            colors[(int)ImGuiCol.HeaderHovered] = OklchToRgba(0.671f, 0.1685f, _hue, 0.80f);
+            colors[(int)ImGuiCol.HeaderActive] = OklchToRgba(0.671f, 0.1685f, _hue, 1.00f);
+            colors[(int)ImGuiCol.Separator] = OklchToRgba(0.543f, 0.0276f, _hue, 0.50f);
+            colors[(int)ImGuiCol.SeparatorHovered] = OklchToRgba(0.516f, 0.1573f, _hue, 0.78f);
+            colors[(int)ImGuiCol.SeparatorActive] = OklchToRgba(0.516f, 0.1573f, _hue, 1.00f);
+            colors[(int)ImGuiCol.ResizeGrip] = OklchToRgba(0.671f, 0.1685f, _hue, 0.20f);
+            colors[(int)ImGuiCol.ResizeGripHovered] = OklchToRgba(0.671f, 0.1685f, _hue, 0.67f);
+            colors[(int)ImGuiCol.ResizeGripActive] = OklchToRgba(0.671f, 0.1685f, _hue, 0.95f);
+            colors[(int)ImGuiCol.TabHovered] = OklchToRgba(0.671f, 0.1685f, _hue, 0.80f);
+            colors[(int)ImGuiCol.Tab] = OklchToRgba(0.464f, 0.1073f, _hue, 0.86f);
+            colors[(int)ImGuiCol.TabSelected] = OklchToRgba(0.517f, 0.1234f, _hue, 1.00f);
+            colors[(int)ImGuiCol.TabSelectedOverline] = OklchToRgba(0.671f, 0.1685f, _hue, 1.00f);
+            colors[(int)ImGuiCol.TabDimmed] = OklchToRgba(0.215f, 0.0278f, _hue, 0.97f);
+            colors[(int)ImGuiCol.TabDimmedSelected] = OklchToRgba(0.378f, 0.0793f, _hue, 1.00f);
+            colors[(int)ImGuiCol.DockingPreview] = OklchToRgba(0.671f, 0.1685f, _hue, 0.70f);
+            colors[(int)ImGuiCol.PlotLinesHovered] = OklchToRgba(0.712f, 0.1814f, _hue, 1.00f);
+            colors[(int)ImGuiCol.PlotHistogram] = OklchToRgba(0.789f, 0.1614f, _hue, 1.00f);
+            colors[(int)ImGuiCol.PlotHistogramHovered] = OklchToRgba(0.772f, 0.1738f, _hue, 1.00f);
+            colors[(int)ImGuiCol.TableHeaderBg] = OklchToRgba(0.312f, 0.0045f, _hue, 1.00f);
+            colors[(int)ImGuiCol.TableBorderStrong] = OklchToRgba(0.432f, 0.0167f, _hue, 1.00f);
+            colors[(int)ImGuiCol.TableBorderLight] = OklchToRgba(0.353f, 0.0087f, _hue, 1.00f);
+            colors[(int)ImGuiCol.TextLink] = OklchToRgba(0.671f, 0.1685f, _hue, 1.00f);
+            colors[(int)ImGuiCol.TextSelectedBg] = OklchToRgba(0.671f, 0.1685f, _hue, 0.35f);
+            colors[(int)ImGuiCol.TreeLines] = OklchToRgba(0.543f, 0.0276f, _hue, 0.50f);
+            colors[(int)ImGuiCol.DragDropTarget] = OklchToRgba(0.968f, 0.2110f, _hue, 0.90f);
+            colors[(int)ImGuiCol.NavCursor] = OklchToRgba(0.671f, 0.1685f, _hue, 1.00f);
         }
 
         private static Vector4 OklchToRgba(float l, float c, float h, float a)
@@ -170,6 +179,20 @@ namespace XNOEdit.Managers
                 Math.Clamp(b, 0f, 1f),
                 a
             );
+        }
+
+        public static float HueForCategory(MissionCategory category)
+        {
+            return category switch
+            {
+                MissionCategory.None => 248.8f,
+                MissionCategory.Sonic => 240.0f,
+                MissionCategory.Shadow => 0.0f,
+                MissionCategory.Silver => 190.0f,
+                MissionCategory.Eotw => 300.0f,
+                MissionCategory.Solaris => 90.0f,
+                _ => ImGuiHue
+            };
         }
 
         public ObjectSceneVisibility InitXnoPanel(NinjaNext xno, ModelRenderer renderer)
