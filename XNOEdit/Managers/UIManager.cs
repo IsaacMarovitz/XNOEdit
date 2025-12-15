@@ -203,6 +203,7 @@ namespace XNOEdit.Managers
             _currentVisibility = visibility;
 
             XnoPanel = new XnoPanel(xno, visibility);
+            ImGui.SetWindowFocus(XnoPanel.Name);
 
             return visibility;
         }
@@ -220,6 +221,8 @@ namespace XNOEdit.Managers
                 XnoPanel = new XnoPanel(xno, visibility, index);
                 ImGui.SetWindowFocus(XnoPanel.Name);
             };
+
+            ImGui.SetWindowFocus(StagePanel.Name);
 
             return visibility;
         }
