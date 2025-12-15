@@ -41,13 +41,13 @@ namespace XNOEdit.Services
         }
     }
 
-    public class SetLoadStep : LoadStep
+    public class MissionLoadStep : LoadStep
     {
         public override LoadStepType Type => LoadStepType.Set;
         public IFile File { get; }
-        public SetLoadResult? Result { get; private set; }
+        public MissionLoadResult? Result { get; private set; }
 
-        public SetLoadStep(IFile file)
+        public MissionLoadStep(IFile file)
         {
             File = file;
         }
@@ -58,7 +58,7 @@ namespace XNOEdit.Services
             IProgress<LoadProgress> progress,
             CancellationToken token)
         {
-            Result = await loader.ReadSetAsync(File, progress, token);
+            Result = await loader.ReadMissionAsync(File, progress, token);
         }
     }
 
@@ -116,7 +116,7 @@ namespace XNOEdit.Services
         }
 
         public LoadChain AddXno(IFile file) => Add(new XnoLoadStep(file));
-        public LoadChain AddSet(IFile file) => Add(new SetLoadStep(file));
+        public LoadChain AddSet(IFile file) => Add(new MissionLoadStep(file));
         public LoadChain AddArc(ArcFile arcFile) => Add(new ArcLoadStep(arcFile));
 
         public void Start()

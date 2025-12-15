@@ -40,7 +40,8 @@ namespace XNOEdit.Services
         List<LoadedTexture> Textures
     );
 
-    public record SetLoadResult(
+    public record MissionLoadResult(
+        string Name,
         StageSet Set
     );
 
@@ -113,7 +114,7 @@ namespace XNOEdit.Services
             }, cancellationToken);
         }
 
-        public async Task<SetLoadResult?> ReadSetAsync(
+        public async Task<MissionLoadResult?> ReadMissionAsync(
             IFile file,
             IProgress<LoadProgress>? progress = null,
             CancellationToken cancellationToken = default)
@@ -133,7 +134,7 @@ namespace XNOEdit.Services
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {file.Name}", 1, 1));
 
-                return new SetLoadResult(set);
+                return new MissionLoadResult(file.Name, set);
             }, cancellationToken);
         }
 

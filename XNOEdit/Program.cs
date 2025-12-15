@@ -364,7 +364,7 @@ namespace XNOEdit
             }
         }
 
-        private static void ApplySetResult(SetLoadResult result)
+        private static void ApplyMissionResult(MissionLoadResult result)
         {
             if (_scene is not StageScene stageScene)
                 return;
@@ -469,6 +469,10 @@ namespace XNOEdit
                 totalInstances += instances.Count;
             }
 
+            var category = MissionsMap.GetMissionCategory(Path.GetFileNameWithoutExtension(result.Name));
+            UIManager.SetColors(UIManager.HueForCategory(category));
+            SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}");
+
             Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
         }
 
@@ -553,7 +557,7 @@ namespace XNOEdit
                 _textureManager.Add(tex.Name, tex.Texture, tex.View);
             }
 
-            SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}");
+            SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}.arc");
 
             var renderers = result.Entries.Select(e => e.Renderer).ToArray();
             var xnos = result.Entries.Select(e => e.Xno).ToList();
@@ -825,8 +829,8 @@ namespace XNOEdit
                         case ArcLoadStep { Result: not null } arcStep:
                             ApplyArcResult(arcStep.Result);
                             break;
-                        case SetLoadStep { Result: not null } setStep:
-                            ApplySetResult(setStep.Result);
+                        case MissionLoadStep { Result: not null } missionStep:
+                            ApplyMissionResult(missionStep.Result);
                             break;
                     }
                 });
@@ -868,8 +872,6 @@ namespace XNOEdit
 
             var setName = Path.GetFileNameWithoutExtension(setFile.Name);
             var terrainPath = MissionsMap.GetTerrainPath(setName);
-            var category = MissionsMap.GetMissionCategory(setName);
-            UIManager.SetColors(UIManager.HueForCategory(category));
 
             var currentStage = _scene as StageScene;
             var canReuseTerrain = currentStage?.TerrainName == terrainPath && terrainPath != null;
