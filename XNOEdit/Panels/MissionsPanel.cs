@@ -37,9 +37,15 @@ namespace XNOEdit.Panels
             public TreeNode Add(string name, params TreeNode[] children)
             {
                 var node = new TreeNode(name);
-                foreach (var child in children)
-                    node.Children.Add(child);
+                node.Children.AddRange(children);
+
                 Children.Add(node);
+                return this;
+            }
+
+            public TreeNode Add(params TreeNode[] children)
+            {
+                Children.AddRange(children);
                 return this;
             }
 
@@ -131,6 +137,8 @@ namespace XNOEdit.Panels
                 new TreeNode("Mephiles 1", MissionsMap.FirstMefMissionGroup),
                 new TreeNode("Mephiles 2", MissionsMap.SecondMefMissionGroup),
                 new TreeNode("Solaris", MissionsMap.SolarisMissionGroup));
+
+            root.Add(new TreeNode("Misc.", MissionsMap.MiscMissionGroup));
 
             return root;
         }

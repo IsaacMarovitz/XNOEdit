@@ -202,6 +202,8 @@ namespace XNOEdit
         // They should be shown as gizmos in a later revision
         private static readonly string[] _gizmoTypes =
         [
+            // TODO: MAB Editing
+            "particle",
             "wvo_waterslider",
             "chainjump",
             "cameraeventbox",

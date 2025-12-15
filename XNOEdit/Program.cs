@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
-using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
@@ -883,12 +882,16 @@ namespace XNOEdit
                 }
                 else
                 {
-                    UIManager.TriggerAlert(AlertLevel.Warning, $"Terrain not found: {fullPath}");
+                    UIManager.TriggerAlert(AlertLevel.Warning, $"Failed to find terrain at {terrainPath}.arc");
                 }
             }
             else
             {
-                UIManager.TriggerAlert(AlertLevel.Warning, $"No terrain mapping for {setName}");
+                DispatchToMainThread(() =>
+                {
+                    _scene?.Dispose();
+                    _scene = new StageScene([]);
+                });
             }
 
             _loadChain?.AddSet(setFile);

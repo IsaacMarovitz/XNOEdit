@@ -44,6 +44,7 @@ namespace XNOEdit
         public static MissionGroup FirstMefMissionGroup => new(FirstMefMissions, "stage_boss_mefi01");
         public static MissionGroup SecondMefMissionGroup => new(SecondMefMissions, "stage_boss_mefi02");
         public static MissionGroup SolarisMissionGroup => new(SolarisMissions, "stage_boss_solaris");
+        public static MissionGroup MiscMissionGroup => new(MiscMissions, null);
 
         private static readonly MissionGroup[] All;
 
@@ -82,23 +83,33 @@ namespace XNOEdit
         [
             "set_mission_0001",
             "set_mission_0004",
+            "set_mission_0004a",
             "set_mission_0003a",
             "set_mission_0003a_01",
             "set_mission_0004a_01",
             "set_mission_0004a_02",
+            "set_mission_0007a",
+            "set_mission_0010a",
             "set_mission_0010a_01",
             "set_mission_0012a",
             "set_mission_0014a",
             "set_mission_0015a",
             "set_mission_0105a",
             "set_mission_0107a",
+            "set_mission_0107a_01",
             "set_mission_0108a01",
             "set_mission_0109a",
+            "set_mission_0109a_01",
+            "set_mission_0109a_02",
             "set_mission_0110a",
             "set_mission_0202a",
+            "set_mission_0202a_01",
             "set_mission_0202a_02",
             "set_mission_0203a",
+            "set_mission_0204a_01",
             "set_mission_0208a",
+            "set_mission_0210a",
+            "set_mission_0211a",
             "set_mission_0211a_01",
             "set_mission_0211a_02",
             "set_mission_0212a",
@@ -192,6 +203,10 @@ namespace XNOEdit
             "set_mission_1302",
             "set_sonic_vs_silver",
             "set_silver_vs_sonic",
+            "set_twn_a_060228",
+            "set_test_twn_a",
+            "twn_mapA_effects",
+            "dset_twn_a_sonic"
         ];
 
         private static readonly ReadOnlyCollection<string> TwnBMissions =
@@ -208,15 +223,20 @@ namespace XNOEdit
             "set_mission_0015b",
             "set_mission_0101b",
             "set_mission_0102b",
+            "set_mission_0102b02",
             "set_mission_0105b",
+            "set_mission_0105b_01",
             "set_mission_0105b_02",
+            "set_mission_0107b",
             "set_mission_0108b01",
             "set_mission_0109b",
             "set_mission_0110b",
             "set_mission_0203b01",
             "set_mission_0204b_01",
+            "set_mission_0208b",
             "set_mission_0210b",
             "set_mission_0210b_01",
+            "set_mission_0211b",
             "set_mission_0212b",
             "set_mission_1002",
             "set_mission_1012_00",
@@ -314,6 +334,7 @@ namespace XNOEdit
         private static readonly ReadOnlyCollection<string> TwnCMissions =
         [
             "set_twn_c",
+            "set_mission_0008c",
             "set_mission_0008c_01",
             "set_mission_0010c",
             "set_mission_0012c",
@@ -322,9 +343,18 @@ namespace XNOEdit
             "set_mission_0014c",
             "set_mission_0015c",
             "set_mission_0101c",
+            "set_mission_0101c_01",
+            "set_mission_0102c",
+            "set_mission_0105c",
+            "set_mission_0107c",
+            "set_mission_0109c",
             "set_mission_0110c",
             "set_mission_0201c",
             "set_mission_0202c",
+            "set_mission_0202c_01",
+            "set_mission_0202c_02",
+            "set_mission_0203c",
+            "set_mission_0210c",
             "set_mission_0211c",
             "set_mission_0211c_01",
             "set_mission_0211c_02",
@@ -391,7 +421,8 @@ namespace XNOEdit
             "set_mission_1012_01",
             "set_mission_1108_01",
             "set_mission_1109_01",
-            "set_mission_1130_01"
+            "set_mission_1130_01",
+            "set_twn_d"
         ];
 
         private static readonly ReadOnlyCollection<string> WvoAMissions =
@@ -405,7 +436,10 @@ namespace XNOEdit
             "set_wvoA_silver",
             "set_wvoA_silver_h",
             "set_end_e_sonic",
-            "set_wvo_a_tag"
+            "set_wvo_a_tag",
+            "set_wvo_a_battle",
+            "dset_wvo_a_sonic",
+            "end_mapE_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> WvoBMissions =
@@ -414,6 +448,7 @@ namespace XNOEdit
             "set_wvoB_sonic_h",
             "set_wvoB_shadow",
             "set_wvoB_shadow_h",
+            "dset_wvo_b_sonic"
         ];
 
         private static readonly ReadOnlyCollection<string> DtdAMissions =
@@ -422,16 +457,24 @@ namespace XNOEdit
             "set_dtd_a_sonic_h",
             "set_dtd_a_shadow",
             "set_dtd_a_shadow_h",
-            "set_end_d_sonic"
+            "set_end_d_sonic",
+            "set_dtd_a_silver",
+            "dset_dtd_a_sonic",
+            "dtd_mapA_effects",
+            "end_mapD_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> DtdBMissions =
         [
+            "set_dtd_b_sonic",
             "set_dtd_b_shadow",
             "set_dtd_b_shadow_h",
             "set_dtd_b_silver",
             "set_dtd_a_silver_h",
-            "set_dtd_b_tag"
+            "set_dtd_b_tag",
+            "set_dtd_b_battle",
+            "dset_dtd_b_sonic",
+            "dtd_mapB_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> CscAMissions =
@@ -439,7 +482,8 @@ namespace XNOEdit
             "set_cscA_sonic",
             "set_cscA_sonic_h",
             "set_cscA_shadow",
-            "set_cscA_shadow_h"
+            "set_cscA_shadow_h",
+            "CSC_mapA_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> CscBMissions =
@@ -450,32 +494,45 @@ namespace XNOEdit
             "set_cscB_shadow_h",
             "set_cscB_silver",
             "set_cscB_silver_h",
-            "set_csc_b_tag"
+            "set_csc_b_tag",
+            "set_csc_b_battle",
+            "CSC_mapB_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> CscCMissions =
         [
             "set_cscC_sonic",
             "set_cscC_sonic_h",
+            "set_cscC_sonic_area",
             "set_cscC_shadow",
-            "set_cscC_shadow_h"
+            "set_cscC_shadow_h",
+            "set_cscC_shadow_area",
+            "CSC_mapC_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> CscEMissions =
         [
             "set_cscE_sonic",
-            "set_cscE_sonic_h"
+            "set_cscE_sonic_h",
+            "set_cscE_sonic_area"
         ];
 
         private static readonly ReadOnlyCollection<string> CscFMissions =
         [
             "set_cscF_shadow",
             "set_cscF_shadow_h",
+            "set_cscF_shadow_area",
+            "set_cscF_silver",
+            "set_cscF_silver_area",
             "set_cscF1_silver",
             "set_cscF1_silver_h",
+            "set_cscF1_silver_area",
             "set_cscF2_silver",
             "set_cscF2_silver_h",
-            "set_end_a_sonic"
+            "set_cscF2_silver_area",
+            "set_end_a_sonic",
+            "CSC_mapF_effects",
+            "end_mapA_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> FlcAMissions =
@@ -487,7 +544,11 @@ namespace XNOEdit
             "set_flc_a_silver",
             "set_flc_a_silver_h",
             "set_end_b_sonic",
-            "set_flc_a_tag"
+            "set_flc_a_tag",
+            "set_flc_a_battle",
+            "dset_flc_a",
+            "flc_mapA_effects",
+            "end_mapB_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> FlcBMissions =
@@ -497,7 +558,9 @@ namespace XNOEdit
             "set_flc_b_shadow",
             "set_flc_b_shadow_h",
             "set_flc_b_silver",
-            "set_flc_b_silver_h"
+            "set_flc_b_silver_h",
+            "dset_flc_b",
+            "flc_mapB_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> FlcCMissions =
@@ -508,13 +571,19 @@ namespace XNOEdit
         private static readonly ReadOnlyCollection<string> TpjAMissions =
         [
             "set_tpjA_sonic",
-            "set_tpjA_sonic_h"
+            "set_tpjA_sonic_h",
+            "set_tpjA_sonic_area",
+            "tpj_mapA_effects",
+            "dset_tpj_a"
         ];
 
         private static readonly ReadOnlyCollection<string> TpjBMissions =
         [
             "set_tpjB_sonic",
-            "set_tpjB_sonic_h"
+            "set_tpjB_sonic_h",
+            "set_tpjB_sonic_area",
+            "tpj_mapB_effects",
+            "dset_tpj_b"
         ];
 
         private static readonly ReadOnlyCollection<string> TpjCMissions =
@@ -523,25 +592,37 @@ namespace XNOEdit
             "set_tpjC_rouge_h",
             "set_tpjC_silver",
             "set_tpjC_silver_h",
-            "set_end_c_sonic"
+            "set_end_c_sonic",
+            "tpj_mapC_effects",
+            "dset_tpj_c",
+            "end_mapC_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> RctAMissions =
         [
             "set_rctA_sonic",
             "set_rctA_sonic_h",
+            "set_rctA_sonic_area",
             "set_rctA_shadow",
             "set_rctA_shadow_h",
+            "set_rctA_shadow_area",
             "set_rctA_silver",
-            "set_rctA_silver_h"
+            "set_rctA_silver_h",
+            "set_rctA_silver_area",
+            "dset_rct_a_sonic",
+            "rct_mapA_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> RctBMissions =
         [
             "set_rctB_sonic",
             "set_rctB_sonic_h",
+            "set_rctB_sonic_area",
             "set_rctB_shadow",
-            "set_rctB_shadow_h"
+            "set_rctB_shadow_h",
+            "set_rctB_shadow_area",
+            "dset_rct_b_sonic",
+            "rct_mapB_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> AqaAMissions =
@@ -552,7 +633,10 @@ namespace XNOEdit
             "set_aqaA_shadow_h",
             "set_aqaA_silver",
             "set_aqaA_silver_h",
-            "set_aqa_a_tag"
+            "set_aqa_a_tag",
+            "set_aqa_a_battle",
+            "aqa_mapA_effects",
+            "d_set_aqaA_sonic"
         ];
 
         private static readonly ReadOnlyCollection<string> AqaBMissions =
@@ -562,7 +646,10 @@ namespace XNOEdit
             "set_aqaB_shadow",
             "set_aqaB_shadow_h",
             "set_aqaB_silver",
-            "set_aqaB_silver_h"
+            "set_aqaB_silver_h",
+            "aqa_mapB_effects",
+            "d_set_aqaB_sonic",
+            "d_set_aqaB_silver_sonic"
         ];
 
         private static readonly ReadOnlyCollection<string> KdvAMissions =
@@ -572,7 +659,11 @@ namespace XNOEdit
             "set_kdv_a_shadow",
             "set_kdv_a_shadow_h",
             "set_end_g_sonic",
-            "set_kdv_a_tag"
+            "set_kdv_a_tag",
+            "set_kdv_a_battle",
+            "dset_kdv_a_sonic",
+            "end_mapG_effects",
+            "KDV_mapA_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> KdvBMissions =
@@ -582,13 +673,17 @@ namespace XNOEdit
             "set_kdv_b_shadow",
             "set_kdv_b_shadow_h",
             "set_kdv_b_silver",
-            "set_kdv_b_silver_h"
+            "set_kdv_b_silver_h",
+            "dset_kdv_b_sonic",
+            "kdv_mapB_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> KdvCMissions =
         [
             "set_kdv_c_sonic",
-            "set_kdv_c_sonic_h"
+            "set_kdv_c_sonic_h",
+            "set_kdv_c_sonic_area",
+            "KDV_mapC_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> KdvDMissions =
@@ -598,7 +693,9 @@ namespace XNOEdit
             "set_kdv_d_shadow",
             "set_kdv_d_shadow_h",
             "set_kdv_d_silver",
-            "set_kdv_d_silver_h"
+            "set_kdv_d_silver_h",
+            "dset_kdv_d_sonic",
+            "kdv_mapD_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> WapAMissions =
@@ -609,6 +706,9 @@ namespace XNOEdit
             "set_wap_a_shadow_h",
             "set_wap_a_silver",
             "set_wap_a_silver_h",
+            "set_wap_b_battle",
+            "dset_wap_a_sonic",
+            "wap_mapA_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> WapBMissions =
@@ -620,7 +720,10 @@ namespace XNOEdit
             "set_wap_b_silver",
             "set_wap_b_silver_h",
             "set_end_f_sonic",
-            "set_wap_b_tag"
+            "set_wap_b_tag",
+            "dset_wap_b_sonic",
+            "wap_mapB_effects",
+            "end_mapF_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> Dr1DtdMissions =
@@ -631,7 +734,8 @@ namespace XNOEdit
         private static readonly ReadOnlyCollection<string> Dr1WapMissions =
         [
             "set_eCerberus_shadow",
-            "set_eGenesis_silver"
+            "set_eGenesis_silver",
+            "wap_boss_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> Dr2Missions =
@@ -653,17 +757,20 @@ namespace XNOEdit
         private static readonly ReadOnlyCollection<string> FirstIblisMissions =
         [
             "set_iblis01_silver",
+            "iblis01_map_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> SecondIblisMissions =
         [
             "set_secondiblis_sonic",
-            "set_secondiblis_shadow"
+            "set_secondiblis_shadow",
+            "iblis02_map_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> ThirdIblisMissions =
         [
             "set_thirdiblis_silver",
+            "iblis03_map_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> FirstMefMissions =
@@ -675,6 +782,7 @@ namespace XNOEdit
         private static readonly ReadOnlyCollection<string> SecondMefMissions =
         [
             "set_secondmefiress_shadow",
+            "sendmefi_effects"
         ];
 
         private static readonly ReadOnlyCollection<string> SolarisMissions =
@@ -682,14 +790,48 @@ namespace XNOEdit
             "set_solaris01_super3",
             "set_solaris02_super3"
         ];
+
+        private static readonly ReadOnlyCollection<string> MiscMissions =
+        [
+            "set_test002",
+            "set_test002_camera",
+            "set_test_player_goal",
+            "set_test_player_shadow",
+            "set_test_player_silver",
+            "set_test003",
+            "set_test_design",
+            "set_test_boss",
+            "set_test_enemy",
+            "set_test_vehicle",
+            "set_aqa",
+            "set_cmn",
+            "set_cmn_area",
+            "set_csc",
+            "set_dtd",
+            "set_end",
+            "set_flc",
+            "set_kdv",
+            "set_rct",
+            "set_rct_area",
+            "set_test_design",
+            "set_tps",
+            "set_twn",
+            "set_wap",
+            "set_wvo",
+            "set_cscD_sonic_h",
+            "CSC_mapD_effects",
+            "set_cscD_sonic",
+            "set_dtd_c_sonic",
+            "nakamutest_mapB_effects"
+        ];
     }
 
     public struct MissionGroup
     {
         public readonly ReadOnlyCollection<string> Missions;
-        public readonly string Terrain;
+        public readonly string? Terrain;
 
-        public MissionGroup(ReadOnlyCollection<string> missions, string terrain)
+        public MissionGroup(ReadOnlyCollection<string> missions, string? terrain)
         {
             Missions = missions;
             Terrain = terrain;
