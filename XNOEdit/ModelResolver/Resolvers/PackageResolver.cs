@@ -1,11 +1,15 @@
 using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 
-namespace XNOEdit.ModelResolver
+namespace XNOEdit.ModelResolver.Resolvers
 {
-    public class CommonResolver : IModelResolver
+    public class PackageResolver : IModelResolver
     {
-        public string[] ResolveModel(Package package, StageSetObject setObject)
+        public int Priority => -20;
+
+        public bool CanResolve(string objectType) => true;
+
+        public string[] Resolve(Package package, StageSetObject setObject)
         {
             string[] models = [];
 

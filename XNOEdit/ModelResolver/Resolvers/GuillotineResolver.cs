@@ -1,11 +1,18 @@
 using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 
-namespace XNOEdit.ModelResolver
+namespace XNOEdit.ModelResolver.Resolvers
 {
-    public class GuillotineResolver : IModelResolver
+    public class GuillotineResolver : ModelResolver
     {
-        public string[] ResolveModel(Package package, StageSetObject setObject)
+        protected override IReadOnlySet<string> SupportedTypes { get; } = new HashSet<string>
+        {
+            "common_guillotine"
+        };
+
+        public override int Priority => 10;
+
+        public override string[] Resolve(Package package, StageSetObject setObject)
         {
             string[] models = [];
 

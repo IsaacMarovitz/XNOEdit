@@ -1,11 +1,18 @@
 using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 
-namespace XNOEdit.ModelResolver
+namespace XNOEdit.ModelResolver.Resolvers
 {
-    public class RevolvingNetResolver : IModelResolver
+    public class RevolvingNetResolver : ModelResolver
     {
-        public string[] ResolveModel(Package package, StageSetObject setObject)
+        protected override IReadOnlySet<string> SupportedTypes { get; } = new HashSet<string>
+        {
+            "wvo_revolvingnet"
+        };
+
+        public override int Priority => 10;
+
+        public override string[] Resolve(Package package, StageSetObject setObject)
         {
             List<string> models = [];
 

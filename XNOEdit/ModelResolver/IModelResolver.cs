@@ -5,6 +5,8 @@ namespace XNOEdit.ModelResolver
 {
     public interface IModelResolver
     {
-        string[] ResolveModel(Package package, StageSetObject setObject);
+        string[] Resolve(Package package, StageSetObject setObject);
+        int Priority => 0;
+        bool CanResolve(string objectType);
     }
 }

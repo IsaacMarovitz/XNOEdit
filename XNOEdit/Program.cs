@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
-using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
@@ -514,24 +513,14 @@ namespace XNOEdit
 
                     var package = new Package(packageFile.Decompress());
 
-                    var resolver = ResolverForType(setObject.Type);
-                    var matches = resolver.ResolveModel(package, setObject);
+                    var registry = new ResolverRegistry();
+                    var matches = registry.Resolve(package, setObject);
 
                     return matches;
                 }
             }
 
             return null;
-        }
-
-        public static IModelResolver ResolverForType(string type)
-        {
-            return type switch
-            {
-                "common_guillotine" => new GuillotineResolver(),
-                "wvo_revolvingnet" => new RevolvingNetResolver(),
-                _ => new CommonResolver()
-            };
         }
 
         private static void AddModelInstance(
