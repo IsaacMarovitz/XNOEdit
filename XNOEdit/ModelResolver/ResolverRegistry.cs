@@ -13,6 +13,7 @@ namespace XNOEdit.ModelResolver
             Register(new PhysicsObjectResolver());
             Register(new GuillotineResolver());
             Register(new RevolvingNetResolver());
+            Register(new EnemyResolver());
             Register(new GizmoResolver());
         }
 

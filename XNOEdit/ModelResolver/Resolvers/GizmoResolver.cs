@@ -9,6 +9,8 @@ namespace XNOEdit.ModelResolver.Resolvers
         protected override IReadOnlySet<string> SupportedTypes { get; } = new HashSet<string>
         {
             "particle",
+            "ambience",
+            "ambience_collision",
             "wvo_waterslider",
             "chainjump",
             "cameraeventbox",

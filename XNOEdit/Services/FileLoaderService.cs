@@ -61,6 +61,11 @@ namespace XNOEdit.Services
         Quaternion Rotation
     );
 
+    public record ModelKey(
+        string ModelPath,
+        string? ArchiveHint
+    );
+
     public record StageLoadResult(
         string Name,
         List<ArcXnoEntry> Entries,
@@ -157,24 +162,26 @@ namespace XNOEdit.Services
 
                 // Load XNOs for each unique model
                 var loadedGroups = new List<LoadedObjectGroup>();
-                var modelPaths = instancesByModel.Keys.ToList();
+                var modelKeys = instancesByModel.Keys.ToList();
                 var current = 0;
-                var total = modelPaths.Count;
+                var total = modelKeys.Count;
 
-                foreach (var modelPath in modelPaths)
+                var archiveCache = new Dictionary<string, ArcFile>();
+
+                foreach (var modelKey in modelKeys)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     progress?.Report(new LoadProgress(
                         LoadStage.LoadingModel,
-                        $"Loading {Path.GetFileName(modelPath)}...",
+                        $"Loading {Path.GetFileName(modelKey.ModelPath)}...",
                         current,
                         total));
 
-                    var modelFile = resolverContext.ObjectArchive.GetFile($"/win32/{modelPath}");
+                    var modelFile = GetModelFile(modelKey, resolverContext.ObjectArchive, archiveCache);
                     if (modelFile == null)
                     {
-                        Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelPath}");
+                        Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelKey.ModelPath}");
                         current++;
                         continue;
                     }
@@ -183,9 +190,9 @@ namespace XNOEdit.Services
                     if (xnoResult?.ObjectChunk != null)
                     {
                         loadedGroups.Add(new LoadedObjectGroup(
-                            modelPath,
+                            modelKey.ModelPath,
                             xnoResult,
-                            instancesByModel[modelPath]));
+                            instancesByModel[modelKey]));
                     }
 
                     current++;
@@ -197,11 +204,11 @@ namespace XNOEdit.Services
             }, cancellationToken);
         }
 
-        private static (Dictionary<string, List<ResolvedInstanceData>>, HashSet<string>) ResolveObjects(
+        private static (Dictionary<ModelKey, List<ResolvedInstanceData>>, HashSet<string>) ResolveObjects(
             StageSet set,
             ResolverContext context)
         {
-            var instancesByModel = new Dictionary<string, List<ResolvedInstanceData>>();
+            var instancesByModel = new Dictionary<ModelKey, List<ResolvedInstanceData>>();
             var failedTypes = new HashSet<string>();
             var registry = new ResolverRegistry();
 
@@ -217,11 +224,12 @@ namespace XNOEdit.Services
                     foreach (var instance in match.Instances)
                     {
                         var modelPath = NormalizeModelPath(instance.ModelPath);
+                        var key = new ModelKey(modelPath, instance.ArchiveHint);
 
-                        if (!instancesByModel.TryGetValue(modelPath, out var instances))
+                        if (!instancesByModel.TryGetValue(key, out var instances))
                         {
                             instances = [];
-                            instancesByModel[modelPath] = instances;
+                            instancesByModel[key] = instances;
                         }
 
                         instances.Add(new ResolvedInstanceData(instance.Position, instance.Rotation));
@@ -245,6 +253,39 @@ namespace XNOEdit.Services
             if (!Path.HasExtension(path))
                 return path + ".xno";
             return path;
+        }
+
+        private static IFile? GetModelFile(
+            ModelKey modelKey,
+            ArcFile objectArchive,
+            Dictionary<string, ArcFile> archiveCache)
+        {
+            if (modelKey.ArchiveHint == null)
+            {
+                // Default: look in object.arc
+                return objectArchive.GetFile($"/win32/{modelKey.ModelPath}");
+            }
+
+            // Look in the hinted archive
+            if (!archiveCache.TryGetValue(modelKey.ArchiveHint, out var archive))
+            {
+                var archivePath = Path.Join(
+                    Configuration.GameFolder,
+                    "xenon",
+                    "archives",
+                    $"{modelKey.ArchiveHint}.arc");
+
+                if (!File.Exists(archivePath))
+                {
+                    Logger.Warning?.PrintMsg(LogClass.Application, $"Archive not found: {archivePath}");
+                    return null;
+                }
+
+                archive = new ArcFile(archivePath);
+                archiveCache[modelKey.ArchiveHint] = archive;
+            }
+
+            return archive.GetFile($"/win32/{modelKey.ModelPath}");
         }
 
         public async Task<StageLoadResult?> ReadArcAsync(
