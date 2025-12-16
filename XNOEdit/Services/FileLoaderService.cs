@@ -263,7 +263,7 @@ namespace XNOEdit.Services
             if (modelKey.ArchiveHint == null)
             {
                 // Default: look in object.arc
-                return objectArchive.GetFile($"/win32/{modelKey.ModelPath}");
+                return objectArchive.GetFile($"{modelKey.ModelPath}");
             }
 
             // Look in the hinted archive
@@ -271,8 +271,6 @@ namespace XNOEdit.Services
             {
                 var archivePath = Path.Join(
                     Configuration.GameFolder,
-                    "xenon",
-                    "archives",
                     $"{modelKey.ArchiveHint}.arc");
 
                 if (!File.Exists(archivePath))
@@ -285,7 +283,7 @@ namespace XNOEdit.Services
                 archiveCache[modelKey.ArchiveHint] = archive;
             }
 
-            return archive.GetFile($"/win32/{modelKey.ModelPath}");
+            return archive.GetFile($"{modelKey.ModelPath}");
         }
 
         public async Task<StageLoadResult?> ReadArcAsync(

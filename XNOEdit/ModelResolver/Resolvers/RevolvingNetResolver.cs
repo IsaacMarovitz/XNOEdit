@@ -61,7 +61,7 @@ namespace XNOEdit.ModelResolver.Resolvers
 
                         instances.Add(new ResolvedInstance
                         {
-                            ModelPath = bodyFile.Location,
+                            ModelPath = $"/win32/{bodyFile.Location}",
                             Position = setObject.Position,
                             Rotation = setObject.Rotation,
                             Visible = true
@@ -69,7 +69,7 @@ namespace XNOEdit.ModelResolver.Resolvers
 
                         instances.Add(new ResolvedInstance
                         {
-                            ModelPath = netFile.Location,
+                            ModelPath = $"/win32/{netFile.Location}",
                             Position = setObject.Position + netOffset,
                             Rotation = setObject.Rotation,
                             Visible = true

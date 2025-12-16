@@ -47,7 +47,7 @@ namespace XNOEdit.ModelResolver.Resolvers
                         return ResolveResult.Empty;
 
                     return ResolveResult.WithInstance(
-                        ResolvedInstance.Create(modelPath, setObject.Position, setObject.Rotation));
+                        ResolvedInstance.Create($"/win32/{modelPath}", setObject.Position, setObject.Rotation));
                 }
             }
 

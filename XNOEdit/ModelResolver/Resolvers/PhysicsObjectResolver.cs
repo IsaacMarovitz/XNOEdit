@@ -32,7 +32,7 @@ namespace XNOEdit.ModelResolver.Resolvers
                 return ResolveResult.Empty;
 
             return ResolveResult.WithInstance(
-                ResolvedInstance.Create(physicsParam.Model, setObject.Position, setObject.Rotation));
+                ResolvedInstance.Create($"/win32/{physicsParam.Model}", setObject.Position, setObject.Rotation));
         }
     }
 }
