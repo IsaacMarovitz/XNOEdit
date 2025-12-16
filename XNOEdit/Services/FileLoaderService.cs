@@ -36,7 +36,7 @@ namespace XNOEdit.Services
         public bool IsIndeterminate => Total == 0;
     }
 
-    public record XnoLoadResult(
+    public record ObjectLoadResult(
         NinjaNext Xno,
         ObjectChunk? ObjectChunk,
         ModelRenderer? Renderer,
@@ -52,7 +52,7 @@ namespace XNOEdit.Services
 
     public record LoadedObjectGroup(
         string ModelPath,
-        XnoLoadResult XnoResult,
+        ObjectLoadResult ObjectResult,
         List<ResolvedInstanceData> Instances
     );
 
@@ -61,7 +61,7 @@ namespace XNOEdit.Services
         Quaternion Rotation
     );
 
-    public record ArcLoadResult(
+    public record StageLoadResult(
         string Name,
         List<ArcXnoEntry> Entries,
         List<LoadedTexture> Textures,
@@ -87,7 +87,7 @@ namespace XNOEdit.Services
             _queue = queue;
         }
 
-        public async Task<XnoLoadResult?> ReadXnoAsync(
+        public async Task<ObjectLoadResult?> ReadXnoAsync(
             IFile file,
             ArcFile? shaderArchive,
             IProgress<LoadProgress>? progress = null,
@@ -126,7 +126,7 @@ namespace XNOEdit.Services
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {xno.Name}", 1, 1));
 
-                return new XnoLoadResult(xno, objectChunk, renderer, textures);
+                return new ObjectLoadResult(xno, objectChunk, renderer, textures);
             }, cancellationToken);
         }
 
@@ -247,7 +247,7 @@ namespace XNOEdit.Services
             return path;
         }
 
-        public async Task<ArcLoadResult?> ReadArcAsync(
+        public async Task<StageLoadResult?> ReadArcAsync(
             ArcFile file,
             ArcFile? shaderArchive,
             IProgress<LoadProgress>? progress = null,
@@ -314,7 +314,7 @@ namespace XNOEdit.Services
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {name}", total, total));
 
-                return new ArcLoadResult(name, entries, allTextures, maxRadius);
+                return new StageLoadResult(name, entries, allTextures, maxRadius);
             }, cancellationToken);
         }
 

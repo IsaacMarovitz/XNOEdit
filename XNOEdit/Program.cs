@@ -104,7 +104,7 @@ namespace XNOEdit
             UIManager.EnvironmentPanel?.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
             UIManager.ObjectsPanel?.LoadObject += QueueObjectLoad;
-            UIManager.StagesPanel?.LoadStage += QueueArcLoad;
+            UIManager.StagesPanel?.LoadStage += QueueStageLoad;
             UIManager.MissionsPanel?.LoadMission += QueueMissionLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, imguiController);
@@ -325,7 +325,78 @@ namespace XNOEdit
             }
         }
 
-        private static void ApplyXnoResult(XnoLoadResult result)
+        private static void QueueObjectLoad(IFile file)
+        {
+            _loadChain?.Clear();
+            _loadChain?.AddXno(file);
+            _loadChain?.Start();
+        }
+
+        private static void QueueStageLoad(ArcFile arcFile)
+        {
+            _loadChain?.Clear();
+            _loadChain?.AddArc(arcFile);
+            _loadChain?.Start();
+        }
+
+        private static void QueueMissionLoad(IFile setFile)
+        {
+            _loadChain?.Clear();
+
+            var setName = Path.GetFileNameWithoutExtension(setFile.Name);
+            var terrainPath = MissionsMap.GetTerrainPath(setName);
+
+            var currentStage = _scene as StageScene;
+            var canReuseTerrain = currentStage?.TerrainName == terrainPath && terrainPath != null;
+
+            if (canReuseTerrain)
+            {
+                // Same terrain, just clear objects and load new SET
+                DispatchToMainThread(() =>
+                {
+                    currentStage!.ClearInstancedRenderers();
+                });
+            }
+            else if (terrainPath != null)
+            {
+                // Different terrain, load the arc
+                var fullPath = Path.Join(
+                    Configuration.GameFolder,
+                    "win32",
+                    "archives",
+                    $"{terrainPath}.arc"
+                );
+
+                if (File.Exists(fullPath))
+                {
+                    _loadChain?.AddArc(new ArcFile(fullPath));
+                }
+                else
+                {
+                    UIManager.TriggerAlert(AlertLevel.Warning, $"Failed to find terrain at {terrainPath}.arc");
+                    return;
+                }
+            }
+            else
+            {
+                // No terrain for this mission
+                DispatchToMainThread(() =>
+                {
+                    _scene?.Dispose();
+                    _scene = new StageScene([]);
+                });
+            }
+
+            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
+            var objectArchive = new ArcFile(objectArcPath);
+            var objectParams = UIManager.ObjectsPanel?.ObjectParameters.Parameters ?? [];
+            var resolverContext = new ResolverContext(objectParams, _propActors, objectArchive);
+
+            _loadChain?.AddSet(setFile, resolverContext);
+            _loadChain?.Start();
+        }
+
+        private static void ApplyObjectResult(ObjectLoadResult result)
         {
             if (result.ObjectChunk != null && result.Renderer != null)
             {
@@ -364,67 +435,7 @@ namespace XNOEdit
             }
         }
 
-        private static void ApplyMissionResult(MissionLoadResult result)
-        {
-            if (_scene is not StageScene stageScene)
-                return;
-
-            stageScene.ClearInstancedRenderers();
-
-            foreach (var type in result.FailedTypes)
-            {
-                Logger.Warning?.PrintMsg(LogClass.Application, $"Model for objects of type {type} not found");
-            }
-
-            if (result.FailedTypes.Count > 0)
-            {
-                UIManager.TriggerAlert(AlertLevel.Warning, "Failed to find model for one or more object types");
-            }
-
-            if (result.LoadedGroups.Count == 0 && result.FailedTypes.Count == 0)
-            {
-                UIManager.TriggerAlert(AlertLevel.Warning, "SET file has no placeable objects");
-                return;
-            }
-
-            var loadedCount = 0;
-            var totalInstances = 0;
-
-            foreach (var group in result.LoadedGroups)
-            {
-                var renderer = new InstancedModelRenderer(
-                    _wgpu,
-                    _device,
-                    group.XnoResult.ObjectChunk,
-                    group.XnoResult.Xno.GetChunk<TextureListChunk>(),
-                    group.XnoResult.Xno.GetChunk<EffectListChunk>(),
-                    _shaderArchive);
-
-                var instanceData = group.Instances
-                    .Select(i => InstanceData.Create(i.Position, i.Rotation))
-                    .ToArray();
-
-                renderer.SetInstances(instanceData);
-
-                stageScene.AddInstancedRenderer(group.ModelPath, renderer);
-
-                // Add textures to texture manager
-                foreach (var tex in group.XnoResult.Textures)
-                {
-                    _textureManager.Add(tex.Name, tex.Texture, tex.View);
-                }
-
-                loadedCount++;
-                totalInstances += group.Instances.Count;
-            }
-
-            SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}");
-            UIManager.InitMissionPanel(result.Name);
-
-            Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
-        }
-
-        private static void ApplyArcResult(ArcLoadResult result)
+        private static void ApplyStageResult(StageLoadResult result)
         {
             _textureManager.Clear();
             foreach (var tex in result.Textures)
@@ -460,6 +471,66 @@ namespace XNOEdit
             _modelCenter = Vector3.Zero;
 
             SetModelRadius(result.MaxRadius);
+        }
+
+        private static void ApplyMissionResult(MissionLoadResult result)
+        {
+            if (_scene is not StageScene stageScene)
+                return;
+
+            stageScene.ClearInstancedRenderers();
+
+            foreach (var type in result.FailedTypes)
+            {
+                Logger.Warning?.PrintMsg(LogClass.Application, $"Model for objects of type {type} not found");
+            }
+
+            if (result.FailedTypes.Count > 0)
+            {
+                UIManager.TriggerAlert(AlertLevel.Warning, "Failed to find model for one or more object types");
+            }
+
+            if (result.LoadedGroups.Count == 0 && result.FailedTypes.Count == 0)
+            {
+                UIManager.TriggerAlert(AlertLevel.Warning, "SET file has no placeable objects");
+                return;
+            }
+
+            var loadedCount = 0;
+            var totalInstances = 0;
+
+            foreach (var group in result.LoadedGroups)
+            {
+                var renderer = new InstancedModelRenderer(
+                    _wgpu,
+                    _device,
+                    group.ObjectResult.ObjectChunk,
+                    group.ObjectResult.Xno.GetChunk<TextureListChunk>(),
+                    group.ObjectResult.Xno.GetChunk<EffectListChunk>(),
+                    _shaderArchive);
+
+                var instanceData = group.Instances
+                    .Select(i => InstanceData.Create(i.Position, i.Rotation))
+                    .ToArray();
+
+                renderer.SetInstances(instanceData);
+
+                stageScene.AddInstancedRenderer(group.ModelPath, renderer);
+
+                // Add textures to texture manager
+                foreach (var tex in group.ObjectResult.Textures)
+                {
+                    _textureManager.Add(tex.Name, tex.Texture, tex.View);
+                }
+
+                loadedCount++;
+                totalInstances += group.Instances.Count;
+            }
+
+            SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}");
+            UIManager.InitMissionPanel(result.Name);
+
+            Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
         }
 
         private static void OnRender(double deltaTime)
@@ -698,11 +769,11 @@ namespace XNOEdit
                 {
                     switch (step)
                     {
-                        case XnoLoadStep { Result: not null } xnoStep:
-                            ApplyXnoResult(xnoStep.Result);
+                        case ObjectLoadStep { Result: not null } xnoStep:
+                            ApplyObjectResult(xnoStep.Result);
                             break;
-                        case ArcLoadStep { Result: not null } arcStep:
-                            ApplyArcResult(arcStep.Result);
+                        case StageLoadStep { Result: not null } arcStep:
+                            ApplyStageResult(arcStep.Result);
                             break;
                         case MissionLoadStep { Result: not null } missionStep:
                             ApplyMissionResult(missionStep.Result);
@@ -725,77 +796,6 @@ namespace XNOEdit
                     Logger.Error?.PrintStack(LogClass.Application, "Load chain failed");
                 });
             };
-        }
-
-        private static void QueueObjectLoad(IFile file)
-        {
-            _loadChain?.Clear();
-            _loadChain?.AddXno(file);
-            _loadChain?.Start();
-        }
-
-        private static void QueueArcLoad(ArcFile arcFile)
-        {
-            _loadChain?.Clear();
-            _loadChain?.AddArc(arcFile);
-            _loadChain?.Start();
-        }
-
-        private static void QueueMissionLoad(IFile setFile)
-        {
-            _loadChain?.Clear();
-
-            var setName = Path.GetFileNameWithoutExtension(setFile.Name);
-            var terrainPath = MissionsMap.GetTerrainPath(setName);
-
-            var currentStage = _scene as StageScene;
-            var canReuseTerrain = currentStage?.TerrainName == terrainPath && terrainPath != null;
-
-            if (canReuseTerrain)
-            {
-                // Same terrain, just clear objects and load new SET
-                DispatchToMainThread(() =>
-                {
-                    currentStage!.ClearInstancedRenderers();
-                });
-            }
-            else if (terrainPath != null)
-            {
-                // Different terrain, load the arc
-                var fullPath = Path.Join(
-                    Configuration.GameFolder,
-                    "win32",
-                    "archives",
-                    $"{terrainPath}.arc"
-                );
-
-                if (File.Exists(fullPath))
-                {
-                    _loadChain?.AddArc(new ArcFile(fullPath));
-                }
-                else
-                {
-                    UIManager.TriggerAlert(AlertLevel.Warning, $"Failed to find terrain at {terrainPath}.arc");
-                    return;
-                }
-            }
-            else
-            {
-                // No terrain for this mission
-                DispatchToMainThread(() =>
-                {
-                    _scene?.Dispose();
-                    _scene = new StageScene([]);
-                });
-            }
-
-            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
-            var objectArchive = new ArcFile(objectArcPath);
-            var objectParams = UIManager.ObjectsPanel?.ObjectParameters.Parameters ?? [];
-            var resolverContext = new ResolverContext(objectParams, _propActors, objectArchive);
-
-            _loadChain?.AddSet(setFile, resolverContext);
-            _loadChain?.Start();
         }
 
         private static void SetModelRadius(float radius)

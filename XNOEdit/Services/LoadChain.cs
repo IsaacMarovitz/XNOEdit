@@ -6,9 +6,9 @@ namespace XNOEdit.Services
 {
     public enum LoadStepType
     {
-        Xno,
-        Set,
-        Arc
+        Object,
+        Mission,
+        Stage
     }
 
     public abstract class LoadStep
@@ -21,13 +21,13 @@ namespace XNOEdit.Services
             CancellationToken token);
     }
 
-    public class XnoLoadStep : LoadStep
+    public class ObjectLoadStep : LoadStep
     {
-        public override LoadStepType Type => LoadStepType.Xno;
+        public override LoadStepType Type => LoadStepType.Object;
         public IFile File { get; }
-        public XnoLoadResult? Result { get; private set; }
+        public ObjectLoadResult? Result { get; private set; }
 
-        public XnoLoadStep(IFile file)
+        public ObjectLoadStep(IFile file)
         {
             File = file;
         }
@@ -42,9 +42,30 @@ namespace XNOEdit.Services
         }
     }
 
+    public class StageLoadStep : LoadStep
+    {
+        public override LoadStepType Type => LoadStepType.Stage;
+        public ArcFile ArcFile { get; }
+        public StageLoadResult? Result { get; private set; }
+
+        public StageLoadStep(ArcFile arcFile)
+        {
+            ArcFile = arcFile;
+        }
+
+        public override async Task ExecuteAsync(
+            FileLoaderService loader,
+            ArcFile? shaderArchive,
+            IProgress<LoadProgress> progress,
+            CancellationToken token)
+        {
+            Result = await loader.ReadArcAsync(ArcFile, shaderArchive, progress, token);
+        }
+    }
+
     public class MissionLoadStep : LoadStep
     {
-        public override LoadStepType Type => LoadStepType.Set;
+        public override LoadStepType Type => LoadStepType.Mission;
         public IFile File { get; }
         public ResolverContext ResolverContext { get; }
         public MissionLoadResult? Result { get; private set; }
@@ -62,27 +83,6 @@ namespace XNOEdit.Services
             CancellationToken token)
         {
             Result = await loader.ReadMissionAsync(File, ResolverContext, shaderArchive, progress, token);
-        }
-    }
-
-    public class ArcLoadStep : LoadStep
-    {
-        public override LoadStepType Type => LoadStepType.Arc;
-        public ArcFile ArcFile { get; }
-        public ArcLoadResult? Result { get; private set; }
-
-        public ArcLoadStep(ArcFile arcFile)
-        {
-            ArcFile = arcFile;
-        }
-
-        public override async Task ExecuteAsync(
-            FileLoaderService loader,
-            ArcFile? shaderArchive,
-            IProgress<LoadProgress> progress,
-            CancellationToken token)
-        {
-            Result = await loader.ReadArcAsync(ArcFile, shaderArchive, progress, token);
         }
     }
 
@@ -118,9 +118,9 @@ namespace XNOEdit.Services
             return this;
         }
 
-        public LoadChain AddXno(IFile file) => Add(new XnoLoadStep(file));
+        public LoadChain AddXno(IFile file) => Add(new ObjectLoadStep(file));
         public LoadChain AddSet(IFile file, ResolverContext resolverContext) => Add(new MissionLoadStep(file, resolverContext));
-        public LoadChain AddArc(ArcFile arcFile) => Add(new ArcLoadStep(arcFile));
+        public LoadChain AddArc(ArcFile arcFile) => Add(new StageLoadStep(arcFile));
 
         public void Start()
         {
