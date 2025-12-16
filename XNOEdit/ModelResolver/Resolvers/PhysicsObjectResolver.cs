@@ -14,7 +14,9 @@ namespace XNOEdit.ModelResolver.Resolvers
 
         public override ResolveResult Resolve(ResolverContext context, StageSetObject setObject)
         {
-            var objectNameIndex = context.Actor.Parameters
+            var actor = context.Actors.Find(x => x.Name == setObject.Type);
+
+            var objectNameIndex = actor.Parameters
                 .Select((param, index) => (param, index))
                 .Where(pair => pair.param.Name == "objectName")
                 .Select(pair => pair.index)

@@ -9,18 +9,18 @@ namespace XNOEdit.ModelResolver
     {
         public ArcFile ObjectArchive { get; }
         public List<ObjectPhysicsParameter> ObjectParameters { get; }
-        public Actor Actor { get; }
+        public List<Actor> Actors { get; }
 
         private readonly Dictionary<string, NinjaNext> _xnoCache = new();
         private readonly Dictionary<string, Package> _packageCache = new();
 
         public ResolverContext(
             List<ObjectPhysicsParameter> objectParameters,
-            Actor actor,
+            List<Actor> actors,
             ArcFile objectArchive)
         {
             ObjectParameters = objectParameters;
-            Actor = actor;
+            Actors = actors;
             ObjectArchive = objectArchive;
         }
 

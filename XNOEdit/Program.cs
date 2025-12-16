@@ -379,22 +379,13 @@ namespace XNOEdit
 
             var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
             var objectArchive = new ArcFile(objectArcPath);
+            var context = new ResolverContext(objectParams, _propActors, objectArchive);
+            var registry = new ResolverRegistry();
 
             HashSet<string> failedTypes = [];
 
             foreach (var setObject in result.Set.Objects)
             {
-                var actor = _propActors.Find(x => x.Name == setObject.Type);
-
-                if (actor == null)
-                {
-                    Logger.Warning?.PrintMsg(LogClass.Application, $"Prop actor of type {setObject.Type} not found");
-                    continue;
-                }
-
-                var context = new ResolverContext(objectParams, actor, objectArchive);
-                var registry = new ResolverRegistry();
-
                 var match = registry.Resolve(context, setObject);
 
                 if (match.Skip)
