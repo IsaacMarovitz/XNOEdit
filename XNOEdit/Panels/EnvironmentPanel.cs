@@ -15,7 +15,7 @@ namespace XNOEdit.Panels
         public EnvironmentPanel(UIManager uiManager)
         {
             _uiManager = uiManager;
-            uiManager.SetColors(UIManager.ImGuiHue);
+            uiManager.SetColors(UIManager.DefaultHue);
         }
 
         public void InitSunAngles(RenderSettings settings)

@@ -14,7 +14,7 @@ namespace XNOEdit.Managers
 {
     public class UIManager : IDisposable
     {
-        public const float ImGuiHue = 248.8f;
+        public const float DefaultHue = 248.8f;
         public event Action ResetCameraAction;
 
         public ViewportPanel? ViewportPanel { get; private set; }
@@ -22,6 +22,7 @@ namespace XNOEdit.Managers
         public ImGuiController? Controller { get; private set; }
         public ObjectsPanel? ObjectsPanel { get; private set; }
         public XnoPanel? XnoPanel { get; private set; }
+        public MissionPanel? MissionPanel { get; private set; }
         public StagePanel? StagePanel { get; private set; }
         public StagesPanel? StagesPanel { get; private set; }
         public MissionsPanel? MissionsPanel { get; private set; }
@@ -39,7 +40,7 @@ namespace XNOEdit.Managers
         private bool _environmentWindow = true;
         private bool _fileBrowser = true;
         private bool _guizmos = true;
-        private float _hue = 0f;
+        private float _hue;
 
         private ImFontPtr _faFont;
 
@@ -181,29 +182,30 @@ namespace XNOEdit.Managers
             );
         }
 
-        public static float HueForCategory(MissionCategory category)
+        private static float HueForCategory(MissionCategory category)
         {
             return category switch
             {
-                MissionCategory.None => 248.8f,
                 MissionCategory.Sonic => 240.0f,
                 MissionCategory.Shadow => 0.0f,
                 MissionCategory.Silver => 190.0f,
                 MissionCategory.Eotw => 300.0f,
                 MissionCategory.Solaris => 90.0f,
-                _ => ImGuiHue
+                _ => DefaultHue
             };
         }
 
         public ObjectSceneVisibility InitXnoPanel(NinjaNext xno, ModelRenderer renderer)
         {
             StagePanel = null;
+            MissionPanel = null;
 
             var visibility = new ObjectSceneVisibility(renderer);
             _currentVisibility = visibility;
 
             XnoPanel = new XnoPanel(xno, visibility);
             ImGui.SetWindowFocus(XnoPanel.Name);
+            SetColors(HueForCategory(MissionCategory.None));
 
             return visibility;
         }
@@ -211,6 +213,7 @@ namespace XNOEdit.Managers
         public StageSceneVisibility InitStagePanel(string name, List<NinjaNext> xnos, List<ModelRenderer> renderers)
         {
             XnoPanel = null;
+            MissionPanel = null;
 
             var visibility = new StageSceneVisibility(renderers);
             _currentVisibility = visibility;
@@ -223,8 +226,20 @@ namespace XNOEdit.Managers
             };
 
             ImGui.SetWindowFocus(StagePanel.Name);
+            SetColors(HueForCategory(MissionCategory.None));
 
             return visibility;
+        }
+
+        public void InitMissionPanel(string name)
+        {
+            MissionPanel = null;
+
+            MissionPanel = new MissionPanel(name);
+
+            ImGui.SetWindowFocus(MissionPanel.Name);
+            var category = MissionsMap.GetMissionCategory(Path.GetFileNameWithoutExtension(name));
+            SetColors(HueForCategory(category));
         }
 
         public unsafe void OnRender(
@@ -257,6 +272,7 @@ namespace XNOEdit.Managers
                 ImGuiP.DockBuilderDockWindow(EnvironmentPanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(XnoPanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(StagePanel.Name, leftDock);
+                ImGuiP.DockBuilderDockWindow(MissionPanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(ObjectsPanel.Name, bottomDock);
                 ImGuiP.DockBuilderDockWindow(StagesPanel.Name, bottomDock);
                 ImGuiP.DockBuilderDockWindow(MissionsPanel.Name, bottomDock);
@@ -276,6 +292,8 @@ namespace XNOEdit.Managers
 
             if (_stageWindow)
                 StagePanel?.Render();
+
+            MissionPanel?.Render();
 
             if (_fileBrowser)
             {

@@ -39,7 +39,6 @@ namespace XNOEdit.Panels
             }
         }
 
-
         public void Render()
         {
             ImGui.Begin(Name, ImGuiWindowFlags.AlwaysAutoResize);

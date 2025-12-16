@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
+using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
@@ -41,7 +42,7 @@ namespace XNOEdit
         private static Vector3 _modelCenter = Vector3.Zero;
         private static float _modelRadius = 1.0f;
         private static RenderSettings _settings = new();
-        private static readonly UIManager UIManager = new();
+        private static UIManager UIManager;
         private static FileLoaderService _fileLoader;
         private static LoadChain? _loadChain;
         private static readonly ConcurrentQueue<Action> _mainThreadQueue = new();
@@ -100,6 +101,7 @@ namespace XNOEdit
             _skybox = new SkyboxRenderer(_wgpu, _device);
 
             var imguiController = new ImGuiController(_wgpu, _device, _window, 2);
+            UIManager = new UIManager(_window);
             UIManager.OnLoad(imguiController, _wgpu, _device);
             UIManager.EnvironmentPanel?.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
@@ -400,11 +402,10 @@ namespace XNOEdit
                     continue;
                 }
 
-                // TODO: Support multiple models like wvo_revolvingnet
-                var first = model.FirstOrDefault();
-
-                if (first != null)
-                    AddModelInstance(first, setObject.Position, setObject.Rotation, instancesByModel);
+                foreach (var instance in model)
+                {
+                    AddModelInstance(instance, setObject.Position, setObject.Rotation, instancesByModel);
+                }
             }
 
             foreach (var type in failedTypes)
@@ -469,9 +470,8 @@ namespace XNOEdit
                 totalInstances += instances.Count;
             }
 
-            var category = MissionsMap.GetMissionCategory(Path.GetFileNameWithoutExtension(result.Name));
-            UIManager.SetColors(UIManager.HueForCategory(category));
             SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}");
+            UIManager.InitMissionPanel(result.Name);
 
             Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
         }
