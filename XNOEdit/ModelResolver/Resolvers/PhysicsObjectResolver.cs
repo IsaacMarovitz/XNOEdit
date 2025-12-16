@@ -7,7 +7,9 @@ namespace XNOEdit.ModelResolver.Resolvers
         protected override IReadOnlySet<string> SupportedTypes { get; } = new HashSet<string>
         {
             "objectphysics",
-            "objectphysics_item"
+            "objectphysics_item",
+            "common_path_obj",
+            "physicspath"
         };
 
         public override int Priority => 20;

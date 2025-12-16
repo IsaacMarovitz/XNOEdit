@@ -30,7 +30,7 @@ namespace XNOEdit.ModelResolver.Resolvers
 
                     var category = package.Categories.FirstOrDefault(x => x.Name == "model");
                     if (category == null)
-                        return ResolveResult.Empty;
+                        return ResolveResult.Failed("Could not find model category in revolving net package");
 
                     var instances = new List<ResolvedInstance>();
 

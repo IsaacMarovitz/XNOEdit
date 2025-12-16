@@ -24,11 +24,11 @@ namespace XNOEdit.ModelResolver.Resolvers
 
                     var category = package.Categories.FirstOrDefault(x => x.Name == "model");
                     if (category == null)
-                        return ResolveResult.Empty;
+                        return ResolveResult.Failed($"Could not find model category in package for {setObject.Type}");
 
                     var modelFile = category.Files.FirstOrDefault(x => x.Name == "model");
                     if (modelFile == null)
-                        return ResolveResult.Empty;
+                        return ResolveResult.Failed($"Could not find generic model in package for {setObject.Type}");
 
                     return ResolveResult.WithInstance(
                         ResolvedInstance.Create($"/win32/{modelFile.Location}", setObject.Position, setObject.Rotation));

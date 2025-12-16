@@ -27,7 +27,7 @@ namespace XNOEdit.ModelResolver.Resolvers
 
                     var category = package.Categories.FirstOrDefault(x => x.Name == "model");
                     if (category == null)
-                        return ResolveResult.Empty;
+                        return ResolveResult.Failed("Could not find model category in guillotine package");
 
                     var modelAFile = category.Files.FirstOrDefault(x => x.Name == "modelA");
                     var modelBFile = category.Files.FirstOrDefault(x => x.Name == "modelB");
@@ -44,7 +44,7 @@ namespace XNOEdit.ModelResolver.Resolvers
                     };
 
                     if (string.IsNullOrEmpty(modelPath))
-                        return ResolveResult.Empty;
+                        return ResolveResult.Failed($"Could not find requested guillotine model {variant}");
 
                     return ResolveResult.WithInstance(
                         ResolvedInstance.Create($"/win32/{modelPath}", setObject.Position, setObject.Rotation));
