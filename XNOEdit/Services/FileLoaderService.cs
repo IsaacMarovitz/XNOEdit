@@ -46,8 +46,14 @@ namespace XNOEdit.Services
     public record MissionLoadResult(
         string Name,
         StageSet Set,
-        Dictionary<string, List<ResolvedInstanceData>> InstancesByModel,
+        List<LoadedObjectGroup> LoadedGroups,
         HashSet<string> FailedTypes
+    );
+
+    public record LoadedObjectGroup(
+        string ModelPath,
+        XnoLoadResult XnoResult,
+        List<ResolvedInstanceData> Instances
     );
 
     public record ResolvedInstanceData(
@@ -127,10 +133,11 @@ namespace XNOEdit.Services
         public async Task<MissionLoadResult?> ReadMissionAsync(
             IFile file,
             ResolverContext resolverContext,
+            ArcFile? shaderArchive,
             IProgress<LoadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 Logger.Info?.PrintMsg(LogClass.Application, $"Loading Mission: {file.Name}");
 
@@ -148,9 +155,45 @@ namespace XNOEdit.Services
 
                 var (instancesByModel, failedTypes) = ResolveObjects(set, resolverContext);
 
-                progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {file.Name}", 1, 1));
+                // Load XNOs for each unique model
+                var loadedGroups = new List<LoadedObjectGroup>();
+                var modelPaths = instancesByModel.Keys.ToList();
+                var current = 0;
+                var total = modelPaths.Count;
 
-                return new MissionLoadResult(file.Name, set, instancesByModel, failedTypes);
+                foreach (var modelPath in modelPaths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    progress?.Report(new LoadProgress(
+                        LoadStage.LoadingModel,
+                        $"Loading {Path.GetFileName(modelPath)}...",
+                        current,
+                        total));
+
+                    var modelFile = resolverContext.ObjectArchive.GetFile($"/win32/{modelPath}");
+                    if (modelFile == null)
+                    {
+                        Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelPath}");
+                        current++;
+                        continue;
+                    }
+
+                    var xnoResult = await ReadXnoAsync(modelFile, shaderArchive, null, cancellationToken);
+                    if (xnoResult?.ObjectChunk != null)
+                    {
+                        loadedGroups.Add(new LoadedObjectGroup(
+                            modelPath,
+                            xnoResult,
+                            instancesByModel[modelPath]));
+                    }
+
+                    current++;
+                }
+
+                progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {file.Name}", total, total));
+
+                return new MissionLoadResult(file.Name, set, loadedGroups, failedTypes);
             }, cancellationToken);
         }
 

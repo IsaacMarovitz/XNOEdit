@@ -61,7 +61,7 @@ namespace XNOEdit.Services
             IProgress<LoadProgress> progress,
             CancellationToken token)
         {
-            Result = await loader.ReadMissionAsync(File, ResolverContext, progress, token);
+            Result = await loader.ReadMissionAsync(File, ResolverContext, shaderArchive, progress, token);
         }
     }
 

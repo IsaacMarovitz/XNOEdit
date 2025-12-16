@@ -381,60 +381,41 @@ namespace XNOEdit
                 UIManager.TriggerAlert(AlertLevel.Warning, "Failed to find model for one or more object types");
             }
 
-            if (result.InstancesByModel.Count == 0 && result.FailedTypes.Count == 0)
+            if (result.LoadedGroups.Count == 0 && result.FailedTypes.Count == 0)
             {
                 UIManager.TriggerAlert(AlertLevel.Warning, "SET file has no placeable objects");
                 return;
             }
 
-            // Load models and create instanced renderers
-            // NOTE: This still does synchronous XNO loading - will be moved in next step
-            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
-            var objectArchive = new ArcFile(objectArcPath);
-
             var loadedCount = 0;
             var totalInstances = 0;
 
-            foreach (var (modelPath, instances) in result.InstancesByModel)
+            foreach (var group in result.LoadedGroups)
             {
-                var modelFile = objectArchive.GetFile($"/win32/{modelPath}");
-                if (modelFile == null)
-                {
-                    Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelPath}");
-                    continue;
-                }
-
-                XnoLoadResult? xnoResult = null;
-                var task = _fileLoader.ReadXnoAsync(modelFile, _shaderArchive).ContinueWith(x => xnoResult = x.Result);
-                task.Wait();
-
-                if (xnoResult?.ObjectChunk == null)
-                    continue;
-
                 var renderer = new InstancedModelRenderer(
                     _wgpu,
                     _device,
-                    xnoResult.ObjectChunk,
-                    xnoResult.Xno.GetChunk<TextureListChunk>(),
-                    xnoResult.Xno.GetChunk<EffectListChunk>(),
+                    group.XnoResult.ObjectChunk,
+                    group.XnoResult.Xno.GetChunk<TextureListChunk>(),
+                    group.XnoResult.Xno.GetChunk<EffectListChunk>(),
                     _shaderArchive);
 
-                var instanceData = instances
+                var instanceData = group.Instances
                     .Select(i => InstanceData.Create(i.Position, i.Rotation))
                     .ToArray();
 
                 renderer.SetInstances(instanceData);
 
-                stageScene.AddInstancedRenderer(modelPath, renderer);
+                stageScene.AddInstancedRenderer(group.ModelPath, renderer);
 
                 // Add textures to texture manager
-                foreach (var tex in xnoResult.Textures)
+                foreach (var tex in group.XnoResult.Textures)
                 {
                     _textureManager.Add(tex.Name, tex.Texture, tex.View);
                 }
 
                 loadedCount++;
-                totalInstances += instances.Count;
+                totalInstances += group.Instances.Count;
             }
 
             SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}");
