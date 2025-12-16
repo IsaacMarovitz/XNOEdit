@@ -1,5 +1,7 @@
-using Marathon.Formats.Parameter;
+using System.Numerics;
+using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
+using XNOEdit.Logging;
 
 namespace XNOEdit.ModelResolver.Resolvers
 {
@@ -12,22 +14,74 @@ namespace XNOEdit.ModelResolver.Resolvers
 
         public override int Priority => 10;
 
-        public override string[] Resolve(Package package, StageSetObject setObject)
+        public override ResolveResult Resolve(ResolverContext context, StageSetObject setObject)
         {
-            List<string> models = [];
+            foreach (var group in ObjectPackagesMap.All)
+            {
+                foreach (var packageEntry in group.ObjectPackages)
+                {
+                    if (packageEntry.Key != setObject.Type)
+                        continue;
 
-            var category = package.Categories.FirstOrDefault(x => x.Name == "model");
+                    var packagePath = $"/xenon/object/{group.Folder}/{packageEntry.Value}.pkg";
+                    var package = context.LoadPackage(packagePath);
+                    if (package == null)
+                        continue;
 
-            var bodyFile = category?.Files.FirstOrDefault(x => x.Name == "body");
-            var netFile = category?.Files.FirstOrDefault(x => x.Name == "net");
+                    var category = package.Categories.FirstOrDefault(x => x.Name == "model");
+                    if (category == null)
+                        return ResolveResult.Empty;
 
-            if (bodyFile != null)
-                models.Add(bodyFile.Location);
+                    var instances = new List<ResolvedInstance>();
 
-            if (netFile != null)
-                models.Add(netFile.Location);
+                    var bodyFile = category.Files.FirstOrDefault(x => x.Name == "body");
+                    var netFile = category.Files.FirstOrDefault(x => x.Name == "net");
 
-            return models.ToArray();
+                    if (netFile != null && bodyFile != null)
+                    {
+                        var xno = context.LoadXno($"/win32/{bodyFile.Location}");
+                        var netOffset = Vector3.Zero;
+
+                        if (xno != null)
+                        {
+                            var objectChunk = xno.GetChunk<ObjectChunk>();
+                            var nodeNameChunk = xno.GetChunk<NodeNameChunk>();
+
+                            var indexOf = nodeNameChunk.Names.Select((value, index) => new { value, index })
+                                .Where(pair => pair.value == "netpoint")
+                                .Select(pair => pair.index + 1)
+                                .FirstOrDefault() - 1;
+
+                            netOffset = objectChunk.Nodes[indexOf].Translation;
+                        }
+                        else
+                        {
+                            Logger.Warning?.PrintMsg(LogClass.Application, $"Failed to find XNO at {bodyFile.Location}");
+                        }
+
+                        instances.Add(new ResolvedInstance
+                        {
+                            ModelPath = bodyFile.Location,
+                            Position = setObject.Position,
+                            Rotation = setObject.Rotation,
+                            Visible = true
+                        });
+
+                        instances.Add(new ResolvedInstance
+                        {
+                            ModelPath = netFile.Location,
+                            Position = setObject.Position + netOffset,
+                            Rotation = setObject.Rotation,
+                            Visible = true
+                        });
+                    }
+
+
+                    return ResolveResult.WithInstances(instances);
+                }
+            }
+
+            return ResolveResult.Failed($"Package not found for {setObject.Type}");
         }
     }
 }

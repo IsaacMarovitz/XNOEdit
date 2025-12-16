@@ -1,4 +1,3 @@
-using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 
 namespace XNOEdit.ModelResolver.Resolvers
@@ -9,18 +8,34 @@ namespace XNOEdit.ModelResolver.Resolvers
 
         public bool CanResolve(string objectType) => true;
 
-        public string[] Resolve(Package package, StageSetObject setObject)
+        public ResolveResult Resolve(ResolverContext context, StageSetObject setObject)
         {
-            string[] models = [];
+            foreach (var group in ObjectPackagesMap.All)
+            {
+                foreach (var packageEntry in group.ObjectPackages)
+                {
+                    if (packageEntry.Key != setObject.Type)
+                        continue;
 
-            var category = package.Categories.FirstOrDefault(x => x.Name == "model");
+                    var packagePath = $"/xenon/object/{group.Folder}/{packageEntry.Value}.pkg";
+                    var package = context.LoadPackage(packagePath);
+                    if (package == null)
+                        continue;
 
-            var modelFile = category?.Files.FirstOrDefault(x => x.Name == "model");
+                    var category = package.Categories.FirstOrDefault(x => x.Name == "model");
+                    if (category == null)
+                        return ResolveResult.Empty;
 
-            if (modelFile != null)
-                models = [modelFile.Location];
+                    var modelFile = category.Files.FirstOrDefault(x => x.Name == "model");
+                    if (modelFile == null)
+                        return ResolveResult.Empty;
 
-            return models;
+                    return ResolveResult.WithInstance(
+                        ResolvedInstance.Create(modelFile.Location, setObject.Position, setObject.Rotation));
+                }
+            }
+
+            return ResolveResult.Failed($"Package not found for {setObject.Type}");
         }
     }
 }

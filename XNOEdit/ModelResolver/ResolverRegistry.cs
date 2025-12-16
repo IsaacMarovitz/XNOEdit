@@ -1,4 +1,3 @@
-using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 using XNOEdit.ModelResolver.Resolvers;
 
@@ -11,8 +10,10 @@ namespace XNOEdit.ModelResolver
 
         public ResolverRegistry()
         {
+            Register(new PhysicsObjectResolver());
             Register(new GuillotineResolver());
             Register(new RevolvingNetResolver());
+            Register(new GizmoResolver());
         }
 
         public void Register(IModelResolver resolver)
@@ -21,20 +22,20 @@ namespace XNOEdit.ModelResolver
             _resolvers.Sort((a, b) => b.Priority.CompareTo(a.Priority));
         }
 
-        public string[] Resolve(Package package, StageSetObject setObject)
+        public ResolveResult Resolve(ResolverContext context, StageSetObject setObject)
         {
             foreach (var resolver in _resolvers)
             {
                 if (!resolver.CanResolve(setObject.Type))
                     continue;
 
-                var result = resolver.Resolve(package, setObject);
+                var result = resolver.Resolve(context, setObject);
 
-                if (result.Length > 0)
+                if (result.Skip || result.Instances.Count > 0 || !result.Success)
                     return result;
             }
 
-            return _fallbackResolver.Resolve(package, setObject);
+            return _fallbackResolver.Resolve(context, setObject);
         }
     }
 }

@@ -1,4 +1,3 @@
-using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 
 namespace XNOEdit.ModelResolver.Resolvers
@@ -12,25 +11,47 @@ namespace XNOEdit.ModelResolver.Resolvers
 
         public override int Priority => 10;
 
-        public override string[] Resolve(Package package, StageSetObject setObject)
+        public override ResolveResult Resolve(ResolverContext context, StageSetObject setObject)
         {
-            string[] models = [];
-
-            var category = package.Categories.FirstOrDefault(x => x.Name == "model");
-
-            var modelAFile = category?.Files.FirstOrDefault(x => x.Name == "modelA");
-            var modelBFile = category?.Files.FirstOrDefault(x => x.Name == "modelB");
-            var modelCFile = category?.Files.FirstOrDefault(x => x.Name == "modelC");
-
-            models = setObject.Parameters[0].Value switch
+            foreach (var group in ObjectPackagesMap.All)
             {
-                1 => [modelAFile?.Location ?? ""],
-                2 => [modelBFile?.Location ?? ""],
-                3 => [modelCFile?.Location ?? ""],
-                _ => models
-            };
+                foreach (var packageEntry in group.ObjectPackages)
+                {
+                    if (packageEntry.Key != setObject.Type)
+                        continue;
 
-            return models.ToArray();
+                    var packagePath = $"/xenon/object/{group.Folder}/{packageEntry.Value}.pkg";
+                    var package = context.LoadPackage(packagePath);
+                    if (package == null)
+                        continue;
+
+                    var category = package.Categories.FirstOrDefault(x => x.Name == "model");
+                    if (category == null)
+                        return ResolveResult.Empty;
+
+                    var modelAFile = category.Files.FirstOrDefault(x => x.Name == "modelA");
+                    var modelBFile = category.Files.FirstOrDefault(x => x.Name == "modelB");
+                    var modelCFile = category.Files.FirstOrDefault(x => x.Name == "modelC");
+
+                    var variant = setObject.Parameters.Count > 0 ? setObject.Parameters[0].Value : 0;
+
+                    var modelPath = variant switch
+                    {
+                        1 => modelAFile?.Location,
+                        2 => modelBFile?.Location,
+                        3 => modelCFile?.Location,
+                        _ => null
+                    };
+
+                    if (string.IsNullOrEmpty(modelPath))
+                        return ResolveResult.Empty;
+
+                    return ResolveResult.WithInstance(
+                        ResolvedInstance.Create(modelPath, setObject.Position, setObject.Rotation));
+                }
+            }
+
+            return ResolveResult.Failed($"Package not found for {setObject.Type}");
         }
     }
 }

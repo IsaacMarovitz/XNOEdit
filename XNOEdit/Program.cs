@@ -392,18 +392,28 @@ namespace XNOEdit
                     continue;
                 }
 
-                var model = TryGetModelFromObjectName(setObject, actor, objectParams)
-                            ?? TryGetModelFromPackage(setObject, objectArchive);
+                var context = new ResolverContext(objectParams, actor, objectArchive);
+                var registry = new ResolverRegistry();
 
-                if (model == null)
-                {
-                    failedTypes.Add(setObject.Type);
+                var match = registry.Resolve(context, setObject);
+
+                if (match.Skip)
                     continue;
-                }
 
-                foreach (var instance in model)
+                if (match.Success)
                 {
-                    AddModelInstance(instance, setObject.Position, setObject.Rotation, instancesByModel);
+                    foreach (var instance in match.Instances)
+                    {
+                        AddModelInstance(instance.ModelPath, instance.Position, instance.Rotation, instancesByModel);
+                    }
+                }
+                else
+                {
+                    if (match.ErrorMessage != null)
+                    {
+                        Logger.Warning?.PrintMsg(LogClass.Application, match.ErrorMessage);
+                        failedTypes.Add(setObject.Type);
+                    }
                 }
             }
 
@@ -473,54 +483,6 @@ namespace XNOEdit
             UIManager.InitMissionPanel(result.Name);
 
             Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
-        }
-
-        private static string[]? TryGetModelFromObjectName(StageSetObject setObject, Actor actor, List<ObjectPhysicsParameter> objectParams)
-        {
-            var objectNameIndex = actor.Parameters
-                .Select((param, index) => (param, index))
-                .Where(pair => pair.param.Name == "objectName")
-                .Select(pair => pair.index)
-                .FirstOrDefault(-1);
-
-            if (objectNameIndex == -1)
-                return null;
-
-            var modelName = (string)setObject.Parameters[objectNameIndex].Value;
-            var physicsParam = objectParams.FirstOrDefault(x => x.Name == modelName);
-
-            if (physicsParam == null)
-                return null;
-
-            return [physicsParam.Model];
-        }
-
-        private static string[]? TryGetModelFromPackage(StageSetObject setObject, ArcFile objectArchive)
-        {
-            if (ObjectPackagesMap.GizmoTypes.Contains(setObject.Type))
-                return [];
-
-            foreach (var group in ObjectPackagesMap.All)
-            {
-                foreach (var packageName in group.ObjectPackages)
-                {
-                    if (packageName.Key != setObject.Type)
-                        continue;
-
-                    var packageFile = objectArchive.GetFile($"/xenon/object/{group.Folder}/{packageName.Value}.pkg");
-                    if (packageFile == null)
-                        continue;
-
-                    var package = new Package(packageFile.Decompress());
-
-                    var registry = new ResolverRegistry();
-                    var matches = registry.Resolve(package, setObject);
-
-                    return matches;
-                }
-            }
-
-            return null;
         }
 
         private static void AddModelInstance(
