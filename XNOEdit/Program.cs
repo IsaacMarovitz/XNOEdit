@@ -5,7 +5,6 @@ using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
-using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using SDL3;
@@ -372,77 +371,41 @@ namespace XNOEdit
 
             stageScene.ClearInstancedRenderers();
 
-            var objectParams = UIManager.ObjectsPanel.ObjectParameters.Parameters;
-
-            // Group instances by model name
-            var instancesByModel = new Dictionary<string, List<InstanceData>>();
-
-            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
-            var objectArchive = new ArcFile(objectArcPath);
-            var context = new ResolverContext(objectParams, _propActors, objectArchive);
-            var registry = new ResolverRegistry();
-
-            HashSet<string> failedTypes = [];
-
-            foreach (var setObject in result.Set.Objects)
-            {
-                var match = registry.Resolve(context, setObject);
-
-                if (match.Skip)
-                    continue;
-
-                if (match.Success)
-                {
-                    foreach (var instance in match.Instances)
-                    {
-                        AddModelInstance(instance.ModelPath, instance.Position, instance.Rotation, instancesByModel);
-                    }
-                }
-                else
-                {
-                    if (match.ErrorMessage != null)
-                    {
-                        Logger.Warning?.PrintMsg(LogClass.Application, match.ErrorMessage);
-                        failedTypes.Add(setObject.Type);
-                    }
-                }
-            }
-
-            foreach (var type in failedTypes)
+            foreach (var type in result.FailedTypes)
             {
                 Logger.Warning?.PrintMsg(LogClass.Application, $"Model for objects of type {type} not found");
             }
 
-            if (failedTypes.Count > 0)
+            if (result.FailedTypes.Count > 0)
             {
-                UIManager.TriggerAlert(AlertLevel.Warning, "Failed to find model for one of more object types");
+                UIManager.TriggerAlert(AlertLevel.Warning, "Failed to find model for one or more object types");
             }
 
-            if (instancesByModel.Count == 0 && failedTypes.Count == 0)
+            if (result.InstancesByModel.Count == 0 && result.FailedTypes.Count == 0)
             {
                 UIManager.TriggerAlert(AlertLevel.Warning, "SET file has no placeable objects");
                 return;
             }
 
             // Load models and create instanced renderers
+            // NOTE: This still does synchronous XNO loading - will be moved in next step
+            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
+            var objectArchive = new ArcFile(objectArcPath);
+
             var loadedCount = 0;
             var totalInstances = 0;
 
-            foreach (var (modelName, instances) in instancesByModel)
+            foreach (var (modelPath, instances) in result.InstancesByModel)
             {
-                var finalModelName = modelName;
-                if (!Path.HasExtension(finalModelName))
-                    finalModelName += ".xno";
-
-                var modelFile = objectArchive.GetFile($"/win32/{finalModelName}");
+                var modelFile = objectArchive.GetFile($"/win32/{modelPath}");
                 if (modelFile == null)
                 {
-                    Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelName}");
+                    Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelPath}");
                     continue;
                 }
 
                 XnoLoadResult? xnoResult = null;
-                var task = _fileLoader.ReadXnoAsync(modelFile, _shaderArchive).ContinueWith(x => xnoResult =  x.Result);
+                var task = _fileLoader.ReadXnoAsync(modelFile, _shaderArchive).ContinueWith(x => xnoResult = x.Result);
                 task.Wait();
 
                 if (xnoResult?.ObjectChunk == null)
@@ -456,9 +419,13 @@ namespace XNOEdit
                     xnoResult.Xno.GetChunk<EffectListChunk>(),
                     _shaderArchive);
 
-                renderer.SetInstances(instances.ToArray());
+                var instanceData = instances
+                    .Select(i => InstanceData.Create(i.Position, i.Rotation))
+                    .ToArray();
 
-                stageScene.AddInstancedRenderer(modelName, renderer);
+                renderer.SetInstances(instanceData);
+
+                stageScene.AddInstancedRenderer(modelPath, renderer);
 
                 // Add textures to texture manager
                 foreach (var tex in xnoResult.Textures)
@@ -474,21 +441,6 @@ namespace XNOEdit
             UIManager.InitMissionPanel(result.Name);
 
             Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
-        }
-
-        private static void AddModelInstance(
-            string model,
-            Vector3 position,
-            Quaternion rotation,
-            Dictionary<string, List<InstanceData>> instancesByModel)
-        {
-            if (!instancesByModel.TryGetValue(model, out var instances))
-            {
-                instances = [];
-                instancesByModel[model] = instances;
-            }
-
-            instances.Add(InstanceData.Create(position, rotation));
         }
 
         private static void ApplyArcResult(ArcLoadResult result)
@@ -856,7 +808,12 @@ namespace XNOEdit
                 });
             }
 
-            _loadChain?.AddSet(setFile);
+            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
+            var objectArchive = new ArcFile(objectArcPath);
+            var objectParams = UIManager.ObjectsPanel?.ObjectParameters.Parameters ?? [];
+            var resolverContext = new ResolverContext(objectParams, _propActors, objectArchive);
+
+            _loadChain?.AddSet(setFile, resolverContext);
             _loadChain?.Start();
         }
 

@@ -1,3 +1,4 @@
+using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
@@ -6,6 +7,7 @@ using Marathon.IO.Types.FileSystem;
 using Pfim;
 using Silk.NET.WebGPU;
 using XNOEdit.Logging;
+using XNOEdit.ModelResolver;
 using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Wgpu;
 
@@ -16,6 +18,7 @@ namespace XNOEdit.Services
         Starting,
         Decompressing,
         Parsing,
+        Resolving,
         LoadingTextures,
         CreatingBuffers,
         LoadingModel,
@@ -42,7 +45,14 @@ namespace XNOEdit.Services
 
     public record MissionLoadResult(
         string Name,
-        StageSet Set
+        StageSet Set,
+        Dictionary<string, List<ResolvedInstanceData>> InstancesByModel,
+        HashSet<string> FailedTypes
+    );
+
+    public record ResolvedInstanceData(
+        Vector3 Position,
+        Quaternion Rotation
     );
 
     public record ArcLoadResult(
@@ -116,6 +126,7 @@ namespace XNOEdit.Services
 
         public async Task<MissionLoadResult?> ReadMissionAsync(
             IFile file,
+            ResolverContext resolverContext,
             IProgress<LoadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
@@ -132,10 +143,65 @@ namespace XNOEdit.Services
                 progress?.Report(new LoadProgress(LoadStage.Parsing, $"Parsing {file.Name}..."));
                 var set = new StageSet(data);
 
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(new LoadProgress(LoadStage.Resolving, "Resolving objects..."));
+
+                var (instancesByModel, failedTypes) = ResolveObjects(set, resolverContext);
+
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {file.Name}", 1, 1));
 
-                return new MissionLoadResult(file.Name, set);
+                return new MissionLoadResult(file.Name, set, instancesByModel, failedTypes);
             }, cancellationToken);
+        }
+
+        private static (Dictionary<string, List<ResolvedInstanceData>>, HashSet<string>) ResolveObjects(
+            StageSet set,
+            ResolverContext context)
+        {
+            var instancesByModel = new Dictionary<string, List<ResolvedInstanceData>>();
+            var failedTypes = new HashSet<string>();
+            var registry = new ResolverRegistry();
+
+            foreach (var setObject in set.Objects)
+            {
+                var match = registry.Resolve(context, setObject);
+
+                if (match.Skip)
+                    continue;
+
+                if (match.Success)
+                {
+                    foreach (var instance in match.Instances)
+                    {
+                        var modelPath = NormalizeModelPath(instance.ModelPath);
+
+                        if (!instancesByModel.TryGetValue(modelPath, out var instances))
+                        {
+                            instances = [];
+                            instancesByModel[modelPath] = instances;
+                        }
+
+                        instances.Add(new ResolvedInstanceData(instance.Position, instance.Rotation));
+                    }
+                }
+                else
+                {
+                    if (match.ErrorMessage != null && !failedTypes.Contains(setObject.Type))
+                    {
+                        Logger.Warning?.PrintMsg(LogClass.Application, match.ErrorMessage);
+                        failedTypes.Add(setObject.Type);
+                    }
+                }
+            }
+
+            return (instancesByModel, failedTypes);
+        }
+
+        private static string NormalizeModelPath(string path)
+        {
+            if (!Path.HasExtension(path))
+                return path + ".xno";
+            return path;
         }
 
         public async Task<ArcLoadResult?> ReadArcAsync(

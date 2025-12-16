@@ -1,5 +1,6 @@
 using Marathon.Formats.Archive;
 using Marathon.IO.Types.FileSystem;
+using XNOEdit.ModelResolver;
 
 namespace XNOEdit.Services
 {
@@ -45,11 +46,13 @@ namespace XNOEdit.Services
     {
         public override LoadStepType Type => LoadStepType.Set;
         public IFile File { get; }
+        public ResolverContext ResolverContext { get; }
         public MissionLoadResult? Result { get; private set; }
 
-        public MissionLoadStep(IFile file)
+        public MissionLoadStep(IFile file, ResolverContext resolverContext)
         {
             File = file;
+            ResolverContext = resolverContext;
         }
 
         public override async Task ExecuteAsync(
@@ -58,7 +61,7 @@ namespace XNOEdit.Services
             IProgress<LoadProgress> progress,
             CancellationToken token)
         {
-            Result = await loader.ReadMissionAsync(File, progress, token);
+            Result = await loader.ReadMissionAsync(File, ResolverContext, progress, token);
         }
     }
 
@@ -116,7 +119,7 @@ namespace XNOEdit.Services
         }
 
         public LoadChain AddXno(IFile file) => Add(new XnoLoadStep(file));
-        public LoadChain AddSet(IFile file) => Add(new MissionLoadStep(file));
+        public LoadChain AddSet(IFile file, ResolverContext resolverContext) => Add(new MissionLoadStep(file, resolverContext));
         public LoadChain AddArc(ArcFile arcFile) => Add(new ArcLoadStep(arcFile));
 
         public void Start()
