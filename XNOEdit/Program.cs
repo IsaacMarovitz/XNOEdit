@@ -101,7 +101,7 @@ namespace XNOEdit
             _skybox = new SkyboxRenderer(_wgpu, _device);
 
             var imguiController = new ImGuiController(_wgpu, _device, _window, 2);
-            UIManager = new UIManager(_window);
+            UIManager = new UIManager();
             UIManager.OnLoad(imguiController, _wgpu, _device);
             UIManager.EnvironmentPanel?.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
