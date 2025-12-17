@@ -16,6 +16,7 @@ namespace XNOEdit.ModelResolver
             Register(new EnemyResolver());
             Register(new AqaMagnetResolver());
             Register(new ItemboxResolver());
+            Register(new ChaosEmeraldResolver());
             Register(new GizmoResolver());
         }
 

@@ -9,7 +9,7 @@ namespace XNOEdit.ModelResolver.Resolvers
             "objectphysics",
             "objectphysics_item",
             "common_path_obj",
-            "physicspath"
+            "physicspath",
         };
 
         public override int Priority => 20;

@@ -17,6 +17,7 @@ namespace XNOEdit.ModelResolver.Resolvers
             "cameraeventbox",
             "cameraeventcylinder",
             "eventbox",
+            "end_timekeeper",
             "player_start2",
             "player_goal",
             "amigo_collision",
@@ -26,8 +27,11 @@ namespace XNOEdit.ModelResolver.Resolvers
             "common_water_collision",
             "common_hint_collision",
             "common_windcollision_box",
+            "tamaire_collision_box",
+            "twn_gflag_stopplayercollision",
             "impulsesphere",
-            "snowboardjump"
+            "snowboardjump",
+            "radarmapmark"
         };
 
         public override int Priority => 20;
