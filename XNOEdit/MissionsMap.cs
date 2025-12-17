@@ -194,6 +194,7 @@ namespace XNOEdit
             "set_silver_vs_sonic",
             "set_twn_a_060228",
             "set_test_twn_a",
+            "set_twn",
             "dset_twn_a_sonic",
             "twn_mapA_effects"
         ];
@@ -786,7 +787,6 @@ namespace XNOEdit
             "set_rct",
             "set_rct_area",
             "set_tps",
-            "set_twn",
             "set_wap",
             "set_wvo",
             "set_test002",
