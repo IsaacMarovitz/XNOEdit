@@ -10,32 +10,20 @@ namespace XNOEdit.ModelResolver.Resolvers
 
         public ResolveResult Resolve(ResolverContext context, StageSetObject setObject)
         {
-            foreach (var group in ObjectPackagesMap.All)
-            {
-                foreach (var packageEntry in group.ObjectPackages)
-                {
-                    if (packageEntry.Key != setObject.Type)
-                        continue;
+            var package = context.FindPackageForType(setObject.Type);
+            if (package == null)
+                return ResolveResult.Failed($"Package not found for {setObject.Type}");
 
-                    var packagePath = $"/xenon/object/{group.Folder}/{packageEntry.Value}.pkg";
-                    var package = context.LoadPackage(packagePath);
-                    if (package == null)
-                        continue;
+            var category = package.Categories.FirstOrDefault(x => x.Name == "model");
+            if (category == null)
+                return ResolveResult.Failed($"Could not find model category in package for {setObject.Type}");
 
-                    var category = package.Categories.FirstOrDefault(x => x.Name == "model");
-                    if (category == null)
-                        return ResolveResult.Failed($"Could not find model category in package for {setObject.Type}");
+            var modelFile = category.Files.FirstOrDefault(x => x.Name == "model");
+            if (modelFile == null)
+                return ResolveResult.Failed($"Could not find generic model in package for {setObject.Type}");
 
-                    var modelFile = category.Files.FirstOrDefault(x => x.Name == "model");
-                    if (modelFile == null)
-                        return ResolveResult.Failed($"Could not find generic model in package for {setObject.Type}");
-
-                    return ResolveResult.WithInstance(
-                        ResolvedInstance.Create($"/win32/{modelFile.Location}", setObject.Position, setObject.Rotation));
-                }
-            }
-
-            return ResolveResult.Failed($"Package not found for {setObject.Type}");
+            return ResolveResult.WithInstance(
+                ResolvedInstance.Create($"/win32/{modelFile.Location}", setObject.Position, setObject.Rotation));
         }
     }
 }
