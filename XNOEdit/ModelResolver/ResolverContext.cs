@@ -78,10 +78,16 @@ namespace XNOEdit.ModelResolver
             return objectChunk.Nodes[indexOf];
         }
 
-        public void ClearCaches()
+        public static string? GetVariantModel(
+            PackageCategory category,
+            int variant,
+            params string[] fileNames)
         {
-            _xnoCache.Clear();
-            _packageCache.Clear();
+            if (variant < 1 || variant > fileNames.Length)
+                return null;
+
+            var fileName = fileNames[variant - 1];
+            return category.Files.FirstOrDefault(x => x.Name == fileName)?.Location;
         }
     }
 }
