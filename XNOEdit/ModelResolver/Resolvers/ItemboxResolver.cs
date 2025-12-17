@@ -1,4 +1,7 @@
+using System.Numerics;
+using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
+using XNOEdit.Logging;
 
 namespace XNOEdit.ModelResolver.Resolvers
 {
@@ -43,6 +46,39 @@ namespace XNOEdit.ModelResolver.Resolvers
                     var ring5File = category.Files.FirstOrDefault(x => x.Name == "model_ring5");
                     var speedupFile = category.Files.FirstOrDefault(x => x.Name == "model_speedup");
 
+                    var instances = new List<ResolvedInstance>();
+                    var contentsOffset = Vector3.Zero;
+
+                    if (setObject.Type == "itemboxg" && groundBaseFile != null)
+                    {
+                        var xno = context.LoadXno($"/win32/{groundBaseFile.Location}");
+
+                        if (xno != null)
+                        {
+                            var objectChunk = xno.GetChunk<ObjectChunk>();
+                            var nodeNameChunk = xno.GetChunk<NodeNameChunk>();
+
+                            var indexOf = nodeNameChunk.Names.Select((value, index) => new { value, index })
+                                .Where(pair => pair.value == "Itempoint_ground")
+                                .Select(pair => pair.index + 1)
+                                .FirstOrDefault() - 1;
+
+                            contentsOffset = objectChunk.Nodes[indexOf].Translation;
+
+                            instances.Add(new ResolvedInstance
+                            {
+                                ModelPath = $"/win32/{groundBaseFile.Location}",
+                                Position = setObject.Position,
+                                Rotation = setObject.Rotation,
+                                Visible = true
+                            });
+                        }
+                        else
+                        {
+                            Logger.Warning?.PrintMsg(LogClass.Application, $"Failed to find XNO at {groundBaseFile.Location}");
+                        }
+                    }
+
                     var variant = setObject.Parameters.Count > 0 ? setObject.Parameters[0].Value : 0;
 
                     var modelPath = variant switch
@@ -61,8 +97,15 @@ namespace XNOEdit.ModelResolver.Resolvers
                     if (string.IsNullOrEmpty(modelPath))
                         return ResolveResult.Failed($"Could not find requested itembox model {variant}");
 
-                    return ResolveResult.WithInstance(
-                        ResolvedInstance.Create($"/win32/{modelPath}", setObject.Position, setObject.Rotation));
+                    instances.Add(new ResolvedInstance
+                    {
+                        ModelPath = $"/win32/{modelPath}",
+                        Position = setObject.Position + contentsOffset,
+                        Rotation = setObject.Rotation,
+                        Visible = true
+                    });
+
+                    return ResolveResult.WithInstances(instances);
                 }
             }
 
