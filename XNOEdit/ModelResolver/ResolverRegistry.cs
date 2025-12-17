@@ -10,7 +10,7 @@ namespace XNOEdit.ModelResolver
 
         public ResolverRegistry()
         {
-            Register(new PhysicsObjectResolver());
+            Register(new ObjectResolver());
             Register(new GuillotineResolver());
             Register(new RevolvingNetResolver());
             Register(new EnemyResolver());

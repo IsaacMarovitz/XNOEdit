@@ -10,7 +10,8 @@ namespace XNOEdit.Panels
         public const string Name = "Objects";
 
         public event Action<IFile> LoadObject;
-        public ObjectPhysicsParameterList ObjectParameters { get; private set; }
+        public ObjectPhysicsParameterList PhysicsParameters { get; private set; }
+        public PathObjParameterList PathParameters { get; private set; }
 
         private readonly FileContainer _enemy = new("Enemy");
         private readonly FileContainer _human = new("Human");
@@ -57,8 +58,11 @@ namespace XNOEdit.Panels
             _object.AddFromArcPath(objectArcPath, "*.xno");
 
             var objectArchive = new ArcFile(objectArcPath);
-            var parametersFile = objectArchive.GetFile("/xenon/object/Common.bin");
-            ObjectParameters = new ObjectPhysicsParameterList(parametersFile.Decompress());
+            var commonFile = objectArchive.GetFile("/xenon/object/Common.bin");
+            var pathObjFile = objectArchive.GetFile("/xenon/object/PathObj.bin");
+
+            PhysicsParameters = new ObjectPhysicsParameterList(commonFile.Decompress());
+            PathParameters = new PathObjParameterList(pathObjFile.Decompress());
 
             var win32Path = Path.Join(
                 Configuration.GameFolder,

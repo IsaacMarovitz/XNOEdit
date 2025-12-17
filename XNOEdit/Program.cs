@@ -389,8 +389,9 @@ namespace XNOEdit
 
             var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
             var objectArchive = new ArcFile(objectArcPath);
-            var objectParams = UIManager.ObjectsPanel?.ObjectParameters.Parameters ?? [];
-            var resolverContext = new ResolverContext(objectParams, _propActors, objectArchive);
+            var physicsParams = UIManager.ObjectsPanel?.PhysicsParameters.Parameters ?? [];
+            var pathParams = UIManager.ObjectsPanel?.PathParameters.Parameters ?? [];
+            var resolverContext = new ResolverContext(physicsParams, pathParams, _propActors, objectArchive);
 
             _loadChain?.AddSet(setFile, resolverContext);
             _loadChain?.Start();

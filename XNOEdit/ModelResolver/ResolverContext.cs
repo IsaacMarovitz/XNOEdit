@@ -8,18 +8,21 @@ namespace XNOEdit.ModelResolver
     public class ResolverContext
     {
         public ArcFile ObjectArchive { get; }
-        public List<ObjectPhysicsParameter> ObjectParameters { get; }
+        public List<ObjectPhysicsParameter> PhysicsParameters { get; }
+        public List<PathObjParameter> PathParameters { get; }
         public List<Actor> Actors { get; }
 
         private readonly Dictionary<string, NinjaNext> _xnoCache = new();
         private readonly Dictionary<string, Package> _packageCache = new();
 
         public ResolverContext(
-            List<ObjectPhysicsParameter> objectParameters,
+            List<ObjectPhysicsParameter> physicsParameters,
+            List<PathObjParameter> pathParams,
             List<Actor> actors,
             ArcFile objectArchive)
         {
-            ObjectParameters = objectParameters;
+            PhysicsParameters = physicsParameters;
+            PathParameters = pathParams;
             Actors = actors;
             ObjectArchive = objectArchive;
         }

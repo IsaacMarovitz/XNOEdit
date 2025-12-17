@@ -2,14 +2,14 @@ using Marathon.Formats.Placement;
 
 namespace XNOEdit.ModelResolver.Resolvers
 {
-    public class PhysicsObjectResolver : ModelResolver
+    public class ObjectResolver : ModelResolver
     {
         protected override IReadOnlySet<string> SupportedTypes { get; } = new HashSet<string>
         {
             "objectphysics",
             "objectphysics_item",
-            "common_path_obj",
             "physicspath",
+            "common_path_obj",
         };
 
         public override int Priority => 20;
@@ -28,13 +28,29 @@ namespace XNOEdit.ModelResolver.Resolvers
                 return ResolveResult.Empty;
 
             var modelName = (string)setObject.Parameters[objectNameIndex].Value;
-            var physicsParam = context.ObjectParameters.FirstOrDefault(x => x.Name == modelName);
+            string modelPath;
 
-            if (physicsParam == null)
-                return ResolveResult.Empty;
+            if (setObject.Type == "common_path_obj")
+            {
+                var pathParam = context.PathParameters.FirstOrDefault(x => x.Name == modelName);
+
+                if (pathParam == null)
+                    return ResolveResult.Failed($"Unable to find path parameter '{modelName}'");
+
+                modelPath = pathParam.Model;
+            }
+            else
+            {
+                var physicsParam = context.PhysicsParameters.FirstOrDefault(x => x.Name == modelName);
+
+                if (physicsParam == null)
+                    return ResolveResult.Failed($"Unable to find physics parameter '{modelName}'");
+
+                modelPath = physicsParam.Model;
+            }
 
             return ResolveResult.WithInstance(
-                ResolvedInstance.Create($"/win32/{physicsParam.Model}", setObject.Position, setObject.Rotation));
+                ResolvedInstance.Create($"/win32/{modelPath}", setObject.Position, setObject.Rotation));
         }
     }
 }
