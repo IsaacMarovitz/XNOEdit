@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="Marathon/Marathon/Marathon.csproj" />
+  <Project Path="SDL3-CS/SDL3-CS/SDL3-CS.csproj" />
+  <Project Path="SDL3-CS/SDL3-CS.Native/SDL3-CS.Native.csproj" />
   <Project Path="XNOEdit/XNOEdit.csproj" />
 </Solution>
