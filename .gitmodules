@@ -2,3 +2,6 @@
 	path = Marathon
 	url = https://www.github.com/hyperbx/Marathon
 	branch = v2.0.0
+[submodule "SDL3-CS"]
+	path = SDL3-CS
+	url = https://github.com/edwardgushchin/SDL3-CS
