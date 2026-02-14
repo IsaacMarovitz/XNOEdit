@@ -13,4 +13,38 @@ namespace Solaris.RHI
         Uniform  = 1 << 6,
         Storage  = 1 << 7,
     }
+
+    public enum SlPrimitiveTopology
+    {
+        PointList,
+        LineList,
+        LineStrip,
+        TriangleList,
+        TriangleStrip,
+    }
+
+    public enum SlCullMode
+    {
+        None,
+        Front,
+        Back,
+    }
+
+    public enum SlFrontFace
+    {
+        Clockwise,
+        CounterClockwise,
+    }
+
+    public enum SlCompareFunction
+    {
+        Never,
+        Less,
+        LessEqual,
+        Greater,
+        GreaterEqual,
+        Equal,
+        NotEqual,
+        Always,
+    }
 }

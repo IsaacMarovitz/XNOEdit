@@ -277,8 +277,8 @@ namespace XNOEdit.Renderer
                         DstFactor = BlendFactor.OneMinusSrcAlpha
                     }
                 })
-                .WithTopology(PrimitiveTopology.TriangleList)
-                .WithCulling(CullMode.None)
+                .WithTopology(SlPrimitiveTopology.TriangleList)
+                .WithCulling(SlCullMode.None)
                 .WithVertexLayout(vbLayout)
                 .WithShader(_shaderModule);
 

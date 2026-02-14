@@ -27,7 +27,7 @@ namespace Solaris.Wgpu
             SlDevice device,
             string shaderSource,
             string label,
-            Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
+            Dictionary<string, SlPipelineVariantDescriptor> pipelineVariants)
         {
             Device = device;
             _resources = [];
@@ -92,7 +92,7 @@ namespace Solaris.Wgpu
             throw new KeyNotFoundException($"Pipeline variant '{variant}' not found");
         }
 
-        private RenderPipeline* CreatePipeline(PipelineVariantDescriptor descriptor)
+        private RenderPipeline* CreatePipeline(SlPipelineVariantDescriptor descriptor)
         {
             var builder = new RenderPipelineBuilder(Device)
                 .WithShader(_shaderModule)
@@ -194,7 +194,7 @@ namespace Solaris.Wgpu
             SlDevice device,
             string shaderSource,
             string label,
-            Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
+            Dictionary<string, SlPipelineVariantDescriptor> pipelineVariants)
             : base(device, shaderSource, label, pipelineVariants)
         {
         }

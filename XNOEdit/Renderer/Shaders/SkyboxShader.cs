@@ -24,15 +24,15 @@ namespace XNOEdit.Renderer.Shaders
                 device,
                 shaderSource,
                 "Skybox Shader",
-                pipelineVariants: new Dictionary<string, PipelineVariantDescriptor>
+                pipelineVariants: new Dictionary<string, SlPipelineVariantDescriptor>
                 {
                     ["default"] = new()
                     {
-                        Topology = PrimitiveTopology.TriangleStrip,
-                        CullMode = CullMode.None,
-                        FrontFace = FrontFace.CW,
+                        Topology = SlPrimitiveTopology.TriangleStrip,
+                        CullMode = SlCullMode.None,
+                        FrontFace = SlFrontFace.Clockwise,
                         DepthWrite = false,
-                        DepthCompare = CompareFunction.Always
+                        DepthCompare = SlCompareFunction.Always
                     }
                 })
         {

@@ -14,6 +14,12 @@ namespace Solaris.Wgpu
             Queue = queue;
         }
 
+        public override void Submit(SlCommandBuffer commandBuffer)
+        {
+            var wgpuCommandBuffer = (commandBuffer as WgpuCommandBuffer).CommandBuffer;
+            _wgpu.QueueSubmit(Queue, 1, &wgpuCommandBuffer);
+        }
+
         public override void Dispose()
         {
             if (Queue != null)

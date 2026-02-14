@@ -20,5 +20,55 @@ namespace Solaris.Wgpu
 
             return result;
         }
+
+        public static PrimitiveTopology Convert(this SlPrimitiveTopology topology)
+        {
+            return topology switch
+            {
+                SlPrimitiveTopology.PointList => PrimitiveTopology.PointList,
+                SlPrimitiveTopology.LineList => PrimitiveTopology.LineList,
+                SlPrimitiveTopology.LineStrip => PrimitiveTopology.LineStrip,
+                SlPrimitiveTopology.TriangleList => PrimitiveTopology.TriangleList,
+                SlPrimitiveTopology.TriangleStrip => PrimitiveTopology.TriangleStrip,
+                _ => throw new ArgumentOutOfRangeException(nameof(topology), topology, null)
+            };
+        }
+
+        public static CullMode Convert(this SlCullMode cullMode)
+        {
+            return cullMode switch
+            {
+                SlCullMode.None => CullMode.None,
+                SlCullMode.Front => CullMode.Front,
+                SlCullMode.Back => CullMode.Back,
+                _ => throw new ArgumentOutOfRangeException(nameof(cullMode), cullMode, null)
+            };
+        }
+
+        public static FrontFace Convert(this SlFrontFace frontFace)
+        {
+            return frontFace switch
+            {
+                SlFrontFace.Clockwise => FrontFace.CW,
+                SlFrontFace.CounterClockwise => FrontFace.Ccw,
+                _ => throw new ArgumentOutOfRangeException(nameof(frontFace), frontFace, null)
+            };
+        }
+
+        public static CompareFunction Convert(this SlCompareFunction compareFunction)
+        {
+            return compareFunction switch
+            {
+                SlCompareFunction.Never => CompareFunction.Never,
+                SlCompareFunction.Less => CompareFunction.Less,
+                SlCompareFunction.LessEqual => CompareFunction.LessEqual,
+                SlCompareFunction.Greater => CompareFunction.Greater,
+                SlCompareFunction.GreaterEqual => CompareFunction.GreaterEqual,
+                SlCompareFunction.Equal => CompareFunction.Equal,
+                SlCompareFunction.NotEqual => CompareFunction.NotEqual,
+                SlCompareFunction.Always => CompareFunction.Always,
+                _ => throw new ArgumentOutOfRangeException(nameof(compareFunction), compareFunction, null)
+            };
+        }
     }
 }

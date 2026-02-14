@@ -10,15 +10,15 @@ namespace Solaris.Builders
         private ShaderModule* _shaderModule;
         private string _vertexEntry = "vs_main";
         private string _fragmentEntry = "fs_main";
-        private PrimitiveTopology _topology = PrimitiveTopology.TriangleList;
-        private CullMode _cullMode = CullMode.None;
-        private FrontFace _frontFace = FrontFace.Ccw;
+        private SlPrimitiveTopology _topology = SlPrimitiveTopology.TriangleList;
+        private SlCullMode _cullMode = SlCullMode.None;
+        private SlFrontFace _frontFace = SlFrontFace.CounterClockwise;
         private readonly List<VertexBufferLayout> _vertexLayouts = [];
         private readonly List<IntPtr> _bindGroupLayouts = [];
 
         private bool _hasDepth;
         private bool _depthWrite = true;
-        private CompareFunction _depthCompare = CompareFunction.Greater;
+        private SlCompareFunction _depthCompare = SlCompareFunction.Greater;
 
         private bool _hasBlend;
         private BlendState _blendState;
@@ -40,13 +40,13 @@ namespace Solaris.Builders
             return this;
         }
 
-        public RenderPipelineBuilder WithTopology(PrimitiveTopology topology)
+        public RenderPipelineBuilder WithTopology(SlPrimitiveTopology topology)
         {
             _topology = topology;
             return this;
         }
 
-        public RenderPipelineBuilder WithCulling(CullMode cullMode, FrontFace frontFace = FrontFace.Ccw)
+        public RenderPipelineBuilder WithCulling(SlCullMode cullMode, SlFrontFace frontFace = SlFrontFace.CounterClockwise)
         {
             _cullMode = cullMode;
             _frontFace = frontFace;
@@ -79,7 +79,7 @@ namespace Solaris.Builders
 
         public RenderPipelineBuilder WithDepth(
             bool write = true,
-            CompareFunction compare = CompareFunction.Greater)
+            SlCompareFunction compare = SlCompareFunction.Greater)
         {
             _hasDepth = true;
             _depthWrite = write;
@@ -204,7 +204,7 @@ namespace Solaris.Builders
                     {
                         Format = DepthTextureFormat,
                         DepthWriteEnabled = _depthWrite,
-                        DepthCompare = _depthCompare,
+                        DepthCompare = _depthCompare.Convert(),
                         StencilFront = new StencilFaceState
                         {
                             Compare = CompareFunction.Always,
@@ -231,9 +231,9 @@ namespace Solaris.Builders
                     Fragment = &fragmentState,
                     Primitive = new PrimitiveState
                     {
-                        Topology = _topology,
-                        FrontFace = _frontFace,
-                        CullMode = _cullMode
+                        Topology = _topology.Convert(),
+                        FrontFace = _frontFace.Convert(),
+                        CullMode = _cullMode.Convert(),
                     },
                     Multisample = new MultisampleState
                     {

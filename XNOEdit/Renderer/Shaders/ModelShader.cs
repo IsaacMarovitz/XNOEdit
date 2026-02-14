@@ -56,33 +56,33 @@ namespace XNOEdit.Renderer.Shaders
                 device,
                 shaderSource,
                 "Model Shader",
-                pipelineVariants: new Dictionary<string, PipelineVariantDescriptor>
+                pipelineVariants: new Dictionary<string, SlPipelineVariantDescriptor>
                 {
                     ["default"] = new()
                     {
-                        Topology = PrimitiveTopology.TriangleList,
-                        CullMode = CullMode.None,
-                        FrontFace = FrontFace.Ccw,
+                        Topology = SlPrimitiveTopology.TriangleList,
+                        CullMode = SlCullMode.None,
+                        FrontFace = SlFrontFace.CounterClockwise,
                         DepthWrite = true,
-                        DepthCompare = CompareFunction.Greater,
+                        DepthCompare = SlCompareFunction.Greater,
                         AlphaBlend = true
                     },
                     ["culled"] = new()
                     {
-                        Topology = PrimitiveTopology.TriangleList,
-                        CullMode = CullMode.Back,
-                        FrontFace = FrontFace.Ccw,
+                        Topology = SlPrimitiveTopology.TriangleList,
+                        CullMode = SlCullMode.Back,
+                        FrontFace = SlFrontFace.CounterClockwise,
                         DepthWrite = true,
-                        DepthCompare = CompareFunction.Greater,
+                        DepthCompare = SlCompareFunction.Greater,
                         AlphaBlend = true
                     },
                     ["wireframe"] = new()
                     {
-                        Topology = PrimitiveTopology.LineList,
-                        CullMode = CullMode.None,
-                        FrontFace = FrontFace.Ccw,
+                        Topology = SlPrimitiveTopology.LineList,
+                        CullMode = SlCullMode.None,
+                        FrontFace = SlFrontFace.CounterClockwise,
                         DepthWrite = true,
-                        DepthCompare = CompareFunction.Greater,
+                        DepthCompare = SlCompareFunction.Greater,
                         AlphaBlend = false
                     }
                 })

@@ -26,15 +26,15 @@ namespace XNOEdit.Renderer.Shaders
                 device,
                 shaderSource,
                 "Grid Shader",
-                pipelineVariants: new Dictionary<string, PipelineVariantDescriptor>
+                pipelineVariants: new Dictionary<string, SlPipelineVariantDescriptor>
                 {
                     ["default"] = new()
                     {
-                        Topology = PrimitiveTopology.LineList,
-                        CullMode = CullMode.None,
-                        FrontFace = FrontFace.CW,
+                        Topology = SlPrimitiveTopology.LineList,
+                        CullMode = SlCullMode.None,
+                        FrontFace = SlFrontFace.Clockwise,
                         DepthWrite = true,
-                        DepthCompare = CompareFunction.Greater,
+                        DepthCompare = SlCompareFunction.Greater,
                         AlphaBlend = true
                     }
                 })
