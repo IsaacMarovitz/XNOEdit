@@ -1,20 +1,19 @@
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Wgpu;
+using Solaris.RHI;
+using Solaris.Wgpu;
 using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace Solaris.Builders
 {
     public unsafe class BindGroupBuilder
     {
-        private readonly WebGPU _wgpu;
-        private readonly Device* _device;
+        private readonly SlDevice _device;
         private readonly List<BindGroupLayoutEntry> _layoutEntries = [];
         private readonly List<BindGroupEntry> _entries = [];
         private BindGroupLayout* _layout;
 
-        public BindGroupBuilder(WebGPU wgpu, Device* device)
+        public BindGroupBuilder(SlDevice device)
         {
-            _wgpu = wgpu;
             _device = device;
         }
 
@@ -48,10 +47,10 @@ namespace Solaris.Builders
 
         public BindGroupBuilder AddUniformBuffer<T>(
             uint binding,
-            WgpuBuffer<T> buffer,
+            SlBuffer<T> buffer,
             ShaderStage visibility = ShaderStage.Vertex | ShaderStage.Fragment) where T : unmanaged
         {
-            return AddUniformBuffer(binding, buffer.Handle, buffer.Size, visibility);
+            return AddUniformBuffer(binding, (Buffer*)buffer.GetHandle(), buffer.Size, visibility);
         }
 
         public BindGroupBuilder AddStorageBuffer(
@@ -141,6 +140,10 @@ namespace Solaris.Builders
                 return _layout;
 
             var entries = _layoutEntries.ToArray();
+
+            // TODO: Clean this up
+            var wgpuDevice = _device as WgpuDevice;
+
             fixed (BindGroupLayoutEntry* pEntries = entries)
             {
                 var desc = new BindGroupLayoutDescriptor
@@ -149,7 +152,7 @@ namespace Solaris.Builders
                     Entries = pEntries
                 };
 
-                _layout = _wgpu.DeviceCreateBindGroupLayout(_device, &desc);
+                _layout = wgpuDevice.Wgpu.DeviceCreateBindGroupLayout(wgpuDevice, &desc);
                 return _layout;
             }
         }
@@ -160,6 +163,10 @@ namespace Solaris.Builders
                 BuildLayout();
 
             var entries = _entries.ToArray();
+
+            // TODO: Clean this up
+            var wgpuDevice = _device as WgpuDevice;
+
             fixed (BindGroupEntry* pEntries = entries)
             {
                 var desc = new BindGroupDescriptor
@@ -169,7 +176,7 @@ namespace Solaris.Builders
                     Entries = pEntries
                 };
 
-                return _wgpu.DeviceCreateBindGroup(_device, &desc);
+                return wgpuDevice.Wgpu.DeviceCreateBindGroup(wgpuDevice, &desc);
             }
         }
     }

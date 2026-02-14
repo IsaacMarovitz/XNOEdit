@@ -1,21 +1,22 @@
 using System.Numerics;
 using Silk.NET.WebGPU;
+using Solaris.RHI;
 
-namespace XNOEdit.Renderer.Wgpu
+namespace Solaris.Wgpu
 {
     public abstract unsafe class WgpuRenderer<TParameters> : IDisposable where TParameters : struct
     {
-        protected readonly WebGPU Wgpu;
+        protected readonly SlDevice Device;
         protected readonly WgpuShader Shader;
 
-        public WgpuRenderer(WebGPU wgpu, WgpuShader shader)
+        public WgpuRenderer(SlDevice device, WgpuShader shader)
         {
-            Wgpu = wgpu;
+            Device = device;
             Shader = shader;
         }
 
         public virtual void Draw(
-            Queue* queue,
+            SlQueue queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
@@ -34,7 +35,8 @@ namespace XNOEdit.Renderer.Wgpu
                 if (bindGroup != null)
                 {
                     uint dynamicOffset = 0;
-                    Wgpu.RenderPassEncoderSetBindGroup(passEncoder, i, bindGroup, 0, &dynamicOffset);
+                    // TODO: Clean this up
+                    (Device as WgpuDevice).Wgpu.RenderPassEncoderSetBindGroup(passEncoder, i, bindGroup, 0, &dynamicOffset);
                 }
             }
         }

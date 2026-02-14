@@ -3,10 +3,11 @@ using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Silk.NET.WebGPU;
+using Solaris.RHI;
+using Solaris.Wgpu;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
-using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer
 {
@@ -21,22 +22,19 @@ namespace XNOEdit.Renderer
 
     public unsafe class Model : IDisposable
     {
-        private readonly WebGPU _wgpu;
-        private readonly Device* _device;
+        private readonly SlDevice _device;
         private readonly List<ModelMesh> _meshes = [];
-        private readonly Dictionary<int, WgpuBuffer<float>> _sharedVertexBuffers = new();
+        private readonly Dictionary<int, SlBuffer<float>> _sharedVertexBuffers = new();
         private readonly ArcFile _shaderArchive;
 
         public Model(
-            WebGPU wgpu,
-            Device* device,
+            SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
             ArcFile shaderArchive,
             ModelShader shader)
         {
-            _wgpu = wgpu;
             _device = device;
             _shaderArchive = shaderArchive;
 
@@ -156,11 +154,7 @@ namespace XNOEdit.Renderer
                     }
                 }
 
-                var vbo = new WgpuBuffer<float>(
-                    _wgpu,
-                    _device,
-                    vertices.ToArray(),
-                    BufferUsage.Vertex);
+                var vbo = _device.CreateBuffer(vertices.ToArray(), SlBufferUsage.Vertex);
                 _sharedVertexBuffers[i] = vbo;
             }
 
@@ -217,7 +211,7 @@ namespace XNOEdit.Renderer
                             // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
                         }
 
-                        var mesh = new ModelMesh(_wgpu, _device, buffer, primitiveList, textureSet, material, shader, i, j);
+                        var mesh = new ModelMesh(_device, buffer, primitiveList, textureSet, material, shader, i, j);
                         _meshes.Add(mesh);
                     }
                     catch (Exception ex)
@@ -354,17 +348,19 @@ namespace XNOEdit.Renderer
         public int MeshSet { get; private set; }
         public bool Visible { get; private set; } = true;
 
-        private readonly WebGPU _wgpu;
+        private readonly SlDevice _device;
         private readonly MeshGeometry _geometry;
         private TextureSet _textureSet;
-        private WgpuBuffer<PerMeshUniforms> _meshUniformBuffer;
+        private SlBuffer<PerMeshUniforms> _meshUniformBuffer;
         private BindGroup* _meshBindGroup;
         private BindGroup* _textureBindGroup;
 
+        // TODO: Clean this up
+        private WebGPU _wgpu => (_device as WgpuDevice).Wgpu;
+
         public ModelMesh(
-            WebGPU wgpu,
-            Device* device,
-            WgpuBuffer<float> sharedVbo,
+            SlDevice device,
+            SlBuffer<float> sharedVbo,
             PrimitiveList primitiveList,
             TextureSet textureSet,
             Material material,
@@ -372,15 +368,15 @@ namespace XNOEdit.Renderer
             int subobject,
             int meshSet)
         {
-            _wgpu = wgpu;
+            _device = device;
             _textureSet = textureSet;
             Subobject = subobject;
             MeshSet = meshSet;
 
             _geometry = MeshGeometry.CreateFromTriangleStrip(
-                wgpu, device, sharedVbo, primitiveList.StripIndices, primitiveList.IndexIndices);
+                device, sharedVbo, primitiveList.StripIndices, primitiveList.IndexIndices);
 
-            CreateMeshUniforms(wgpu, device, material, shader);
+            CreateMeshUniforms(device, material, shader);
         }
 
         public void SetVisible(bool visible)
@@ -388,9 +384,9 @@ namespace XNOEdit.Renderer
             Visible = visible;
         }
 
-        private void CreateMeshUniforms(WebGPU wgpu, Device* device, Material material, ModelShader shader)
+        private void CreateMeshUniforms(SlDevice device, Material material, ModelShader shader)
         {
-            _meshUniformBuffer = WgpuBuffer<PerMeshUniforms>.CreateUniform(wgpu, device);
+            _meshUniformBuffer = device.CreateUniform<PerMeshUniforms>();
 
             var meshUniforms = new PerMeshUniforms
             {
@@ -405,10 +401,10 @@ namespace XNOEdit.Renderer
                 Specular = _textureSet.Specular ? 1.0f : 0.0f,
             };
 
-            var queue = wgpu.DeviceGetQueue(device);
+            var queue = device.GetQueue();
             _meshUniformBuffer.UpdateData(queue, in meshUniforms);
             _meshBindGroup = shader.CreatePerMeshBindGroup(_meshUniformBuffer);
-            wgpu.QueueRelease(queue);
+            queue.Dispose();
         }
 
         public void Draw(

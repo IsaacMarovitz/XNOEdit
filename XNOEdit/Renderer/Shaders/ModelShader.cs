@@ -2,7 +2,9 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
 using Solaris.Builders;
-using XNOEdit.Renderer.Wgpu;
+using Solaris.RHI;
+using Solaris.Wgpu;
+using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer.Shaders
 {
@@ -35,7 +37,7 @@ namespace XNOEdit.Renderer.Shaders
 
     public unsafe class ModelShader : WgpuShader
     {
-        private WgpuBuffer<PerFrameUniforms>? _perFrameUniformBuffer;
+        private SlBuffer<PerFrameUniforms>? _perFrameUniformBuffer;
         private BindGroup* _perFrameBindGroup;
 
         private Sampler* _sampler;
@@ -48,11 +50,9 @@ namespace XNOEdit.Renderer.Shaders
         private BindGroup* _defaultTextureBindGroup;
 
         public ModelShader(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             string shaderSource)
             : base(
-                wgpu,
                 device,
                 shaderSource,
                 "Model Shader",
@@ -104,7 +104,9 @@ namespace XNOEdit.Renderer.Shaders
                 MaxAnisotropy = 16
             };
 
-            _sampler = Wgpu.DeviceCreateSampler(Device, &samplerDesc);
+            // TODO: Cleanup
+            var wgpuDevice = Device as WgpuDevice;
+            _sampler = wgpuDevice.Wgpu.DeviceCreateSampler(wgpuDevice, &samplerDesc);
         }
 
         private void CreateDefaultTexture()
@@ -119,7 +121,9 @@ namespace XNOEdit.Renderer.Shaders
                 Usage = TextureUsage.TextureBinding | TextureUsage.CopyDst
             };
 
-            _defaultTexture = Wgpu.DeviceCreateTexture(Device, &textureDesc);
+            // TODO: Cleanup
+            var wgpuDevice = Device as WgpuDevice;
+            _defaultTexture = wgpuDevice.Wgpu.DeviceCreateTexture(wgpuDevice, &textureDesc);
 
             var whitePixel = stackalloc byte[4] { 255, 255, 255, 255 };
 
@@ -140,9 +144,13 @@ namespace XNOEdit.Renderer.Shaders
 
             var writeSize = new Extent3D { Width = 1, Height = 1, DepthOrArrayLayers = 1 };
 
-            var queue = Wgpu.DeviceGetQueue(Device);
-            Wgpu.QueueWriteTexture(queue, &imageCopyTexture, whitePixel, 4, &textureDataLayout, &writeSize);
-            Wgpu.QueueRelease(queue);
+            var queue = Device.GetQueue();
+
+            // TODO: Cleanup
+            var wgpuQueue = queue as WgpuQueue;
+            wgpuDevice.Wgpu.QueueWriteTexture(wgpuQueue.Queue, &imageCopyTexture, whitePixel, 4, &textureDataLayout, &writeSize);
+
+            queue.Dispose();
 
             var viewDesc = new TextureViewDescriptor
             {
@@ -155,7 +163,7 @@ namespace XNOEdit.Renderer.Shaders
                 Aspect = TextureAspect.All
             };
 
-            _defaultTextureView = Wgpu.TextureCreateView(_defaultTexture, &viewDesc);
+            _defaultTextureView = wgpuDevice.Wgpu.TextureCreateView(_defaultTexture, &viewDesc);
         }
 
         protected override void SetupBindGroups()
@@ -164,10 +172,10 @@ namespace XNOEdit.Renderer.Shaders
             CreateDefaultTexture();
 
             // Group 0: Per-frame uniforms (updated every frame)
-            _perFrameUniformBuffer = WgpuBuffer<PerFrameUniforms>.CreateUniform(Wgpu, Device);
+            _perFrameUniformBuffer = Device.CreateUniform<PerFrameUniforms>();
             RegisterResource(_perFrameUniformBuffer);
 
-            var perFrameBuilder = new BindGroupBuilder(Wgpu, Device);
+            var perFrameBuilder = new BindGroupBuilder(Device);
             perFrameBuilder.AddUniformBuffer(0, _perFrameUniformBuffer);
 
             _perFrameLayout = perFrameBuilder.BuildLayout();
@@ -205,17 +213,19 @@ namespace XNOEdit.Renderer.Shaders
                 Entries = &entry
             };
 
-            return Wgpu.DeviceCreateBindGroupLayout(Device, &layoutDesc);
+            // TODO: Cleanup
+            var wgpuDevice = Device as WgpuDevice;
+            return wgpuDevice.Wgpu.DeviceCreateBindGroupLayout(wgpuDevice, &layoutDesc);
         }
 
-        public BindGroup* CreatePerMeshBindGroup(WgpuBuffer<PerMeshUniforms> uniformBuffer)
+        public BindGroup* CreatePerMeshBindGroup(SlBuffer<PerMeshUniforms> uniformBuffer)
         {
             var layout = GetBindGroupLayout(1);
 
             var entry = new BindGroupEntry
             {
                 Binding = 0,
-                Buffer = uniformBuffer.Handle,
+                Buffer = (Buffer*)uniformBuffer.GetHandle(),
                 Offset = 0,
                 Size = uniformBuffer.Size
             };
@@ -227,7 +237,9 @@ namespace XNOEdit.Renderer.Shaders
                 Entries = &entry
             };
 
-            return Wgpu.DeviceCreateBindGroup(Device, &bindGroupDesc);
+            // TODO: Cleanup
+            var wgpuDevice = Device as WgpuDevice;
+            return wgpuDevice.Wgpu.DeviceCreateBindGroup(wgpuDevice, &bindGroupDesc);
         }
 
         private BindGroupLayout* CreateTextureBindGroupLayout()
@@ -298,7 +310,9 @@ namespace XNOEdit.Renderer.Shaders
                 Entries = entries
             };
 
-            return Wgpu.DeviceCreateBindGroupLayout(Device, &layoutDesc);
+            // TODO: Cleanup
+            var wgpuDevice = Device as WgpuDevice;
+            return wgpuDevice.Wgpu.DeviceCreateBindGroupLayout(wgpuDevice, &layoutDesc);
         }
 
         public BindGroup* CreateTextureBindGroup(
@@ -347,7 +361,9 @@ namespace XNOEdit.Renderer.Shaders
                 Entries = entries
             };
 
-            return Wgpu.DeviceCreateBindGroup(Device, &bindGroupDesc);
+            // TODO: Cleanup
+            var wgpuDevice = Device as WgpuDevice;
+            return wgpuDevice.Wgpu.DeviceCreateBindGroup(wgpuDevice, &bindGroupDesc);
         }
 
         protected override VertexBufferLayout[] CreateVertexLayouts()
@@ -373,7 +389,7 @@ namespace XNOEdit.Renderer.Shaders
             ];
         }
 
-        public void UpdatePerFrameUniforms(Queue* queue, in PerFrameUniforms uniforms)
+        public void UpdatePerFrameUniforms(SlQueue queue, in PerFrameUniforms uniforms)
         {
             _perFrameUniformBuffer?.UpdateData(queue, in uniforms);
         }
@@ -398,16 +414,19 @@ namespace XNOEdit.Renderer.Shaders
 
         public override void Dispose()
         {
+            // TODO: Cleanup
+            var wgpu = (Device as WgpuDevice).Wgpu;
+
             if (_sampler != null)
-                Wgpu.SamplerRelease(_sampler);
+                wgpu.SamplerRelease(_sampler);
 
             if (_defaultTextureView != null)
-                Wgpu.TextureViewRelease(_defaultTextureView);
+                wgpu.TextureViewRelease(_defaultTextureView);
 
             if (_defaultTexture != null)
             {
-                Wgpu.TextureDestroy(_defaultTexture);
-                Wgpu.TextureRelease(_defaultTexture);
+                wgpu.TextureDestroy(_defaultTexture);
+                wgpu.TextureRelease(_defaultTexture);
             }
 
             base.Dispose();

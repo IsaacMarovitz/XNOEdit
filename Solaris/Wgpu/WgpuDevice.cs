@@ -1,24 +1,29 @@
+using System.Runtime.InteropServices;
 using SDL3;
 using Silk.NET.WebGPU;
 using Silk.NET.WebGPU.Extensions.WGPU;
+using Solaris.RHI;
 using XNOEdit.Logging;
 
-namespace XNOEdit.Renderer.Wgpu
+namespace Solaris.Wgpu
 {
-    public unsafe class WgpuDevice : IDisposable
+    public unsafe class WgpuDevice : SlDevice
     {
-        private readonly WebGPU _wgpu;
         private readonly Surface* _surface;
         private readonly Instance* _instance;
         private readonly Adapter* _adapter;
         private readonly TextureFormat _surfaceFormat = TextureFormat.Bgra8Unorm;
+
+        public readonly WebGPU Wgpu;
         private Device* Device { get; }
 
         public static implicit operator Device*(WgpuDevice device) => device.Device;
 
+        private const int CopyBufferAlignment = 4;
+
         public WgpuDevice(WebGPU wgpu, IntPtr window)
         {
-            _wgpu = wgpu;
+            Wgpu = wgpu;
 
             var extras = new InstanceExtras
             {
@@ -31,8 +36,8 @@ namespace XNOEdit.Renderer.Wgpu
                 // NextInChain = (ChainedStruct*)&extras
             };
 
-            _instance = _wgpu.CreateInstance(&instanceDesc);
-            _surface = CreateWebGpuSurface(window, _wgpu, _instance);
+            _instance = Wgpu.CreateInstance(&instanceDesc);
+            _surface = CreateWebGpuSurface(window, Wgpu, _instance);
 
             var adapterOptions = new RequestAdapterOptions
             {
@@ -41,7 +46,7 @@ namespace XNOEdit.Renderer.Wgpu
             };
 
             Adapter* adapter = null;
-            _wgpu.InstanceRequestAdapter(
+            Wgpu.InstanceRequestAdapter(
                 _instance,
                 &adapterOptions,
                 new PfnRequestAdapterCallback((status, adapterPtr, message, userdata) =>
@@ -56,7 +61,7 @@ namespace XNOEdit.Renderer.Wgpu
             _adapter = adapter;
 
             AdapterProperties adapterProps = default;
-            _wgpu.AdapterGetProperties(_adapter, &adapterProps);
+            Wgpu.AdapterGetProperties(_adapter, &adapterProps);
             Logger.Info?.PrintMsg(LogClass.Application, $"Backend type: {adapterProps.BackendType}");
 
             NativeFeature[] feature = [NativeFeature.BufferBindingArray];
@@ -72,7 +77,7 @@ namespace XNOEdit.Renderer.Wgpu
 
                 Device* device = null;
 
-                _wgpu.AdapterRequestDevice(
+                Wgpu.AdapterRequestDevice(
                     _adapter,
                     &deviceDesc,
                     new PfnRequestDeviceCallback((status, devicePtr, message, userdata) =>
@@ -101,7 +106,7 @@ namespace XNOEdit.Renderer.Wgpu
                 AlphaMode = CompositeAlphaMode.Auto
             };
 
-            _wgpu.SurfaceConfigure(_surface, &surfaceConfig);
+            Wgpu.SurfaceConfigure(_surface, &surfaceConfig);
         }
 
         public Surface* GetSurface()
@@ -114,19 +119,66 @@ namespace XNOEdit.Renderer.Wgpu
             return _surfaceFormat;
         }
 
-        public void Dispose()
+        public override SlQueue GetQueue()
+        {
+            return new WgpuQueue(Wgpu, Wgpu.DeviceGetQueue(Device));
+        }
+
+        public override SlBuffer<T> CreateBuffer<T>(Span<T> data, SlBufferUsage usage)
+        {
+            // Calculate size and align to COPY_BUFFER_ALIGNMENT
+            var dataSize = (ulong)(data.Length * sizeof(T));
+            var size = AlignUp(dataSize, CopyBufferAlignment);
+
+            var descriptor = new BufferDescriptor
+            {
+                Size = size,
+                Usage = usage.Convert(),
+                MappedAtCreation = true
+            };
+
+            var handle = Wgpu.DeviceCreateBuffer(Device, &descriptor);
+
+            // Write initial data
+            var mappedRange = Wgpu.BufferGetMappedRange(handle, 0, (nuint)size);
+            var dataBytes = MemoryMarshal.AsBytes(data);
+            dataBytes.CopyTo(new Span<byte>(mappedRange, (int)dataSize));
+            Wgpu.BufferUnmap(handle);
+
+            return new WgpuBuffer<T>(handle, size, Wgpu);
+        }
+
+        public override SlBuffer<T> CreateBuffer<T>(SlBufferDescriptor descriptor)
+        {
+            var dataSize = descriptor.Size == 0 ? (ulong)sizeof(T) : descriptor.Size;
+            var alignment = descriptor.Alignment > 0 ? descriptor.Alignment : CopyBufferAlignment;
+            var size = AlignUp(dataSize, alignment);
+
+            var wgpuDescriptor = new BufferDescriptor
+            {
+                Size = size,
+                Usage = descriptor.Usage.Convert(),
+                MappedAtCreation = false
+            };
+
+            var handle = Wgpu.DeviceCreateBuffer(Device, &wgpuDescriptor);
+
+            return new WgpuBuffer<T>(handle, size, Wgpu);
+        }
+
+        public override void Dispose()
         {
             if (_surface != null)
-                _wgpu.SurfaceRelease(_surface);
+                Wgpu.SurfaceRelease(_surface);
 
             if (Device != null)
-                _wgpu.DeviceRelease(Device);
+                Wgpu.DeviceRelease(Device);
 
             if (_adapter != null)
-                _wgpu.AdapterRelease(_adapter);
+                Wgpu.AdapterRelease(_adapter);
 
             if (_instance != null)
-                _wgpu.InstanceRelease(_instance);
+                Wgpu.InstanceRelease(_instance);
         }
 
         private static Surface* CreateWebGpuSurface(IntPtr window, WebGPU wgpu, Instance* instance)
@@ -225,6 +277,11 @@ namespace XNOEdit.Renderer.Wgpu
             }
 
             return wgpu.InstanceCreateSurface(instance, descriptor);
+        }
+
+        private static ulong AlignUp(ulong value, int alignment)
+        {
+            return (value + (ulong)alignment - 1) & ~((ulong)alignment - 1);
         }
     }
 }

@@ -2,12 +2,12 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Silk.NET.WebGPU;
+using Solaris.Wgpu;
 using XNOEdit.Fonts;
 using XNOEdit.Logging;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
-using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Services;
 
 namespace XNOEdit.Managers

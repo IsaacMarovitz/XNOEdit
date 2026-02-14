@@ -1,5 +1,7 @@
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Wgpu;
+using Solaris.RHI;
+using Solaris.Wgpu;
+using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
@@ -8,31 +10,32 @@ namespace XNOEdit.Renderer
     /// </summary>
     public unsafe class MeshGeometry : IDisposable
     {
-        private readonly WebGPU _wgpu;
+        private readonly SlDevice _device;
 
-        private WgpuBuffer<float>? _sharedVertexBuffer;
-        private WgpuBuffer<ushort>? _indexBuffer;
-        private WgpuBuffer<ushort>? _wireframeIndexBuffer;
+        private SlBuffer<float>? _sharedVertexBuffer;
+        private SlBuffer<ushort>? _indexBuffer;
+        private SlBuffer<ushort>? _wireframeIndexBuffer;
 
         public uint IndexCount { get; private set; }
         public uint WireframeIndexCount { get; private set; }
 
-        public MeshGeometry(WebGPU wgpu)
-        {
-            _wgpu = wgpu;
-        }
+        // TODO: Clean this up
+        private WebGPU _wgpu => (_device as WgpuDevice).Wgpu;
 
+        public MeshGeometry(SlDevice device)
+        {
+            _device = device;
+        }
 
         /// <summary>
         /// Creates geometry using a shared vertex buffer with owned index buffer
         /// </summary>
         public static MeshGeometry CreateWithSharedVertices(
-            WebGPU wgpu,
-            Device* device,
-            WgpuBuffer<float> sharedVertexBuffer,
+            SlDevice device,
+            SlBuffer<float> sharedVertexBuffer,
             ushort[] indices)
         {
-            var geometry = new MeshGeometry(wgpu);
+            var geometry = new MeshGeometry(device);
             geometry._sharedVertexBuffer = sharedVertexBuffer;
             geometry.SetIndices(device, indices);
             return geometry;
@@ -42,24 +45,23 @@ namespace XNOEdit.Renderer
         /// Creates geometry from triangle strip indices (converts to triangle list)
         /// </summary>
         public static MeshGeometry CreateFromTriangleStrip(
-            WebGPU wgpu,
-            Device* device,
-            WgpuBuffer<float> sharedVertexBuffer,
+            SlDevice device,
+            SlBuffer<float> sharedVertexBuffer,
             List<ushort> stripLengths,
             List<ushort> indices)
         {
             var triangleIndices = ConvertStripsToTriangles(stripLengths, indices);
-            return CreateWithSharedVertices(wgpu, device, sharedVertexBuffer, triangleIndices);
+            return CreateWithSharedVertices(device, sharedVertexBuffer, triangleIndices);
         }
 
-        private void SetIndices(Device* device, ushort[] indices)
+        private void SetIndices(SlDevice device, ushort[] indices)
         {
             IndexCount = (uint)indices.Length;
-            _indexBuffer = new WgpuBuffer<ushort>(_wgpu, device, indices, BufferUsage.Index);
+            _indexBuffer = device.CreateBuffer(indices, SlBufferUsage.Index);
 
             var wireframeIndices = GenerateWireframeIndices(indices);
             WireframeIndexCount = (uint)wireframeIndices.Length;
-            _wireframeIndexBuffer = new WgpuBuffer<ushort>(_wgpu, device, wireframeIndices, BufferUsage.Index);
+            _wireframeIndexBuffer = device.CreateBuffer(wireframeIndices, SlBufferUsage.Index);
         }
 
         /// <summary>
@@ -150,7 +152,7 @@ namespace XNOEdit.Renderer
             if (_sharedVertexBuffer == null) return;
 
             _wgpu.RenderPassEncoderSetVertexBuffer(
-                passEncoder, slot, _sharedVertexBuffer.Handle, 0, _sharedVertexBuffer.Size);
+                passEncoder, slot, (Buffer*)_sharedVertexBuffer.GetHandle(), 0, _sharedVertexBuffer.Size);
         }
 
         /// <summary>
@@ -164,7 +166,7 @@ namespace XNOEdit.Renderer
 
                 _wgpu.RenderPassEncoderSetIndexBuffer(
                     passEncoder,
-                    _wireframeIndexBuffer.Handle,
+                    (Buffer*)_wireframeIndexBuffer.GetHandle(),
                     IndexFormat.Uint16,
                     0,
                     _wireframeIndexBuffer.Size);
@@ -176,7 +178,7 @@ namespace XNOEdit.Renderer
 
                 _wgpu.RenderPassEncoderSetIndexBuffer(
                     passEncoder,
-                    _indexBuffer.Handle,
+                    (Buffer*)_indexBuffer.GetHandle(),
                     IndexFormat.Uint16,
                     0,
                     _indexBuffer.Size);

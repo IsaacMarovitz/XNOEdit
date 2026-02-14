@@ -2,13 +2,13 @@ using System.Runtime.InteropServices;
 using Silk.NET.Core.Native;
 using Silk.NET.WebGPU;
 using Solaris.Builders;
+using Solaris.RHI;
 
-namespace XNOEdit.Renderer.Wgpu
+namespace Solaris.Wgpu
 {
     public abstract unsafe class WgpuShader : IDisposable
     {
-        protected readonly WebGPU Wgpu;
-        protected readonly WgpuDevice Device;
+        protected readonly SlDevice Device;
         private readonly ShaderModule* _shaderModule;
 
         private readonly List<IntPtr> _bindGroupLayouts = [];
@@ -24,18 +24,16 @@ namespace XNOEdit.Renderer.Wgpu
         private bool _disposed;
 
         protected WgpuShader(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             string shaderSource,
             string label,
             Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
         {
-            Wgpu = wgpu;
             Device = device;
             _resources = [];
             _pipelines = new Dictionary<string, IntPtr>();
 
-            _shaderModule = CreateShaderModule(wgpu, device, shaderSource, label);
+            _shaderModule = CreateShaderModule(device, shaderSource, label);
             _vertexLayouts = CreateVertexLayouts();
 
             // Let derived classes set up their bind groups
@@ -96,7 +94,7 @@ namespace XNOEdit.Renderer.Wgpu
 
         private RenderPipeline* CreatePipeline(PipelineVariantDescriptor descriptor)
         {
-            var builder = new RenderPipelineBuilder(Wgpu, Device)
+            var builder = new RenderPipelineBuilder(Device)
                 .WithShader(_shaderModule)
                 .WithBindGroupLayouts(_bindGroupLayouts.ToArray())
                 .WithVertexLayouts(_vertexLayouts)
@@ -110,14 +108,11 @@ namespace XNOEdit.Renderer.Wgpu
             return builder;
         }
 
-        private static ShaderModule* CreateShaderModule(
-            WebGPU wgpu,
-            Device* device,
-            string source,
-            string label)
+        private static ShaderModule* CreateShaderModule(SlDevice device, string source, string label)
         {
             var src = SilkMarshal.StringToPtr(source);
             var shaderName = SilkMarshal.StringToPtr(label);
+            var wgpuDevice = device as WgpuDevice;
 
             try
             {
@@ -133,7 +128,7 @@ namespace XNOEdit.Renderer.Wgpu
                     NextInChain = (ChainedStruct*)&wgslDescriptor
                 };
 
-                return wgpu.DeviceCreateShaderModule(device, &descriptor);
+                return wgpuDevice.Wgpu.DeviceCreateShaderModule(wgpuDevice, &descriptor);
             }
             finally
             {
@@ -159,10 +154,13 @@ namespace XNOEdit.Renderer.Wgpu
                 catch { /* Swallow */ }
             }
 
+            // TODO: Clean this up
+            var wgpu = (Device as WgpuDevice).Wgpu;
+
             foreach (var pipeline in _pipelines.Values)
             {
                 if (pipeline != IntPtr.Zero)
-                    Wgpu.RenderPipelineRelease((RenderPipeline*)pipeline);
+                    wgpu.RenderPipelineRelease((RenderPipeline*)pipeline);
             }
 
             if (Attributes.IsAllocated)
@@ -172,17 +170,17 @@ namespace XNOEdit.Renderer.Wgpu
             foreach (BindGroup* bindGroup in _bindGroups)
             {
                 if ((IntPtr)bindGroup != IntPtr.Zero)
-                    Wgpu.BindGroupRelease(bindGroup);
+                    wgpu.BindGroupRelease(bindGroup);
             }
 
             foreach (BindGroupLayout* layout in _bindGroupLayouts)
             {
                 if ((IntPtr)layout != IntPtr.Zero)
-                    Wgpu.BindGroupLayoutRelease(layout);
+                    wgpu.BindGroupLayoutRelease(layout);
             }
 
             if (_shaderModule != null)
-                Wgpu.ShaderModuleRelease(_shaderModule);
+                wgpu.ShaderModuleRelease(_shaderModule);
 
             _disposed = true;
         }
@@ -190,15 +188,14 @@ namespace XNOEdit.Renderer.Wgpu
 
     public unsafe class WgpuShader<TUniforms> : WgpuShader where TUniforms : unmanaged
     {
-        private WgpuBuffer<TUniforms> _uniformBuffer;
+        private SlBuffer<TUniforms> _uniformBuffer;
 
         protected WgpuShader(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             string shaderSource,
             string label,
             Dictionary<string, PipelineVariantDescriptor> pipelineVariants)
-            : base(wgpu, device, shaderSource, label, pipelineVariants)
+            : base(device, shaderSource, label, pipelineVariants)
         {
         }
 
@@ -210,10 +207,10 @@ namespace XNOEdit.Renderer.Wgpu
         protected override void SetupBindGroups()
         {
             // Default: Create bind group 0 for uniforms
-            _uniformBuffer = WgpuBuffer<TUniforms>.CreateUniform(Wgpu, Device);
+            _uniformBuffer = Device.CreateUniform<TUniforms>();
             RegisterResource(_uniformBuffer);
 
-            var bindGroupBuilder = new BindGroupBuilder(Wgpu, Device);
+            var bindGroupBuilder = new BindGroupBuilder(Device);
             bindGroupBuilder.AddUniformBuffer(0, _uniformBuffer);
 
             var layout = bindGroupBuilder.BuildLayout();
@@ -222,7 +219,7 @@ namespace XNOEdit.Renderer.Wgpu
             RegisterBindGroup(layout, bindGroup);
         }
 
-        public void UpdateUniforms(Queue* queue, in TUniforms uniforms)
+        public void UpdateUniforms(SlQueue queue, in TUniforms uniforms)
         {
             _uniformBuffer.UpdateData(queue, in uniforms);
         }

@@ -1,7 +1,8 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Wgpu;
+using Solaris.RHI;
+using Solaris.Wgpu;
 
 namespace XNOEdit.Renderer.Shaders
 {
@@ -17,11 +18,9 @@ namespace XNOEdit.Renderer.Shaders
     public unsafe class SkyboxShader : WgpuShader<SkyboxUniforms>
     {
         public SkyboxShader(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             string shaderSource)
             : base(
-                wgpu,
                 device,
                 shaderSource,
                 "Skybox Shader",

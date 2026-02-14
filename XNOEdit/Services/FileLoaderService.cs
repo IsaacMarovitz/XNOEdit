@@ -6,10 +6,11 @@ using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using Pfim;
 using Silk.NET.WebGPU;
+using Solaris.RHI;
+using Solaris.Wgpu;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
 using XNOEdit.Renderer.Renderers;
-using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Services
 {
@@ -81,13 +82,11 @@ namespace XNOEdit.Services
 
     public class FileLoaderService
     {
-        private readonly WebGPU _wgpu;
-        private readonly WgpuDevice _device;
-        private readonly IntPtr _queue;
+        private readonly SlDevice _device;
+        private readonly SlQueue _queue;
 
-        public FileLoaderService(WebGPU wgpu, WgpuDevice device, IntPtr queue)
+        public FileLoaderService(SlDevice device, SlQueue queue)
         {
-            _wgpu = wgpu;
             _device = device;
             _queue = queue;
         }
@@ -126,7 +125,7 @@ namespace XNOEdit.Services
                     cancellationToken.ThrowIfCancellationRequested();
                     progress?.Report(new LoadProgress(LoadStage.CreatingBuffers, "Creating GPU buffers..."));
 
-                    renderer = new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, shaderArchive);
+                    renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, shaderArchive);
                 }
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {xno.Name}", 1, 1));
@@ -336,7 +335,7 @@ namespace XNOEdit.Services
                         foreach (var tex in textures)
                             loadedTextureNames.Add(tex.Name);
 
-                        var renderer = new ModelRenderer(_wgpu, _device, objectChunk, textureListChunk, effectChunk, shaderArchive);
+                        var renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, shaderArchive);
 
                         // Disable shadow meshes by default
                         if (xno.Name.Contains("sdw"))
@@ -396,6 +395,9 @@ namespace XNOEdit.Services
                     using var stream = file.Decompress().Open();
                     using var image = Pfimage.FromStream(stream);
 
+                    // TODO: Cleanup
+                    var wgpuDevice = (_device as WgpuDevice);
+
                     var mipLevelCount = image.MipMaps != null && image.MipMaps.Length > 0
                         ? (uint)(image.MipMaps.Length + 1)
                         : 1u;
@@ -418,7 +420,7 @@ namespace XNOEdit.Services
                         Usage = TextureUsage.TextureBinding | TextureUsage.CopyDst
                     };
 
-                    var wgpuTexture = _wgpu.DeviceCreateTexture(_device, &textureDesc);
+                    var wgpuTexture = wgpuDevice.Wgpu.DeviceCreateTexture(wgpuDevice, &textureDesc);
 
                     UploadMipLevel((IntPtr)wgpuTexture, image.Data, 0, image.Data.Length,
                         image.Width, image.Height, image.Stride, 0, image.Format);
@@ -444,7 +446,7 @@ namespace XNOEdit.Services
                         Aspect = TextureAspect.All
                     };
 
-                    return ((IntPtr)wgpuTexture, (IntPtr)_wgpu.TextureCreateView(wgpuTexture, &viewDesc));
+                    return ((IntPtr)wgpuTexture, (IntPtr)wgpuDevice.Wgpu.TextureCreateView(wgpuTexture, &viewDesc));
                 }
             }
             catch (Exception ex)
@@ -486,7 +488,11 @@ namespace XNOEdit.Services
                     DepthOrArrayLayers = 1
                 };
 
-                _wgpu.QueueWriteTexture((Queue*)_queue, &imageCopyTexture, pData,
+                // TODO: Cleanup
+                var wgpu = (_device as WgpuDevice).Wgpu;
+                var queue = (_queue as WgpuQueue).Queue;
+
+                wgpu.QueueWriteTexture(queue, &imageCopyTexture, pData,
                     (nuint)(width * height * 4), &textureDataLayout, &writeSize);
             }
         }

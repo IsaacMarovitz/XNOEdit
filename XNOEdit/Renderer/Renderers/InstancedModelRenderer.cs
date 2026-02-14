@@ -3,9 +3,12 @@ using System.Runtime.InteropServices;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Silk.NET.WebGPU;
+using Silk.NET.WebGPU.Extensions.WGPU;
+using Solaris.RHI;
+using Solaris.Wgpu;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
-using XNOEdit.Renderer.Wgpu;
+using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer.Renderers
 {
@@ -45,30 +48,29 @@ namespace XNOEdit.Renderer.Renderers
 
     public unsafe class InstancedModelRenderer : WgpuRenderer<InstancedModelParameters>
     {
-        private readonly Device* _device;
+        private readonly SlDevice _device;
         private readonly Model _model;
 
-        private WgpuBuffer<InstanceData>? _instanceBuffer;
+        private SlBuffer<InstanceData>? _instanceBuffer;
         private InstanceData[] _instances = [];
 
         public int InstanceCount => _instances.Length;
 
         public InstancedModelRenderer(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk? textureListChunk,
             EffectListChunk? effectListChunk,
             ArcFile? shaderArchive)
-            : base(wgpu, CreateShader(wgpu, device))
+            : base(device, CreateShader(device))
         {
             _device = device;
-            _model = new Model(wgpu, device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (InstancedModelShader)Shader);
+            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (InstancedModelShader)Shader);
         }
 
-        private static InstancedModelShader CreateShader(WebGPU wgpu, WgpuDevice device)
+        private static InstancedModelShader CreateShader(SlDevice device)
         {
-            return new InstancedModelShader(wgpu, device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/InstancedModel.wgsl"));
+            return new InstancedModelShader(device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/InstancedModel.wgsl"));
         }
 
         public void SetInstances(InstanceData[] instances)
@@ -82,45 +84,11 @@ namespace XNOEdit.Renderer.Renderers
                 return;
             }
 
-            _instanceBuffer = new WgpuBuffer<InstanceData>(
-                Wgpu,
-                _device,
-                instances,
-                BufferUsage.Vertex | BufferUsage.CopyDst);
-        }
-
-        public void SetInstances(IEnumerable<(Vector3 position, Quaternion rotation)> transforms)
-        {
-            var instances = transforms
-                .Select(t => InstanceData.Create(t.position, t.rotation))
-                .ToArray();
-
-            SetInstances(instances);
-        }
-
-        public void SetInstances(IEnumerable<(Vector3 position, Quaternion rotation, Vector3 scale)> transforms)
-        {
-            var instances = transforms
-                .Select(t => InstanceData.Create(t.position, t.rotation, t.scale))
-                .ToArray();
-
-            SetInstances(instances);
-        }
-
-        public void UpdateInstance(int index, InstanceData data)
-        {
-            if (_instanceBuffer == null || index < 0 || index >= _instances.Length)
-                return;
-
-            _instances[index] = data;
-
-            var queue = Wgpu.DeviceGetQueue(_device);
-            _instanceBuffer.UpdateData(queue, index, in data);
-            Wgpu.QueueRelease(queue);
+            _instanceBuffer = _device.CreateBuffer(instances, SlBufferUsage.Vertex | SlBufferUsage.CopyDst);
         }
 
         public override void Draw(
-            Queue* queue,
+            SlQueue queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
@@ -148,13 +116,16 @@ namespace XNOEdit.Renderer.Renderers
             shader.UpdatePerFrameUniforms(queue, in perFrameUniforms);
 
             var pipeline = shader.GetPipeline(parameters.CullBackfaces, parameters.Wireframe);
-            Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
+
+            // TODO: Clean this up
+            var wgpu = (Device as WgpuDevice).Wgpu;
+            wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
 
             // Bind instance buffer
-            Wgpu.RenderPassEncoderSetVertexBuffer(
+            wgpu.RenderPassEncoderSetVertexBuffer(
                 passEncoder,
                 1,
-                _instanceBuffer.Handle,
+                (Buffer*)_instanceBuffer.GetHandle(),
                 0,
                 (ulong)(_instances.Length * sizeof(InstanceData)));
 

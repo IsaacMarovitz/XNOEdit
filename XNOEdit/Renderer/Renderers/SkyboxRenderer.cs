@@ -1,7 +1,10 @@
 using System.Numerics;
 using Silk.NET.WebGPU;
+using Silk.NET.WebGPU.Extensions.WGPU;
+using Solaris.RHI;
+using Solaris.Wgpu;
 using XNOEdit.Renderer.Shaders;
-using XNOEdit.Renderer.Wgpu;
+using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer.Renderers
 {
@@ -13,10 +16,10 @@ namespace XNOEdit.Renderer.Renderers
 
     public unsafe class SkyboxRenderer : WgpuRenderer<SkyboxParameters>
     {
-        private readonly WgpuBuffer<float> _vertexBuffer;
+        private readonly SlBuffer<float> _vertexBuffer;
 
-        public SkyboxRenderer(WebGPU wgpu, WgpuDevice device)
-            : base(wgpu, CreateShader(wgpu, device))
+        public SkyboxRenderer(SlDevice device)
+            : base(device, CreateShader(device))
         {
             var vertices = new[]
             {
@@ -26,16 +29,16 @@ namespace XNOEdit.Renderer.Renderers
                 1.0f,   1.0f, 0.0f
             };
 
-            _vertexBuffer = new WgpuBuffer<float>(wgpu, device, vertices, BufferUsage.Vertex);
+            _vertexBuffer = device.CreateBuffer(vertices, SlBufferUsage.Vertex);
         }
 
-        private static SkyboxShader CreateShader(WebGPU wgpu, WgpuDevice device)
+        private static SkyboxShader CreateShader(SlDevice device)
         {
-            return new SkyboxShader(wgpu, device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/Skybox.wgsl"));
+            return new SkyboxShader(device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/Skybox.wgsl"));
         }
 
         public override void Draw(
-            Queue* queue,
+            SlQueue queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
@@ -52,9 +55,11 @@ namespace XNOEdit.Renderer.Renderers
             };
 
             ((SkyboxShader)Shader).UpdateUniforms(queue, in uniforms);
-            Wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline("default"));
-            Wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, _vertexBuffer.Handle, 0, _vertexBuffer.Size);
-            Wgpu.RenderPassEncoderDraw(passEncoder, 4, 1, 0, 0);
+            // TODO: Clean this up
+            var wgpu = (Device as WgpuDevice).Wgpu;
+            wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline("default"));
+            wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, (Buffer*)_vertexBuffer.GetHandle(), 0, _vertexBuffer.Size);
+            wgpu.RenderPassEncoderDraw(passEncoder, 4, 1, 0, 0);
         }
 
         public override void Dispose()

@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using Silk.NET.Core;
 using Silk.NET.Core.Native;
 
-namespace XNOEdit.Renderer.Wgpu
+namespace Solaris.Wgpu
 {
     internal class NSWindow
     {

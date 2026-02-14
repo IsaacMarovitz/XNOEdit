@@ -1,6 +1,6 @@
 using Silk.NET.WebGPU;
 
-namespace XNOEdit.Renderer.Wgpu
+namespace Solaris.Wgpu
 {
     public class PipelineVariantDescriptor
     {

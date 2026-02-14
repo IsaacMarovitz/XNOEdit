@@ -7,15 +7,16 @@ using SDL3;
 using Silk.NET.Core.Native;
 using Silk.NET.WebGPU;
 using Solaris.Builders;
-using XNOEdit.Renderer.Wgpu;
+using Solaris.RHI;
+using Solaris.Wgpu;
+using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
     public unsafe class ImGuiController : IDisposable
     {
-        private readonly WebGPU _wgpu;
-        private readonly WgpuDevice _device;
-        private readonly Queue* _queue;
+        private readonly SlDevice _device;
+        private readonly SlQueue _queue;
         private readonly IntPtr _window;
         private readonly uint _framesInFlight;
 
@@ -28,7 +29,7 @@ namespace XNOEdit.Renderer
 
         private BindGroup* _commonBindGroup;
 
-        private WgpuBuffer<Uniforms> _uniformsBuffer;
+        private SlBuffer<Uniforms> _uniformsBuffer;
 
         private WindowRenderBuffers _windowRenderBuffers;
 
@@ -39,17 +40,20 @@ namespace XNOEdit.Renderer
         private GetClipboardTextDelegate _getClipboardText;
         private IntPtr _clipboardText;
 
+        // TODO: Clean this up
+        private WgpuDevice _wgpuDevice => _device as WgpuDevice;
+        private WebGPU _wgpu => _wgpuDevice.Wgpu;
+
+
         public ImGuiController(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             IntPtr window,
             uint framesInFlight)
         {
-            _wgpu = wgpu;
             _device = device;
             _window = window;
             _framesInFlight = framesInFlight;
-            _queue = _wgpu.DeviceGetQueue(_device);
+            _queue = _device.GetQueue();
 
             Init();
         }
@@ -92,7 +96,7 @@ namespace XNOEdit.Renderer
                 Entries = &imageEntry
             };
 
-            var bindGroup = _wgpu.DeviceCreateBindGroup(_device, in imageDesc);
+            var bindGroup = _wgpu.DeviceCreateBindGroup(_wgpuDevice, in imageDesc);
             _textureBindGroups[id] = (IntPtr)bindGroup;
         }
 
@@ -152,7 +156,7 @@ namespace XNOEdit.Renderer
                 NextInChain = (ChainedStruct*)(&wgslDescriptor)
             };
 
-            _shaderModule = _wgpu.DeviceCreateShaderModule(_device, in descriptor);
+            _shaderModule = _wgpu.DeviceCreateShaderModule(_wgpuDevice, in descriptor);
 
             SilkMarshal.Free(src);
             SilkMarshal.Free(shaderName);
@@ -171,7 +175,7 @@ namespace XNOEdit.Renderer
                 MaxAnisotropy = 1,
             };
 
-            _fontSampler = _wgpu.DeviceCreateSampler(_device, in samplerDescriptor);
+            _fontSampler = _wgpu.DeviceCreateSampler(_wgpuDevice, in samplerDescriptor);
         }
 
         private void InitBindGroupLayouts()
@@ -217,8 +221,8 @@ namespace XNOEdit.Renderer
                 Entries = imageBgLayoutEntries,
             };
 
-            _commonBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_device, in commonBgLayoutDesc);
-            _imageBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_device, in imageBgLayoutDesc);
+            _commonBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_wgpuDevice, in commonBgLayoutDesc);
+            _imageBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_wgpuDevice, in imageBgLayoutDesc);
         }
 
         private void InitPipeline()
@@ -257,7 +261,7 @@ namespace XNOEdit.Renderer
                 Attributes = vertexAttrib
             };
 
-            var pipelineBuilder = new RenderPipelineBuilder(_wgpu, _device)
+            var pipelineBuilder = new RenderPipelineBuilder(_device)
                 .WithBindGroupLayout(_commonBindGroupLayout)
                 .WithBindGroupLayout(_imageBindGroupLayout)
                 .WithCustomBlend(new BlendState
@@ -283,7 +287,7 @@ namespace XNOEdit.Renderer
 
         private void InitUniformBuffers()
         {
-            _uniformsBuffer = WgpuBuffer<Uniforms>.CreateUniform(_wgpu, _device);
+            _uniformsBuffer = _device.CreateUniform<Uniforms>();
         }
 
         private void InitBindGroups()
@@ -293,7 +297,7 @@ namespace XNOEdit.Renderer
             bindGroupEntries[0] = new BindGroupEntry
             {
                 Binding = 0,
-                Buffer = _uniformsBuffer.Handle,
+                Buffer = (Buffer*)_uniformsBuffer.GetHandle(),
                 Offset = 0,
                 Size = (ulong)Align(sizeof(Uniforms), 16),
                 Sampler = null
@@ -315,7 +319,7 @@ namespace XNOEdit.Renderer
                 Entries = bindGroupEntries
             };
 
-            _commonBindGroup = _wgpu.DeviceCreateBindGroup(_device, in bgCommonDesc);
+            _commonBindGroup = _wgpu.DeviceCreateBindGroup(_wgpuDevice, in bgCommonDesc);
         }
 
         private void ProcessTextureRequest(ImTextureDataPtr texture)
@@ -355,7 +359,7 @@ namespace XNOEdit.Renderer
                 Usage = TextureUsage.CopyDst | TextureUsage.TextureBinding
             };
 
-            var texture = _wgpu.DeviceCreateTexture(_device, in textureDescriptor);
+            var texture = _wgpu.DeviceCreateTexture(_wgpuDevice, in textureDescriptor);
 
             TextureViewDescriptor textureViewDescriptor = new()
             {
@@ -391,7 +395,9 @@ namespace XNOEdit.Renderer
                 DepthOrArrayLayers = 1,
             };
 
-            _wgpu.QueueWriteTexture(_queue, &imageCopyTexture, pixels, (nuint)(width * height * 4), in textureDataLayout, in extent);
+            // TODO: Cleanup
+            var wgpuQueue = _queue as WgpuQueue;
+            _wgpu.QueueWriteTexture(wgpuQueue.Queue, &imageCopyTexture, pixels, (nuint)(width * height * 4), in textureDataLayout, in extent);
 
             BindImGuiTextureView(view);
 
@@ -721,8 +727,8 @@ namespace XNOEdit.Renderer
                         IndexBufferGpu: not null
                     })
                 {
-                    _wgpu.RenderPassEncoderSetVertexBuffer(encoder, 0, frameRenderBuffer.VertexBufferGpu.Handle, 0, frameRenderBuffer.VertexBufferGpu.Size);
-                    _wgpu.RenderPassEncoderSetIndexBuffer(encoder, frameRenderBuffer.IndexBufferGpu.Handle, IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferGpu.Size);
+                    _wgpu.RenderPassEncoderSetVertexBuffer(encoder, 0, (Buffer*)frameRenderBuffer.VertexBufferGpu.GetHandle(), 0, frameRenderBuffer.VertexBufferGpu.Size);
+                    _wgpu.RenderPassEncoderSetIndexBuffer(encoder, (Buffer*)frameRenderBuffer.IndexBufferGpu.GetHandle(), IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferGpu.Size);
                     uint dynamicOffsets = 0;
                     _wgpu.RenderPassEncoderSetBindGroup(encoder, 0, _commonBindGroup, 0, in dynamicOffsets);
                 }
@@ -780,7 +786,11 @@ namespace XNOEdit.Renderer
                 frameRenderBuffer.VertexBufferMemory?.Dispose();
                 frameRenderBuffer.VertexBufferGpu?.Dispose();
 
-                frameRenderBuffer.VertexBufferGpu = new WgpuBuffer<byte>(_wgpu, _device, BufferUsage.Vertex | BufferUsage.CopyDst, vertSize);
+                frameRenderBuffer.VertexBufferGpu = _device.CreateBuffer<byte>(new SlBufferDescriptor
+                {
+                    Size = vertSize,
+                    Usage = SlBufferUsage.Vertex | SlBufferUsage.CopyDst
+                });
                 frameRenderBuffer.VertexBufferMemory = GlobalMemory.Allocate((int)vertSize);
             }
 
@@ -789,7 +799,11 @@ namespace XNOEdit.Renderer
                 frameRenderBuffer.IndexBufferMemory?.Dispose();
                 frameRenderBuffer.IndexBufferGpu?.Dispose();
 
-                frameRenderBuffer.IndexBufferGpu = new WgpuBuffer<byte>(_wgpu, _device, BufferUsage.Index | BufferUsage.CopyDst, indexSize);
+                frameRenderBuffer.IndexBufferGpu = _device.CreateBuffer<byte>(new SlBufferDescriptor
+                {
+                    Size = indexSize,
+                    Usage = SlBufferUsage.Index | SlBufferUsage.CopyDst
+                });
                 frameRenderBuffer.IndexBufferMemory = GlobalMemory.Allocate((int)indexSize);
             }
         }
@@ -834,8 +848,7 @@ namespace XNOEdit.Renderer
 
             _wgpu.ShaderModuleRelease(_shaderModule);
 
-            if (_queue != null)
-                _wgpu.QueueRelease(_queue);
+            _queue?.Dispose();
         }
 
         private static int Align(int size, int align)
@@ -850,8 +863,8 @@ namespace XNOEdit.Renderer
 
         private struct FrameRenderBuffer
         {
-            public WgpuBuffer<byte>? VertexBufferGpu;
-            public WgpuBuffer<byte>? IndexBufferGpu;
+            public SlBuffer<byte>? VertexBufferGpu;
+            public SlBuffer<byte>? IndexBufferGpu;
             public GlobalMemory? VertexBufferMemory;
             public GlobalMemory? IndexBufferMemory;
         };

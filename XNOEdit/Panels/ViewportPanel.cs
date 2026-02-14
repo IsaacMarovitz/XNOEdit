@@ -2,8 +2,8 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
 using Silk.NET.WebGPU;
+using Solaris.Wgpu;
 using XNOEdit.Renderer;
-using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Panels
 {

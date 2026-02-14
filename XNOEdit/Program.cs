@@ -9,6 +9,8 @@ using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using SDL3;
 using Silk.NET.WebGPU;
+using Solaris.RHI;
+using Solaris.Wgpu;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.ModelResolver;
@@ -16,7 +18,6 @@ using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Scene;
-using XNOEdit.Renderer.Wgpu;
 using XNOEdit.Services;
 
 namespace XNOEdit
@@ -28,7 +29,7 @@ namespace XNOEdit
         private static IntPtr _window;
         private static WebGPU _wgpu;
         private static WgpuDevice _device;
-        private static Queue* _queue;
+        private static SlQueue _queue;
         private static Texture* _depthTexture;
         private static TextureView* _depthTextureView;
 
@@ -95,10 +96,10 @@ namespace XNOEdit
             CreateDepthTexture();
 
             _camera = new Camera();
-            _grid = new GridRenderer(_wgpu, _device);
-            _skybox = new SkyboxRenderer(_wgpu, _device);
+            _grid = new GridRenderer(_device);
+            _skybox = new SkyboxRenderer(_device);
 
-            var imguiController = new ImGuiController(_wgpu, _device, _window, 2);
+            var imguiController = new ImGuiController(_device, _window, 2);
             UIManager = new UIManager();
             UIManager.OnLoad(imguiController, _wgpu, _device);
             UIManager.EnvironmentPanel?.InitSunAngles(_settings);
@@ -108,7 +109,7 @@ namespace XNOEdit
             UIManager.MissionsPanel?.LoadMission += QueueMissionLoad;
 
             _textureManager = new TextureManager(_wgpu, _device, imguiController);
-            _fileLoader = new FileLoaderService(_wgpu, _device, (IntPtr)_queue);
+            _fileLoader = new FileLoaderService(_device, _queue);
 
             Logger.SetEnable(LogLevel.Debug, Configuration.DebugLogs);
 
@@ -248,7 +249,7 @@ namespace XNOEdit
         {
             _wgpu = WebGPU.GetApi();
             _device = new WgpuDevice(_wgpu, _window);
-            _queue = _wgpu.DeviceGetQueue(_device);
+            _queue = _device.GetQueue();
         }
 
         private static void CreateDepthTexture()
@@ -503,7 +504,6 @@ namespace XNOEdit
             foreach (var group in result.LoadedGroups)
             {
                 var renderer = new InstancedModelRenderer(
-                    _wgpu,
                     _device,
                     group.ObjectResult.ObjectChunk,
                     group.ObjectResult.Xno.GetChunk<TextureListChunk>(),
@@ -630,7 +630,9 @@ namespace XNOEdit
             _wgpu.RenderPassEncoderEnd(uiPass);
 
             var commandBuffer = _wgpu.CommandEncoderFinish(encoder, null);
-            _wgpu.QueueSubmit(_queue, 1, &commandBuffer);
+            // TODO: Cleanup
+            var wgpuQueue = (_queue as WgpuQueue);
+            _wgpu.QueueSubmit(wgpuQueue.Queue, 1, &commandBuffer);
 
             _wgpu.SurfacePresent(_device.GetSurface());
             _wgpu.TextureViewRelease(backbuffer);
@@ -689,9 +691,7 @@ namespace XNOEdit
                 _wgpu.TextureRelease(_depthTexture);
             }
 
-            if (_queue != null)
-                _wgpu.QueueRelease(_queue);
-
+            _queue?.Dispose();
             _device?.Dispose();
 
             SDL.DestroyWindow(_window);
@@ -812,7 +812,7 @@ namespace XNOEdit
 
             var gridSize = radius * 4.0f;
             _grid?.Dispose();
-            _grid = new GridRenderer(_wgpu, _device, gridSize);
+            _grid = new GridRenderer(_device, gridSize);
 
             ResetCamera();
         }

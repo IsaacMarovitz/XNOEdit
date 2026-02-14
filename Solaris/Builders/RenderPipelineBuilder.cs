@@ -1,14 +1,12 @@
 using Silk.NET.Core.Native;
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Wgpu;
+using Solaris.RHI;
+using Solaris.Wgpu;
 
 namespace Solaris.Builders
 {
-    public unsafe class RenderPipelineBuilder
+    public unsafe class RenderPipelineBuilder(SlDevice device)
     {
-        private readonly WebGPU _wgpu;
-        private readonly WgpuDevice _device;
-
         private ShaderModule* _shaderModule;
         private string _vertexEntry = "vs_main";
         private string _fragmentEntry = "fs_main";
@@ -26,12 +24,6 @@ namespace Solaris.Builders
         private BlendState _blendState;
 
         private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
-
-        public RenderPipelineBuilder(WebGPU wgpu, WgpuDevice device)
-        {
-            _wgpu = wgpu;
-            _device = device;
-        }
 
         public static implicit operator RenderPipeline*(RenderPipelineBuilder b) => b.Build();
 
@@ -125,6 +117,10 @@ namespace Solaris.Builders
 
         public RenderPipeline* Build()
         {
+            // TODO: Cleanup
+            var _wgpuDevice = device as WgpuDevice;
+            var _wgpu = _wgpuDevice.Wgpu;
+
             if (_shaderModule == null)
                 throw new InvalidOperationException("Shader module must be set");
 
@@ -139,12 +135,12 @@ namespace Solaris.Builders
                 {
                     layoutDesc.BindGroupLayoutCount = (uint)layouts.Length;
                     layoutDesc.BindGroupLayouts = (BindGroupLayout**)pLayouts;
-                    pipelineLayout = _wgpu.DeviceCreatePipelineLayout(_device, &layoutDesc);
+                    pipelineLayout = _wgpu.DeviceCreatePipelineLayout(_wgpuDevice, &layoutDesc);
                 }
             }
             else
             {
-                pipelineLayout = _wgpu.DeviceCreatePipelineLayout(_device, &layoutDesc);
+                pipelineLayout = _wgpu.DeviceCreatePipelineLayout(_wgpuDevice, &layoutDesc);
             }
 
             var vertexEntry = SilkMarshal.StringToPtr(_vertexEntry);
@@ -182,7 +178,7 @@ namespace Solaris.Builders
 
                 var colorTarget = new ColorTargetState
                 {
-                    Format = _device.GetSurfaceFormat(),
+                    Format = _wgpuDevice.GetSurfaceFormat(),
                     WriteMask = ColorWriteMask.All,
                     Blend = null
                 };
@@ -248,7 +244,7 @@ namespace Solaris.Builders
                     DepthStencil = _hasDepth ? &depthStencil : null
                 };
 
-                var pipeline = _wgpu.DeviceCreateRenderPipeline(_device, &pipelineDesc);
+                var pipeline = _wgpu.DeviceCreateRenderPipeline(_wgpuDevice, &pipelineDesc);
                 _wgpu.PipelineLayoutRelease(pipelineLayout);
 
                 return pipeline;

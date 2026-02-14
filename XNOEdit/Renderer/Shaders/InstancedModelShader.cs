@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Wgpu;
+using Solaris.RHI;
 
 namespace XNOEdit.Renderer.Shaders
 {
@@ -9,10 +9,9 @@ namespace XNOEdit.Renderer.Shaders
         private GCHandle _instanceAttributes;
 
         public InstancedModelShader(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             string shaderSource)
-            : base(wgpu, device, shaderSource)
+            : base(device, shaderSource)
         {
         }
 

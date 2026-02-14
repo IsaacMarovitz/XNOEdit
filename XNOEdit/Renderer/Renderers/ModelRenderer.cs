@@ -2,9 +2,11 @@ using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Silk.NET.WebGPU;
+using Silk.NET.WebGPU.Extensions.WGPU;
+using Solaris.RHI;
+using Solaris.Wgpu;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
-using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer.Renderers
 {
@@ -25,15 +27,14 @@ namespace XNOEdit.Renderer.Renderers
         private readonly Model _model;
 
         public ModelRenderer(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
             ArcFile shaderArchive)
-            : base(wgpu, CreateShader(wgpu, device))
+            : base(device, CreateShader(device))
         {
-            _model = new Model(wgpu, device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (ModelShader)Shader);
+            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (ModelShader)Shader);
         }
 
         public bool GetVisible() => _model.GetAnyMeshVisible();
@@ -46,13 +47,13 @@ namespace XNOEdit.Renderer.Renderers
             _model.SetVisible(subobject, meshSet, visibility);
         }
 
-        private static ModelShader CreateShader(WebGPU wgpu, WgpuDevice device)
+        private static ModelShader CreateShader(SlDevice device)
         {
-            return new ModelShader(wgpu, device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/Model.wgsl"));
+            return new ModelShader(device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/Model.wgsl"));
         }
 
         public override void Draw(
-            Queue* queue,
+            SlQueue queue,
             RenderPassEncoder* passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
@@ -77,7 +78,8 @@ namespace XNOEdit.Renderer.Renderers
             modelShader.UpdatePerFrameUniforms(queue, in perFrameUniforms);
 
             var pipeline = modelShader.GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
-            Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
+            // TODO: Clean this up
+            (Device as WgpuDevice).Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
 
             _model.Draw(passEncoder, modelParameters.Wireframe, modelParameters.TextureManager, modelShader);
         }

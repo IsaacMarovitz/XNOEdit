@@ -1,7 +1,8 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Wgpu;
+using Solaris.RHI;
+using Solaris.Wgpu;
 
 namespace XNOEdit.Renderer.Shaders
 {
@@ -19,11 +20,9 @@ namespace XNOEdit.Renderer.Shaders
     public unsafe class GridShader : WgpuShader<GridUniforms>
     {
         public GridShader(
-            WebGPU wgpu,
-            WgpuDevice device,
+            SlDevice device,
             string shaderSource)
             : base(
-                wgpu,
                 device,
                 shaderSource,
                 "Grid Shader",
