@@ -186,6 +186,7 @@ namespace XNOEdit.Renderer.Shaders
             var entry = new SlBindGroupLayoutEntry
             {
                 Binding = 0,
+                Type = SlBindingType.Buffer,
                 Visibility = SlShaderStage.Vertex | SlShaderStage.Fragment,
                 BufferType = SlBufferBindingType.Uniform
             };
@@ -230,6 +231,7 @@ namespace XNOEdit.Renderer.Shaders
             {
                 Binding = 0,
                 Visibility = SlShaderStage.Fragment,
+                Type = SlBindingType.Sampler,
                 SamplerType = SlSamplerBindingType.Filtering
             };
 
@@ -237,6 +239,7 @@ namespace XNOEdit.Renderer.Shaders
             {
                 Binding = 1,
                 Visibility = SlShaderStage.Fragment,
+                Type = SlBindingType.Texture,
                 TextureSampleType = SlTextureSampleType.Float,
                 TextureDimension = SlTextureViewDimension.Dimension2D
             };
@@ -245,6 +248,7 @@ namespace XNOEdit.Renderer.Shaders
             {
                 Binding = 2,
                 Visibility = SlShaderStage.Fragment,
+                Type = SlBindingType.Texture,
                 TextureSampleType = SlTextureSampleType.Float,
                 TextureDimension = SlTextureViewDimension.Dimension2D
             };
@@ -253,6 +257,7 @@ namespace XNOEdit.Renderer.Shaders
             {
                 Binding = 3,
                 Visibility = SlShaderStage.Fragment,
+                Type = SlBindingType.Texture,
                 TextureSampleType = SlTextureSampleType.Float,
                 TextureDimension = SlTextureViewDimension.Dimension2D
             };
@@ -261,6 +266,7 @@ namespace XNOEdit.Renderer.Shaders
             {
                 Binding = 4,
                 Visibility = SlShaderStage.Fragment,
+                Type = SlBindingType.Texture,
                 TextureSampleType = SlTextureSampleType.Float,
                 TextureDimension = SlTextureViewDimension.Dimension2D
             };

@@ -54,7 +54,7 @@ namespace XNOEdit.Renderer.Renderers
 
             passEncoder.SetPipeline(Shader.GetPipeline());
             passEncoder.SetVertexBuffer(0, _vertexBuffer);
-            passEncoder.DrawIndexed(4);
+            passEncoder.Draw(4);
         }
 
         public override void Dispose()

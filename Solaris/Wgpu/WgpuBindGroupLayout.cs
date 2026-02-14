@@ -27,6 +27,8 @@ namespace Solaris.Wgpu
 
                 switch (src.Type)
                 {
+                    case SlBindingType.Invalid:
+                        throw new ArgumentException("Binding type must be set!");
                     case SlBindingType.Buffer:
                         entries[i].Buffer = new BufferBindingLayout
                         {

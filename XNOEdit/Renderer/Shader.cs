@@ -145,7 +145,7 @@ namespace XNOEdit.Renderer
             // Release all bind groups and layouts
             foreach (var bindGroup in _bindGroups)
             {
-                bindGroup.Dispose();
+                bindGroup?.Dispose();
             }
 
             foreach (var layout in _bindGroupLayouts)

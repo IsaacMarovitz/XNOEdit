@@ -296,6 +296,7 @@ namespace Solaris.RHI
 
     public enum SlBindingType
     {
+        Invalid,
         Buffer,
         Texture,
         Sampler,

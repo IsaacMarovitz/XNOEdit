@@ -23,6 +23,7 @@ namespace Solaris.Builders
             {
                 Binding = binding,
                 Visibility = visibility,
+                Type = SlBindingType.Buffer,
                 BufferType = SlBufferBindingType.Uniform
             });
 
@@ -50,6 +51,7 @@ namespace Solaris.Builders
             {
                 Binding = binding,
                 Visibility = visibility,
+                Type = SlBindingType.Buffer,
                 BufferType = readOnly ? SlBufferBindingType.ReadOnlyStorage : SlBufferBindingType.Storage,
             });
 
@@ -78,6 +80,7 @@ namespace Solaris.Builders
             {
                 Binding = binding,
                 Visibility = visibility,
+                Type = SlBindingType.Texture,
                 TextureSampleType = sampleType,
                 TextureDimension = dimension
             });
@@ -101,6 +104,7 @@ namespace Solaris.Builders
             {
                 Binding = binding,
                 Visibility = visibility,
+                Type = SlBindingType.Sampler,
                 SamplerType = type,
             });
 
