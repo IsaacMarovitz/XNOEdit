@@ -21,7 +21,7 @@ namespace XNOEdit.Renderer
         private readonly uint _framesInFlight;
 
         private ShaderModule* _shaderModule;
-        private Sampler* _fontSampler;
+        private SlSampler _fontSampler;
 
         private BindGroupLayout* _commonBindGroupLayout;
         private BindGroupLayout* _imageBindGroupLayout;
@@ -70,9 +70,9 @@ namespace XNOEdit.Renderer
             DrawImGui(encoder);
         }
 
-        public void BindImGuiTextureView(TextureView* view)
+        public void BindImGuiTextureView(SlTextureView view)
         {
-            var id = (nint)view;
+            var id = (nint)view.GetHandle();
 
             if (_textureBindGroups.TryGetValue(id, out var existing))
             {
@@ -86,7 +86,7 @@ namespace XNOEdit.Renderer
                 Offset = 0,
                 Size = 0,
                 Sampler = null,
-                TextureView = view,
+                TextureView = (TextureView*)view.GetHandle(),
             };
 
             BindGroupDescriptor imageDesc = new()
@@ -100,9 +100,9 @@ namespace XNOEdit.Renderer
             _textureBindGroups[id] = (IntPtr)bindGroup;
         }
 
-        public void UnbindImGuiTextureView(TextureView* view)
+        public void UnbindImGuiTextureView(IntPtr view)
         {
-            if (_textureBindGroups.Remove((IntPtr)view, out var bindGroup))
+            if (_textureBindGroups.Remove(view, out var bindGroup))
             {
                 _wgpu.BindGroupRelease((BindGroup*)bindGroup);
             }
@@ -164,18 +164,18 @@ namespace XNOEdit.Renderer
 
         private void InitSampler()
         {
-            SamplerDescriptor samplerDescriptor = new()
+            SlSamplerDescriptor samplerDescriptor = new()
             {
-                MinFilter = FilterMode.Linear,
-                MagFilter = FilterMode.Linear,
-                MipmapFilter = MipmapFilterMode.Linear,
-                AddressModeU = AddressMode.Repeat,
-                AddressModeV = AddressMode.Repeat,
-                AddressModeW = AddressMode.Repeat,
+                MinFilter = SlFilterMode.Linear,
+                MagFilter = SlFilterMode.Linear,
+                MipmapFilter = SlFilterMode.Linear,
+                AddressModeU = SlAddressMode.Repeat,
+                AddressModeV = SlAddressMode.Repeat,
+                AddressModeW = SlAddressMode.Repeat,
                 MaxAnisotropy = 1,
             };
 
-            _fontSampler = _wgpu.DeviceCreateSampler(_wgpuDevice, in samplerDescriptor);
+            _fontSampler = _device.CreateSampler(samplerDescriptor);
         }
 
         private void InitBindGroupLayouts()
@@ -309,7 +309,7 @@ namespace XNOEdit.Renderer
                 Buffer = null,
                 Offset = 0,
                 Size = 0,
-                Sampler = _fontSampler
+                Sampler = (Sampler*)_fontSampler.GetHandle()
             };
 
             BindGroupDescriptor bgCommonDesc = new()
@@ -344,66 +344,62 @@ namespace XNOEdit.Renderer
             var height = tex.Height;
             var pixels = (byte*)tex.GetPixels();
 
-            TextureDescriptor textureDescriptor = new()
+            SlTextureDescriptor textureDescriptor = new()
             {
-                Dimension = TextureDimension.Dimension2D,
-                Size = new Extent3D
+                Dimension = SlTextureDimension.Dimension2D,
+                Size = new SlExtent3D
                 {
                     Width = (uint)width,
                     Height = (uint)height,
                     DepthOrArrayLayers = 1,
                 },
                 SampleCount = 1,
-                Format = TextureFormat.Rgba8Unorm,
+                Format = SlTextureFormat.Rgba8Unorm,
                 MipLevelCount = 1,
-                Usage = TextureUsage.CopyDst | TextureUsage.TextureBinding
+                Usage = SlTextureUsage.CopyDst | SlTextureUsage.TextureBinding
             };
 
-            var texture = _wgpu.DeviceCreateTexture(_wgpuDevice, in textureDescriptor);
+            var texture = _device.CreateTexture(textureDescriptor);
 
-            TextureViewDescriptor textureViewDescriptor = new()
+            SlTextureViewDescriptor textureViewDescriptor = new()
             {
-                Dimension = TextureViewDimension.Dimension2D,
-                Format = TextureFormat.Rgba8Unorm,
+                Dimension = SlTextureViewDimension.Dimension2D,
+                Format = SlTextureFormat.Rgba8Unorm,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,
                 BaseArrayLayer = 0,
-                ArrayLayerCount = 1,
-                Aspect = TextureAspect.All
+                ArrayLayerCount = 1
             };
 
-            var view = _wgpu.TextureCreateView(texture, in textureViewDescriptor);
+            var view = texture.CreateTextureView(textureViewDescriptor);
 
-            ImageCopyTexture imageCopyTexture = new()
+            SlCopyTextureDescriptor imageCopyTexture = new()
             {
                 Texture = texture,
-                MipLevel = 0,
-                Aspect = TextureAspect.All,
+                MipLevel = 0
             };
 
-            TextureDataLayout textureDataLayout = new()
+            SlTextureDataLayout textureDataLayout = new()
             {
                 Offset = 0,
                 BytesPerRow = (uint)(width * 4),
                 RowsPerImage = (uint)height,
             };
 
-            Extent3D extent = new()
+            SlExtent3D extent = new()
             {
                 Height = (uint)height,
                 Width = (uint)width,
                 DepthOrArrayLayers = 1,
             };
 
-            // TODO: Cleanup
-            var wgpuQueue = _queue as WgpuQueue;
-            _wgpu.QueueWriteTexture(wgpuQueue.Queue, &imageCopyTexture, pixels, (nuint)(width * height * 4), in textureDataLayout, in extent);
+            _queue.WriteTexture(imageCopyTexture, pixels, (nuint)(width * height * 4), textureDataLayout, extent);
 
             BindImGuiTextureView(view);
 
-            _gpuTextures[(IntPtr)view] = (IntPtr)texture;
+            _gpuTextures[(IntPtr)view.GetHandle()] = (IntPtr)texture.GetHandle();
 
-            tex.SetTexID(view);
+            tex.SetTexID(view.GetHandle());
             tex.SetStatus(ImTextureStatus.Ok);
         }
 
@@ -420,7 +416,7 @@ namespace XNOEdit.Renderer
 
             if (id != 0)
             {
-                UnbindImGuiTextureView((TextureView*)id);
+                UnbindImGuiTextureView(id);
 
                 if (_gpuTextures.Remove(id, out var texture))
                 {
@@ -844,7 +840,7 @@ namespace XNOEdit.Renderer
             _wgpu.BindGroupLayoutRelease(_commonBindGroupLayout);
             _wgpu.BindGroupLayoutRelease(_imageBindGroupLayout);
 
-            _wgpu.SamplerRelease(_fontSampler);
+            _fontSampler?.Dispose();
 
             _wgpu.ShaderModuleRelease(_shaderModule);
 

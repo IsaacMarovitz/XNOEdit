@@ -2,7 +2,7 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Silk.NET.WebGPU;
-using Solaris.Wgpu;
+using Solaris.RHI;
 using XNOEdit.Fonts;
 using XNOEdit.Logging;
 using XNOEdit.Panels;
@@ -44,14 +44,14 @@ namespace XNOEdit.Managers
 
         private ImFontPtr _faFont;
 
-        public unsafe void OnLoad(ImGuiController controller, WebGPU wgpu, WgpuDevice device)
+        public unsafe void OnLoad(ImGuiController controller, SlDevice device)
         {
             Controller = controller;
             _alertPanel = new AlertPanel();
             ObjectsPanel = new ObjectsPanel();
             StagesPanel = new StagesPanel(this);
             MissionsPanel = new MissionsPanel();
-            ViewportPanel = new ViewportPanel(wgpu, device, controller);
+            ViewportPanel = new ViewportPanel(device, controller);
             EnvironmentPanel = new EnvironmentPanel(this);
 
             var io = ImGui.GetIO();

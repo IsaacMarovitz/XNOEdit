@@ -1,14 +1,14 @@
-using Silk.NET.WebGPU;
+using Solaris.RHI;
 
 namespace XNOEdit.Services
 {
-    public unsafe struct LoadedTexture
+    public struct LoadedTexture
     {
-        public string Name;
-        public Texture* Texture;
-        public TextureView* View;
+        public readonly string Name;
+        public readonly SlTexture Texture;
+        public readonly SlTextureView View;
 
-        public LoadedTexture(string name, Texture* texture, TextureView* view)
+        public LoadedTexture(string name, SlTexture texture, SlTextureView view)
         {
             Name = name;
             Texture = texture;

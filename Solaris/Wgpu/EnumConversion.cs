@@ -3,7 +3,7 @@ using Solaris.RHI;
 
 namespace Solaris.Wgpu
 {
-    internal static class EnumConversion
+    public static class EnumConversion
     {
         public static BufferUsage Convert(this SlBufferUsage usage)
         {
@@ -68,6 +68,120 @@ namespace Solaris.Wgpu
                 SlCompareFunction.NotEqual => CompareFunction.NotEqual,
                 SlCompareFunction.Always => CompareFunction.Always,
                 _ => throw new ArgumentOutOfRangeException(nameof(compareFunction), compareFunction, null)
+            };
+        }
+
+        public static TextureDimension Convert(this SlTextureDimension textureDimension)
+        {
+            return textureDimension switch
+            {
+                SlTextureDimension.Dimension1D => TextureDimension.Dimension1D,
+                SlTextureDimension.Dimension2D => TextureDimension.Dimension2D,
+                SlTextureDimension.Dimension3D => TextureDimension.Dimension3D,
+                _ => throw new ArgumentOutOfRangeException(nameof(textureDimension), textureDimension, null)
+            };
+        }
+
+        public static TextureViewDimension Convert(this SlTextureViewDimension textureViewDimension)
+        {
+            return textureViewDimension switch
+            {
+                SlTextureViewDimension.DimensionUndefined => TextureViewDimension.DimensionUndefined,
+                SlTextureViewDimension.Dimension1D => TextureViewDimension.Dimension1D,
+                SlTextureViewDimension.Dimension2D => TextureViewDimension.Dimension2D,
+                SlTextureViewDimension.Dimension2DArray => TextureViewDimension.Dimension2DArray,
+                SlTextureViewDimension.DimensionCube => TextureViewDimension.DimensionCube,
+                SlTextureViewDimension.DimensionCubeArray => TextureViewDimension.DimensionCubeArray,
+                SlTextureViewDimension.Dimension3D => TextureViewDimension.Dimension3D,
+                _ => throw new ArgumentOutOfRangeException(nameof(textureViewDimension), textureViewDimension, null)
+            };
+        }
+
+        public static TextureUsage Convert(this SlTextureUsage usage)
+        {
+            var result = TextureUsage.None;
+
+            if (usage.HasFlag(SlTextureUsage.CopySrc)) result |= TextureUsage.CopySrc;
+            if (usage.HasFlag(SlTextureUsage.CopyDst)) result |= TextureUsage.CopyDst;
+            if (usage.HasFlag(SlTextureUsage.TextureBinding)) result |= TextureUsage.TextureBinding;
+            if (usage.HasFlag(SlTextureUsage.StorageBinding)) result |= TextureUsage.StorageBinding;
+            if (usage.HasFlag(SlTextureUsage.RenderAttachment)) result |= TextureUsage.RenderAttachment;
+
+            return result;
+        }
+
+        public static TextureFormat Convert(this SlTextureFormat format)
+        {
+            return format switch
+            {
+                SlTextureFormat.R8Unorm => TextureFormat.R8Unorm,
+                SlTextureFormat.R8Snorm => TextureFormat.R8Snorm,
+                SlTextureFormat.R8Uint => TextureFormat.R8Uint,
+                SlTextureFormat.R8Sint => TextureFormat.R8Sint,
+                SlTextureFormat.R16Uint => TextureFormat.R16Uint,
+                SlTextureFormat.R16Sint => TextureFormat.R16Sint,
+                SlTextureFormat.R16float => TextureFormat.R16float,
+                SlTextureFormat.RG8Unorm => TextureFormat.RG8Unorm,
+                SlTextureFormat.RG8Snorm => TextureFormat.RG8Snorm,
+                SlTextureFormat.RG8Uint => TextureFormat.RG8Uint,
+                SlTextureFormat.RG8Sint => TextureFormat.RG8Sint,
+                SlTextureFormat.R32float => TextureFormat.R32float,
+                SlTextureFormat.R32Uint => TextureFormat.R32Uint,
+                SlTextureFormat.R32Sint => TextureFormat.R32Sint,
+                SlTextureFormat.RG16Uint => TextureFormat.RG16Uint,
+                SlTextureFormat.RG16Sint => TextureFormat.RG16Sint,
+                SlTextureFormat.RG16float => TextureFormat.RG16float,
+                SlTextureFormat.Rgba8Unorm => TextureFormat.Rgba8Unorm,
+                SlTextureFormat.Rgba8UnormSrgb => TextureFormat.Rgba8UnormSrgb,
+                SlTextureFormat.Rgba8Snorm => TextureFormat.Rgba8Snorm,
+                SlTextureFormat.Rgba8Uint => TextureFormat.Rgba8Uint,
+                SlTextureFormat.Rgba8Sint => TextureFormat.Rgba8Sint,
+                SlTextureFormat.Bgra8Unorm => TextureFormat.Bgra8Unorm,
+                SlTextureFormat.Bgra8UnormSrgb => TextureFormat.Bgra8UnormSrgb,
+                SlTextureFormat.Rgba16Uint => TextureFormat.Rgba16Uint,
+                SlTextureFormat.Rgba16Sint => TextureFormat.Rgba16Sint,
+                SlTextureFormat.Rgba16float => TextureFormat.Rgba16float,
+                SlTextureFormat.Rgba32float => TextureFormat.Rgba32float,
+                SlTextureFormat.Rgba32Uint => TextureFormat.Rgba32Uint,
+                SlTextureFormat.Rgba32Sint => TextureFormat.Rgba32Sint,
+                SlTextureFormat.Stencil8 => TextureFormat.Stencil8,
+                SlTextureFormat.Depth16Unorm => TextureFormat.Depth16Unorm,
+                SlTextureFormat.Depth24Plus => TextureFormat.Depth24Plus,
+                SlTextureFormat.Depth24PlusStencil8 => TextureFormat.Depth24PlusStencil8,
+                SlTextureFormat.Depth32float => TextureFormat.Depth32float,
+                SlTextureFormat.Depth32floatStencil8 => TextureFormat.Depth32floatStencil8,
+                _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
+            };
+        }
+
+        public static AddressMode Convert(this SlAddressMode addressMode)
+        {
+            return addressMode switch
+            {
+                SlAddressMode.Repeat => AddressMode.Repeat,
+                SlAddressMode.MirrorRepeat => AddressMode.MirrorRepeat,
+                SlAddressMode.ClampToEdge => AddressMode.ClampToEdge,
+                _ => throw new ArgumentOutOfRangeException(nameof(addressMode), addressMode, null)
+            };
+        }
+
+        public static FilterMode Convert(this SlFilterMode filterMode)
+        {
+            return filterMode switch
+            {
+                SlFilterMode.Nearest => FilterMode.Nearest,
+                SlFilterMode.Linear => FilterMode.Linear,
+                _ => throw new ArgumentOutOfRangeException(nameof(filterMode), filterMode, null)
+            };
+        }
+
+        public static MipmapFilterMode MipmapConvert(this SlFilterMode filterMode)
+        {
+            return filterMode switch
+            {
+                SlFilterMode.Nearest => MipmapFilterMode.Nearest,
+                SlFilterMode.Linear => MipmapFilterMode.Linear,
+                _ => throw new ArgumentOutOfRangeException(nameof(filterMode), filterMode, null)
             };
         }
     }

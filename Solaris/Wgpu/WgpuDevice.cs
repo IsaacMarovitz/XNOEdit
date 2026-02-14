@@ -12,7 +12,6 @@ namespace Solaris.Wgpu
         private readonly Surface* _surface;
         private readonly Instance* _instance;
         private readonly Adapter* _adapter;
-        private readonly TextureFormat _surfaceFormat = TextureFormat.Bgra8Unorm;
 
         public readonly WebGPU Wgpu;
         private Device* Device { get; }
@@ -98,7 +97,7 @@ namespace Solaris.Wgpu
             var surfaceConfig = new SurfaceConfiguration
             {
                 Device = Device,
-                Format = _surfaceFormat,
+                Format = TextureFormat.Bgra8Unorm,
                 Usage = TextureUsage.RenderAttachment,
                 Width = (uint)width,
                 Height = (uint)height,
@@ -114,14 +113,49 @@ namespace Solaris.Wgpu
             return _surface;
         }
 
-        public TextureFormat GetSurfaceFormat()
-        {
-            return _surfaceFormat;
-        }
-
         public override SlQueue GetQueue()
         {
             return new WgpuQueue(Wgpu, Wgpu.DeviceGetQueue(Device));
+        }
+
+        public override SlTexture CreateTexture(SlTextureDescriptor descriptor)
+        {
+            var wgpuDescriptor = new TextureDescriptor
+            {
+                Size = new Extent3D
+                {
+                    Width = descriptor.Size.Width,
+                    Height = descriptor.Size.Height,
+                    DepthOrArrayLayers = descriptor.Size.DepthOrArrayLayers
+                },
+                MipLevelCount = descriptor.MipLevelCount,
+                SampleCount = descriptor.SampleCount,
+                Dimension = descriptor.Dimension.Convert(),
+                Format = descriptor.Format.Convert(),
+                Usage = descriptor.Usage.Convert(),
+            };
+
+            var texture = Wgpu.DeviceCreateTexture(Device, &wgpuDescriptor);
+            return new WgpuTexture(Wgpu, texture);
+        }
+
+        public override SlSampler CreateSampler(SlSamplerDescriptor descriptor)
+        {
+            var wgpuDescriptor = new SamplerDescriptor
+            {
+                AddressModeU = descriptor.AddressModeU.Convert(),
+                AddressModeV = descriptor.AddressModeV.Convert(),
+                AddressModeW = descriptor.AddressModeW.Convert(),
+                MagFilter = descriptor.MagFilter.Convert(),
+                MinFilter = descriptor.MinFilter.Convert(),
+                MipmapFilter = descriptor.MipmapFilter.MipmapConvert(),
+                LodMaxClamp = descriptor.LodMaxClamp,
+                LodMinClamp = descriptor.LodMinClamp,
+                MaxAnisotropy = descriptor.MaxAnisotropy,
+            };
+
+            var sampler = Wgpu.DeviceCreateSampler(Device, &wgpuDescriptor);
+            return new WgpuSampler(Wgpu, sampler);
         }
 
         public override SlBuffer<T> CreateBuffer<T>(Span<T> data, SlBufferUsage usage)

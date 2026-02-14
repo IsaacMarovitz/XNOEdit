@@ -9,6 +9,7 @@ using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using SDL3;
 using Silk.NET.WebGPU;
+using Silk.NET.WebGPU.Extensions.WGPU;
 using Solaris.RHI;
 using Solaris.Wgpu;
 using XNOEdit.Logging;
@@ -19,6 +20,7 @@ using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
 using XNOEdit.Renderer.Scene;
 using XNOEdit.Services;
+using LogLevel = XNOEdit.Logging.LogLevel;
 
 namespace XNOEdit
 {
@@ -27,11 +29,10 @@ namespace XNOEdit
         public static event Action? GameFolderLoaded;
 
         private static IntPtr _window;
-        private static WebGPU _wgpu;
-        private static WgpuDevice _device;
+        private static SlDevice _device;
         private static SlQueue _queue;
-        private static Texture* _depthTexture;
-        private static TextureView* _depthTextureView;
+        private static SlTexture _depthTexture;
+        private static SlTextureView _depthTextureView;
 
         private static Camera? _camera;
         private static ArcFile? _shaderArchive;
@@ -52,7 +53,7 @@ namespace XNOEdit
         private static float _deltaTime;
         private static bool _mouseCaptured;
         private static Vector2 _captureStartPosition;
-        private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
+        private const SlTextureFormat DepthTextureFormat = SlTextureFormat.Depth32float;
 
         private static void Main(string[] args)
         {
@@ -101,14 +102,14 @@ namespace XNOEdit
 
             var imguiController = new ImGuiController(_device, _window, 2);
             UIManager = new UIManager();
-            UIManager.OnLoad(imguiController, _wgpu, _device);
+            UIManager.OnLoad(imguiController, _device);
             UIManager.EnvironmentPanel?.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
             UIManager.ObjectsPanel?.LoadObject += QueueObjectLoad;
             UIManager.StagesPanel?.LoadStage += QueueStageLoad;
             UIManager.MissionsPanel?.LoadMission += QueueMissionLoad;
 
-            _textureManager = new TextureManager(_wgpu, _device, imguiController);
+            _textureManager = new TextureManager(imguiController);
             _fileLoader = new FileLoaderService(_device, _queue);
 
             Logger.SetEnable(LogLevel.Debug, Configuration.DebugLogs);
@@ -247,8 +248,7 @@ namespace XNOEdit
 
         private static void InitializeWgpu()
         {
-            _wgpu = WebGPU.GetApi();
-            _device = new WgpuDevice(_wgpu, _window);
+            _device = new WgpuDevice(WebGPU.GetApi(), _window);
             _queue = _device.GetQueue();
         }
 
@@ -256,30 +256,29 @@ namespace XNOEdit
         {
             SDL.GetWindowSize(_window, out var width, out var height);
 
-            var depthTextureDesc = new TextureDescriptor
+            var depthTextureDesc = new SlTextureDescriptor
             {
-                Size = new Extent3D { Width = (uint)width, Height = (uint)height, DepthOrArrayLayers = 1 },
+                Size = new SlExtent3D { Width = (uint)width, Height = (uint)height, DepthOrArrayLayers = 1 },
                 MipLevelCount = 1,
                 SampleCount = 1,
-                Dimension = TextureDimension.Dimension2D,
+                Dimension = SlTextureDimension.Dimension2D,
                 Format = DepthTextureFormat,
-                Usage = TextureUsage.RenderAttachment
+                Usage = SlTextureUsage.RenderAttachment
             };
 
-            _depthTexture = _wgpu.DeviceCreateTexture(_device, &depthTextureDesc);
+            _depthTexture = _device.CreateTexture(depthTextureDesc);
 
-            var depthViewDesc = new TextureViewDescriptor
+            var depthViewDesc = new SlTextureViewDescriptor
             {
                 Format = DepthTextureFormat,
-                Dimension = TextureViewDimension.Dimension2D,
+                Dimension = SlTextureViewDimension.Dimension2D,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,
                 BaseArrayLayer = 0,
-                ArrayLayerCount = 1,
-                Aspect = TextureAspect.All
+                ArrayLayerCount = 1
             };
 
-            _depthTextureView = _wgpu.TextureCreateView(_depthTexture, &depthViewDesc);
+            _depthTextureView = _depthTexture.CreateTextureView(depthViewDesc);
         }
 
         private static void OnRenderSettingsChanged(SettingsToggle toggle)
@@ -536,8 +535,12 @@ namespace XNOEdit
 
         private static void OnRender(double deltaTime)
         {
+            // TODO: Cleanup
+            var wgpuDevice = (_device as WgpuDevice);
+            var wgpu = wgpuDevice.Wgpu;
+
             SurfaceTexture surfaceTexture;
-            _wgpu.SurfaceGetCurrentTexture(_device.GetSurface(), &surfaceTexture);
+            wgpu.SurfaceGetCurrentTexture(wgpuDevice.GetSurface(), &surfaceTexture);
 
             if (surfaceTexture.Status != SurfaceGetCurrentTextureStatus.Success)
             {
@@ -550,7 +553,7 @@ namespace XNOEdit
             }
 
             var commandEncoderDesc = new CommandEncoderDescriptor();
-            var encoder = _wgpu.DeviceCreateCommandEncoder(_device, &commandEncoderDesc);
+            var encoder = wgpu.DeviceCreateCommandEncoder(wgpuDevice, &commandEncoderDesc);
 
             UIManager.ViewportPanel.PrepareFrame();
 
@@ -590,21 +593,20 @@ namespace XNOEdit
                     Lightmap = _settings.Lightmap,
                 });
 
-            _wgpu.RenderPassEncoderEnd(scenePass);
-            _wgpu.RenderPassEncoderRelease(scenePass);
+            wgpu.RenderPassEncoderEnd(scenePass);
+            wgpu.RenderPassEncoderRelease(scenePass);
 
             var textureViewDesc = new TextureViewDescriptor
             {
-                Format = _device.GetSurfaceFormat(),
+                Format = _device.SurfaceFormat.Convert(),
                 Dimension = TextureViewDimension.Dimension2D,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,
                 BaseArrayLayer = 0,
                 ArrayLayerCount = 1,
-                Aspect = TextureAspect.All
             };
 
-            var backbuffer = _wgpu.TextureCreateView(surfaceTexture.Texture, &textureViewDesc);
+            var backbuffer = wgpu.TextureCreateView(surfaceTexture.Texture, &textureViewDesc);
 
             var uiColorAttachment = new RenderPassColorAttachment
             {
@@ -621,32 +623,36 @@ namespace XNOEdit
                 DepthStencilAttachment = null
             };
 
-            var uiPass = _wgpu.CommandEncoderBeginRenderPass(encoder, &uiRenderPassDesc);
+            var uiPass = wgpu.CommandEncoderBeginRenderPass(encoder, &uiRenderPassDesc);
 
             UIManager.OnRender(
                 view, projection,
                 deltaTime, ref _settings, uiPass, _textureManager);
 
-            _wgpu.RenderPassEncoderEnd(uiPass);
+            wgpu.RenderPassEncoderEnd(uiPass);
 
-            var commandBuffer = _wgpu.CommandEncoderFinish(encoder, null);
+            var commandBuffer = wgpu.CommandEncoderFinish(encoder, null);
             // TODO: Cleanup
             var wgpuQueue = (_queue as WgpuQueue);
-            _wgpu.QueueSubmit(wgpuQueue.Queue, 1, &commandBuffer);
+            wgpu.QueueSubmit(wgpuQueue.Queue, 1, &commandBuffer);
 
-            _wgpu.SurfacePresent(_device.GetSurface());
-            _wgpu.TextureViewRelease(backbuffer);
-            _wgpu.CommandBufferRelease(commandBuffer);
-            _wgpu.CommandEncoderRelease(encoder);
-            _wgpu.RenderPassEncoderRelease(uiPass);
+            wgpu.SurfacePresent(wgpuDevice.GetSurface());
+            wgpu.TextureViewRelease(backbuffer);
+            wgpu.CommandBufferRelease(commandBuffer);
+            wgpu.CommandEncoderRelease(encoder);
+            wgpu.RenderPassEncoderRelease(uiPass);
         }
 
         private static void OnFramebufferResize(Vector2 size)
         {
+            // TODO: Cleanup
+            var wgpuDevice = (_device as WgpuDevice);
+            var wgpu = wgpuDevice.Wgpu;
+
             var surfaceConfig = new SurfaceConfiguration
             {
-                Device = _device,
-                Format = _device.GetSurfaceFormat(),
+                Device = wgpuDevice,
+                Format = _device.SurfaceFormat.Convert(),
                 Usage = TextureUsage.RenderAttachment,
                 Width = (uint)size.X,
                 Height = (uint)size.Y,
@@ -654,16 +660,10 @@ namespace XNOEdit
                 AlphaMode = CompositeAlphaMode.Auto
             };
 
-            _wgpu.SurfaceConfigure(_device.GetSurface(), &surfaceConfig);
+            wgpu.SurfaceConfigure(wgpuDevice.GetSurface(), &surfaceConfig);
 
-            if (_depthTextureView != null)
-                _wgpu.TextureViewRelease(_depthTextureView);
-
-            if (_depthTexture != null)
-            {
-                _wgpu.TextureDestroy(_depthTexture);
-                _wgpu.TextureRelease(_depthTexture);
-            }
+            _depthTextureView?.Dispose();
+            _depthTexture?.Dispose();
 
             CreateDepthTexture();
         }
@@ -682,15 +682,8 @@ namespace XNOEdit
 
             UIManager?.Dispose();
 
-            if (_depthTextureView != null)
-                _wgpu.TextureViewRelease(_depthTextureView);
-
-            if (_depthTexture != null)
-            {
-                _wgpu.TextureDestroy(_depthTexture);
-                _wgpu.TextureRelease(_depthTexture);
-            }
-
+            _depthTextureView?.Dispose();
+            _depthTexture?.Dispose();
             _queue?.Dispose();
             _device?.Dispose();
 

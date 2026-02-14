@@ -2,6 +2,7 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
 using Silk.NET.WebGPU;
+using Solaris.RHI;
 using Solaris.Wgpu;
 using XNOEdit.Renderer;
 
@@ -13,21 +14,19 @@ namespace XNOEdit.Panels
         public Vector2 ViewportSize { get; private set; } = new(800, 600);
         public bool IsHovered { get; private set; }
 
-        private readonly WebGPU _wgpu;
-        private readonly WgpuDevice _device;
+        private readonly SlDevice _device;
         private readonly ImGuiController _imguiController;
 
-        private Texture* _colorTexture;
-        private TextureView* _colorTextureView;
-        private Texture* _depthTexture;
-        private TextureView* _depthTextureView;
+        private SlTexture? _colorTexture;
+        private SlTextureView? _colorTextureView;
+        private SlTexture? _depthTexture;
+        private SlTextureView? _depthTextureView;
 
-        private const TextureFormat ColorTextureFormat = TextureFormat.Bgra8Unorm;
-        private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
+        private const SlTextureFormat ColorTextureFormat = SlTextureFormat.Bgra8Unorm;
+        private const SlTextureFormat DepthTextureFormat = SlTextureFormat.Depth32float;
 
-        public ViewportPanel(WebGPU wgpu, WgpuDevice device, ImGuiController imguiController)
+        public ViewportPanel(SlDevice device, ImGuiController imguiController)
         {
-            _wgpu = wgpu;
             _device = device;
             _imguiController = imguiController;
 
@@ -41,55 +40,53 @@ namespace XNOEdit.Panels
             height = Math.Max(height, 1);
 
             // Create color texture
-            var colorTextureDesc = new TextureDescriptor
+            var colorTextureDesc = new SlTextureDescriptor
             {
-                Size = new Extent3D { Width = width, Height = height, DepthOrArrayLayers = 1 },
+                Size = new SlExtent3D { Width = width, Height = height, DepthOrArrayLayers = 1 },
                 MipLevelCount = 1,
                 SampleCount = 1,
-                Dimension = TextureDimension.Dimension2D,
+                Dimension = SlTextureDimension.Dimension2D,
                 Format = ColorTextureFormat,
-                Usage = TextureUsage.RenderAttachment | TextureUsage.TextureBinding
+                Usage = SlTextureUsage.RenderAttachment | SlTextureUsage.TextureBinding
             };
 
-            _colorTexture = _wgpu.DeviceCreateTexture(_device, &colorTextureDesc);
+            _colorTexture = _device.CreateTexture(colorTextureDesc);
 
-            var colorViewDesc = new TextureViewDescriptor
+            var colorViewDesc = new SlTextureViewDescriptor
             {
                 Format = ColorTextureFormat,
-                Dimension = TextureViewDimension.Dimension2D,
+                Dimension = SlTextureViewDimension.Dimension2D,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,
                 BaseArrayLayer = 0,
-                ArrayLayerCount = 1,
-                Aspect = TextureAspect.All
+                ArrayLayerCount = 1
             };
 
-            _colorTextureView = _wgpu.TextureCreateView(_colorTexture, &colorViewDesc);
+            _colorTextureView = _colorTexture.CreateTextureView(colorViewDesc);
 
-            var depthTextureDesc = new TextureDescriptor
+            var depthTextureDesc = new SlTextureDescriptor
             {
-                Size = new Extent3D { Width = width, Height = height, DepthOrArrayLayers = 1 },
+                Size = new SlExtent3D { Width = width, Height = height, DepthOrArrayLayers = 1 },
                 MipLevelCount = 1,
                 SampleCount = 1,
-                Dimension = TextureDimension.Dimension2D,
+                Dimension = SlTextureDimension.Dimension2D,
                 Format = DepthTextureFormat,
-                Usage = TextureUsage.RenderAttachment
+                Usage = SlTextureUsage.RenderAttachment
             };
 
-            _depthTexture = _wgpu.DeviceCreateTexture(_device, &depthTextureDesc);
+            _depthTexture = _device.CreateTexture(depthTextureDesc);
 
-            var depthViewDesc = new TextureViewDescriptor
+            var depthViewDesc = new SlTextureViewDescriptor
             {
                 Format = DepthTextureFormat,
-                Dimension = TextureViewDimension.Dimension2D,
+                Dimension = SlTextureViewDimension.Dimension2D,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,
                 BaseArrayLayer = 0,
-                ArrayLayerCount = 1,
-                Aspect = TextureAspect.All
+                ArrayLayerCount = 1
             };
 
-            _depthTextureView = _wgpu.TextureCreateView(_depthTexture, &depthViewDesc);
+            _depthTextureView = _depthTexture.CreateTextureView(depthViewDesc);
             _imguiController.BindImGuiTextureView(_colorTextureView);
         }
 
@@ -97,24 +94,13 @@ namespace XNOEdit.Panels
         {
             if (_colorTextureView != null)
             {
-                _imguiController.UnbindImGuiTextureView(_colorTextureView);
-                _wgpu.TextureViewRelease(_colorTextureView);
+                _imguiController.UnbindImGuiTextureView((IntPtr)_colorTextureView.GetHandle());
+                _colorTextureView.Dispose();
             }
 
-            if (_colorTexture != null)
-            {
-                _wgpu.TextureDestroy(_colorTexture);
-                _wgpu.TextureRelease(_colorTexture);
-            }
-
-            if (_depthTextureView != null)
-                _wgpu.TextureViewRelease(_depthTextureView);
-
-            if (_depthTexture != null)
-            {
-                _wgpu.TextureDestroy(_depthTexture);
-                _wgpu.TextureRelease(_depthTexture);
-            }
+            _colorTexture?.Dispose();
+            _depthTextureView?.Dispose();
+            _depthTexture?.Dispose();
 
             _colorTexture = null;
             _colorTextureView = null;
@@ -135,9 +121,12 @@ namespace XNOEdit.Panels
 
         public RenderPassEncoder* BeginRenderPass(CommandEncoder* encoder)
         {
+            // TODO: Cleanup
+            var wgpu = (_device as WgpuDevice)!.Wgpu;
+
             var colorAttachment = new RenderPassColorAttachment
             {
-                View = _colorTextureView,
+                View = (TextureView*)_colorTextureView.GetHandle(),
                 LoadOp = LoadOp.Clear,
                 StoreOp = StoreOp.Store,
                 ClearValue = new Color { R = 0.1, G = 0.1, B = 0.1, A = 1.0 }
@@ -145,7 +134,7 @@ namespace XNOEdit.Panels
 
             var depthAttachment = new RenderPassDepthStencilAttachment
             {
-                View = _depthTextureView,
+                View = (TextureView*)_depthTextureView.GetHandle(),
                 DepthLoadOp = LoadOp.Clear,
                 DepthStoreOp = StoreOp.Store,
                 DepthClearValue = 0.0f // Reverse-Z
@@ -158,7 +147,7 @@ namespace XNOEdit.Panels
                 DepthStencilAttachment = &depthAttachment
             };
 
-            return _wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
+            return wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
         }
 
         public void Render(Matrix4x4 view, Matrix4x4 projection, bool renderGuizmos)
@@ -194,7 +183,7 @@ namespace XNOEdit.Panels
                 _pendingWidth = (uint)Math.Max(contentSize.X, 1);
                 _pendingHeight = (uint)Math.Max(contentSize.Y, 1);
 
-                ImGui.Image(new ImTextureRef(null, _colorTextureView), ViewportSize);
+                ImGui.Image(new ImTextureRef(null, _colorTextureView.GetHandle()), ViewportSize);
 
                 if (renderGuizmos)
                 {

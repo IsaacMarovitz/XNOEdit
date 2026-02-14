@@ -3,8 +3,13 @@ namespace Solaris.RHI
     public abstract class SlDevice : IDisposable
     {
         private const int UniformBufferAlignment = 256;
+        public readonly SlTextureFormat SurfaceFormat = SlTextureFormat.Bgra8Unorm;
 
         public abstract SlQueue GetQueue();
+
+        public abstract SlTexture CreateTexture(SlTextureDescriptor descriptor);
+
+        public abstract SlSampler CreateSampler(SlSamplerDescriptor descriptor);
 
         /// <summary>
         /// Create a buffer with initial data (for vertex/index buffers)
@@ -33,12 +38,5 @@ namespace Solaris.RHI
         }
 
         public abstract void Dispose();
-    }
-
-    public struct SlBufferDescriptor
-    {
-        public SlBufferUsage Usage;
-        public ulong Size;
-        public int Alignment;
     }
 }

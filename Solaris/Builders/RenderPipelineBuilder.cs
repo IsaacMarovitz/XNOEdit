@@ -178,7 +178,7 @@ namespace Solaris.Builders
 
                 var colorTarget = new ColorTargetState
                 {
-                    Format = _wgpuDevice.GetSurfaceFormat(),
+                    Format = TextureFormat.Bgra8Unorm,
                     WriteMask = ColorWriteMask.All,
                     Blend = null
                 };

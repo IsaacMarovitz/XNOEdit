@@ -5,7 +5,7 @@ namespace Solaris.Wgpu
 {
     internal unsafe class WgpuCommandBuffer : SlCommandBuffer
     {
-        private WebGPU _wgpu;
+        private readonly WebGPU _wgpu;
         public CommandBuffer* CommandBuffer { get; }
 
         internal WgpuCommandBuffer(WebGPU wgpu, CommandBuffer* commandBuffer)

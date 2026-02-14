@@ -40,9 +40,9 @@ namespace XNOEdit.Renderer.Shaders
         private SlBuffer<PerFrameUniforms>? _perFrameUniformBuffer;
         private BindGroup* _perFrameBindGroup;
 
-        private Sampler* _sampler;
-        private Texture* _defaultTexture;
-        private TextureView* _defaultTextureView;
+        private SlSampler _sampler;
+        private SlTexture _defaultTexture;
+        private SlTextureView _defaultTextureView;
 
         private BindGroupLayout* _perFrameLayout;
         private BindGroupLayout* _perMeshLayout;
@@ -91,79 +91,69 @@ namespace XNOEdit.Renderer.Shaders
 
         private void CreateSampler()
         {
-            var samplerDesc = new SamplerDescriptor
+            var samplerDesc = new SlSamplerDescriptor
             {
-                AddressModeU = AddressMode.Repeat,
-                AddressModeV = AddressMode.Repeat,
-                AddressModeW = AddressMode.Repeat,
-                MagFilter = FilterMode.Linear,
-                MinFilter = FilterMode.Linear,
-                MipmapFilter = MipmapFilterMode.Linear,
+                AddressModeU = SlAddressMode.Repeat,
+                AddressModeV = SlAddressMode.Repeat,
+                AddressModeW = SlAddressMode.Repeat,
+                MagFilter = SlFilterMode.Linear,
+                MinFilter = SlFilterMode.Linear,
+                MipmapFilter = SlFilterMode.Linear,
                 LodMinClamp = 0.0f,
                 LodMaxClamp = 32.0f,
                 MaxAnisotropy = 16
             };
 
-            // TODO: Cleanup
-            var wgpuDevice = Device as WgpuDevice;
-            _sampler = wgpuDevice.Wgpu.DeviceCreateSampler(wgpuDevice, &samplerDesc);
+            _sampler = Device.CreateSampler(samplerDesc);
         }
 
         private void CreateDefaultTexture()
         {
-            var textureDesc = new TextureDescriptor
+            var textureDesc = new SlTextureDescriptor
             {
-                Size = new Extent3D { Width = 1, Height = 1, DepthOrArrayLayers = 1 },
+                Size = new SlExtent3D { Width = 1, Height = 1, DepthOrArrayLayers = 1 },
                 MipLevelCount = 1,
                 SampleCount = 1,
-                Dimension = TextureDimension.Dimension2D,
-                Format = TextureFormat.Rgba8Unorm,
-                Usage = TextureUsage.TextureBinding | TextureUsage.CopyDst
+                Dimension = SlTextureDimension.Dimension2D,
+                Format = SlTextureFormat.Rgba8Unorm,
+                Usage = SlTextureUsage.TextureBinding | SlTextureUsage.CopyDst
             };
 
-            // TODO: Cleanup
-            var wgpuDevice = Device as WgpuDevice;
-            _defaultTexture = wgpuDevice.Wgpu.DeviceCreateTexture(wgpuDevice, &textureDesc);
+            _defaultTexture = Device.CreateTexture(textureDesc);
 
-            var whitePixel = stackalloc byte[4] { 255, 255, 255, 255 };
+            Span<byte> whitePixel = [255, 255, 255, 255];
 
-            var imageCopyTexture = new ImageCopyTexture
+            var imageCopyTexture = new SlCopyTextureDescriptor
             {
                 Texture = _defaultTexture,
                 MipLevel = 0,
-                Origin = new Origin3D { X = 0, Y = 0, Z = 0 },
-                Aspect = TextureAspect.All
+                Origin = new SlOrigin3D { X = 0, Y = 0, Z = 0 },
             };
 
-            var textureDataLayout = new TextureDataLayout
+            var textureDataLayout = new SlTextureDataLayout
             {
                 Offset = 0,
                 BytesPerRow = 4,
                 RowsPerImage = 1
             };
 
-            var writeSize = new Extent3D { Width = 1, Height = 1, DepthOrArrayLayers = 1 };
+            var writeSize = new SlExtent3D { Width = 1, Height = 1, DepthOrArrayLayers = 1 };
 
             var queue = Device.GetQueue();
-
-            // TODO: Cleanup
-            var wgpuQueue = queue as WgpuQueue;
-            wgpuDevice.Wgpu.QueueWriteTexture(wgpuQueue.Queue, &imageCopyTexture, whitePixel, 4, &textureDataLayout, &writeSize);
-
+            queue.WriteTexture(imageCopyTexture, whitePixel, textureDataLayout, writeSize);
             queue.Dispose();
 
-            var viewDesc = new TextureViewDescriptor
+            var viewDesc = new SlTextureViewDescriptor
             {
-                Format = TextureFormat.Rgba8Unorm,
-                Dimension = TextureViewDimension.Dimension2D,
+                Format = SlTextureFormat.Rgba8Unorm,
+                Dimension = SlTextureViewDimension.Dimension2D,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,
                 BaseArrayLayer = 0,
-                ArrayLayerCount = 1,
-                Aspect = TextureAspect.All
+                ArrayLayerCount = 1
             };
 
-            _defaultTextureView = wgpuDevice.Wgpu.TextureCreateView(_defaultTexture, &viewDesc);
+            _defaultTextureView = _defaultTexture.CreateTextureView(viewDesc);
         }
 
         protected override void SetupBindGroups()
@@ -317,41 +307,43 @@ namespace XNOEdit.Renderer.Shaders
 
         public BindGroup* CreateTextureBindGroup(
             BindGroupLayout* layout,
-            TextureView* mainTextureView,
-            TextureView* blendTextureView,
-            TextureView* normalTextureView,
-            TextureView* lightmapTextureView)
+            SlTextureView? mainTextureView,
+            SlTextureView? blendTextureView,
+            SlTextureView? normalTextureView,
+            SlTextureView? lightmapTextureView)
         {
             var entries = stackalloc BindGroupEntry[5];
 
             entries[0] = new BindGroupEntry
             {
                 Binding = 0,
-                Sampler = _sampler
+                Sampler = (Sampler*)_sampler.GetHandle()
             };
+
+            TextureView* defaultTextureView = (TextureView*)_defaultTextureView.GetHandle();
 
             entries[1] = new BindGroupEntry
             {
                 Binding = 1,
-                TextureView = mainTextureView == null ? _defaultTextureView : mainTextureView
+                TextureView = mainTextureView == null ? defaultTextureView : (TextureView*)mainTextureView.GetHandle()
             };
 
             entries[2] = new BindGroupEntry
             {
                 Binding = 2,
-                TextureView = blendTextureView == null ? _defaultTextureView : blendTextureView
+                TextureView = blendTextureView == null ? defaultTextureView : (TextureView*)blendTextureView.GetHandle()
             };
 
             entries[3] = new BindGroupEntry
             {
                 Binding = 3,
-                TextureView = normalTextureView == null ? _defaultTextureView : normalTextureView
+                TextureView = normalTextureView == null ? defaultTextureView : (TextureView*)normalTextureView.GetHandle()
             };
 
             entries[4] = new BindGroupEntry
             {
                 Binding = 4,
-                TextureView = lightmapTextureView == null ? _defaultTextureView : lightmapTextureView
+                TextureView = lightmapTextureView == null ? defaultTextureView : (TextureView*)lightmapTextureView.GetHandle()
             };
 
             var bindGroupDesc = new BindGroupDescriptor
@@ -395,10 +387,10 @@ namespace XNOEdit.Renderer.Shaders
         }
 
         public BindGroup* GetTextureBindGroup(
-            TextureView* mainTextureView,
-            TextureView* blendTextureView,
-            TextureView* normalTextureView,
-            TextureView* lightmapTextureView)
+            SlTextureView mainTextureView,
+            SlTextureView blendTextureView,
+            SlTextureView normalTextureView,
+            SlTextureView lightmapTextureView)
         {
             var layout = GetBindGroupLayout(2);
             return CreateTextureBindGroup(layout, mainTextureView, blendTextureView, normalTextureView, lightmapTextureView);
@@ -414,20 +406,9 @@ namespace XNOEdit.Renderer.Shaders
 
         public override void Dispose()
         {
-            // TODO: Cleanup
-            var wgpu = (Device as WgpuDevice).Wgpu;
-
-            if (_sampler != null)
-                wgpu.SamplerRelease(_sampler);
-
-            if (_defaultTextureView != null)
-                wgpu.TextureViewRelease(_defaultTextureView);
-
-            if (_defaultTexture != null)
-            {
-                wgpu.TextureDestroy(_defaultTexture);
-                wgpu.TextureRelease(_defaultTexture);
-            }
+            _sampler?.Dispose();
+            _defaultTextureView?.Dispose();
+            _defaultTexture?.Dispose();
 
             base.Dispose();
         }

@@ -8,37 +8,36 @@ namespace Solaris.Wgpu
     public unsafe class WgpuBuffer<T> : SlBuffer<T> where T : unmanaged
     {
         private readonly WebGPU _wgpu;
-
-        public Buffer* Handle { get; }
+        private readonly Buffer* _handle;
 
         internal WgpuBuffer(Buffer* handle, ulong size, WebGPU wgpu)
         {
-            Handle = handle;
-            Size = size;
             _wgpu = wgpu;
+            _handle = handle;
+            Size = size;
         }
 
         public override void* GetHandle()
         {
-            return Handle;
+            return _handle;
         }
 
         public override void UpdateData(SlQueue queue, Span<T> data, ulong offset = 0)
         {
-            var wgpuQueue = (queue as WgpuQueue).Queue;
+            var wgpuQueue = (queue as WgpuQueue)!.Queue;
             var dataBytes = MemoryMarshal.AsBytes(data);
             fixed (byte* pData = dataBytes)
             {
-                _wgpu.QueueWriteBuffer(wgpuQueue, Handle, offset, pData, (nuint)dataBytes.Length);
+                _wgpu.QueueWriteBuffer(wgpuQueue, _handle, offset, pData, (nuint)dataBytes.Length);
             }
         }
 
         public override void UpdateData(SlQueue queue, in T data, ulong offset = 0)
         {
-            var wgpuQueue = (queue as WgpuQueue).Queue;
+            var wgpuQueue = (queue as WgpuQueue)!.Queue;
             fixed (T* pData = &data)
             {
-                _wgpu.QueueWriteBuffer(wgpuQueue, Handle, offset, pData, (nuint)sizeof(T));
+                _wgpu.QueueWriteBuffer(wgpuQueue, _handle, offset, pData, (nuint)sizeof(T));
             }
         }
 
@@ -53,7 +52,7 @@ namespace Solaris.Wgpu
             return new BindGroupEntry
             {
                 Binding = binding,
-                Buffer = Handle,
+                Buffer = _handle,
                 Offset = offset,
                 Size = size == 0 ? (ulong)sizeof(T) : size
             };
@@ -78,10 +77,10 @@ namespace Solaris.Wgpu
 
         public override void Dispose()
         {
-            if (Handle != null)
+            if (_handle != null)
             {
-                _wgpu.BufferDestroy(Handle);
-                _wgpu.BufferRelease(Handle);
+                _wgpu.BufferDestroy(_handle);
+                _wgpu.BufferRelease(_handle);
             }
         }
     }

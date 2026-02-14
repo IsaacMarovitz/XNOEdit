@@ -1,25 +1,14 @@
-using Silk.NET.WebGPU;
+using Solaris.RHI;
 using XNOEdit.Renderer;
 
 namespace XNOEdit.Managers
 {
-    public unsafe class TextureManager : IDisposable
+    public class TextureManager(ImGuiController imguiController) : IDisposable
     {
-        private readonly WebGPU _wgpu;
-        private readonly Device* _device;
-        private readonly ImGuiController _imguiController;
-
         private readonly Dictionary<string, ManagedTexture> _textures = new();
         private bool _disposed;
 
-        public TextureManager(WebGPU wgpu, Device* device, ImGuiController imguiController)
-        {
-            _wgpu = wgpu;
-            _device = device;
-            _imguiController = imguiController;
-        }
-
-        public void Add(string name, Texture* texture, TextureView* view)
+        public void Add(string name, SlTexture texture, SlTextureView view)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(TextureManager));
@@ -30,7 +19,7 @@ namespace XNOEdit.Managers
             }
 
             // Create ImGui bind group for this texture
-            _imguiController.BindImGuiTextureView(view);
+            imguiController.BindImGuiTextureView(view);
 
             _textures[name] = new ManagedTexture
             {
@@ -39,11 +28,11 @@ namespace XNOEdit.Managers
             };
         }
 
-        public void AddRange(IEnumerable<(string Name, IntPtr Texture, IntPtr View)> textures)
+        public void AddRange(IEnumerable<(string Name, SlTexture Texture, SlTextureView View)> textures)
         {
             foreach (var (name, texture, view) in textures)
             {
-                Add(name, (Texture*)texture, (TextureView*)view);
+                Add(name, texture, view);
             }
         }
 
@@ -59,28 +48,29 @@ namespace XNOEdit.Managers
             return false;
         }
 
-        public TextureView* GetView(string? name)
+        public SlTextureView? GetView(string? name)
         {
             if (name != null && _textures.TryGetValue(name, out var texture))
                 return texture.View;
             return null;
         }
 
-        public bool TryGetView(string name, out TextureView* view)
+        public bool TryGetView(string name, out SlTextureView? view)
         {
             if (_textures.TryGetValue(name, out var texture))
             {
                 view = texture.View;
                 return true;
             }
+
             view = null;
             return false;
         }
 
-        public nint GetImGuiId(string name)
+        public unsafe nint GetImGuiId(string name)
         {
             if (_textures.TryGetValue(name, out var texture))
-                return (nint)texture.View;
+                return (nint)texture.View.GetHandle();
             return 0;
         }
 
@@ -99,20 +89,14 @@ namespace XNOEdit.Managers
             _textures.Clear();
         }
 
-        private void ReleaseTexture(ManagedTexture texture)
+        private unsafe void ReleaseTexture(ManagedTexture texture)
         {
             // Unbind from ImGui first
-            _imguiController.UnbindImGuiTextureView(texture.View);
+            imguiController.UnbindImGuiTextureView((IntPtr)texture.View.GetHandle());
 
-            // Release WebGPU resources
-            if (texture.View != null)
-                _wgpu.TextureViewRelease(texture.View);
-
-            if (texture.Texture != null)
-            {
-                _wgpu.TextureDestroy(texture.Texture);
-                _wgpu.TextureRelease(texture.Texture);
-            }
+            // Release resources
+            texture.View?.Dispose();
+            texture.Texture?.Dispose();
         }
 
         public void Dispose()
@@ -125,14 +109,14 @@ namespace XNOEdit.Managers
 
         private struct ManagedTexture
         {
-            public Texture* Texture;
-            public TextureView* View;
+            public SlTexture Texture;
+            public SlTextureView View;
         }
     }
 
     public static unsafe class TextureManagerExtensions
     {
-        public static TextureView* ResolveTexture(this TextureManager manager, string? name)
+        public static SlTextureView? ResolveTexture(this TextureManager manager, string? name)
         {
             return manager.GetView(name);
         }

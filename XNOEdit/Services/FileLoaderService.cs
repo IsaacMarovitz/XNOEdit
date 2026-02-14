@@ -5,9 +5,7 @@ using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using Pfim;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
 using XNOEdit.Renderer.Renderers;
@@ -356,7 +354,7 @@ namespace XNOEdit.Services
             }, cancellationToken);
         }
 
-        private unsafe List<LoadedTexture> LoadTextures(
+        private List<LoadedTexture> LoadTextures(
             IFile file,
             TextureListChunk? textureListChunk,
             CancellationToken cancellationToken,
@@ -379,84 +377,77 @@ namespace XNOEdit.Services
                     continue;
 
                 var pointers = LoadTexture(textureFile);
-                if (pointers.texture != IntPtr.Zero)
-                    result.Add(new LoadedTexture(textureFile.Name, (Texture*)pointers.texture, (TextureView*)pointers.textureView));
+                if (pointers.texture != null)
+                    result.Add(new LoadedTexture(textureFile.Name, pointers.texture, pointers.textureView));
             }
 
             return result;
         }
 
-        private (IntPtr texture, IntPtr textureView) LoadTexture(IFile file)
+        private (SlTexture? texture, SlTextureView? textureView) LoadTexture(IFile file)
         {
             try
             {
-                unsafe
+                using var stream = file.Decompress().Open();
+                using var image = Pfimage.FromStream(stream);
+
+                var mipLevelCount = image.MipMaps != null && image.MipMaps.Length > 0
+                    ? (uint)(image.MipMaps.Length + 1)
+                    : 1u;
+
+                Logger.Debug?.PrintMsg(LogClass.Application,
+                    $"  Loading {file.Name}: {image.Width}x{image.Height}, {mipLevelCount} mip levels, format: {image.Format}");
+
+                var textureDesc = new SlTextureDescriptor
                 {
-                    using var stream = file.Decompress().Open();
-                    using var image = Pfimage.FromStream(stream);
-
-                    // TODO: Cleanup
-                    var wgpuDevice = (_device as WgpuDevice);
-
-                    var mipLevelCount = image.MipMaps != null && image.MipMaps.Length > 0
-                        ? (uint)(image.MipMaps.Length + 1)
-                        : 1u;
-
-                    Logger.Debug?.PrintMsg(LogClass.Application,
-                        $"  Loading {file.Name}: {image.Width}x{image.Height}, {mipLevelCount} mip levels, format: {image.Format}");
-
-                    var textureDesc = new TextureDescriptor
+                    Size = new SlExtent3D
                     {
-                        Size = new Extent3D
-                        {
-                            Width = (uint)image.Width,
-                            Height = (uint)image.Height,
-                            DepthOrArrayLayers = 1
-                        },
-                        MipLevelCount = mipLevelCount,
-                        SampleCount = 1,
-                        Dimension = TextureDimension.Dimension2D,
-                        Format = TextureFormat.Bgra8Unorm,
-                        Usage = TextureUsage.TextureBinding | TextureUsage.CopyDst
-                    };
+                        Width = (uint)image.Width,
+                        Height = (uint)image.Height,
+                        DepthOrArrayLayers = 1
+                    },
+                    MipLevelCount = mipLevelCount,
+                    SampleCount = 1,
+                    Dimension = SlTextureDimension.Dimension2D,
+                    Format = SlTextureFormat.Bgra8Unorm,
+                    Usage = SlTextureUsage.TextureBinding | SlTextureUsage.CopyDst
+                };
 
-                    var wgpuTexture = wgpuDevice.Wgpu.DeviceCreateTexture(wgpuDevice, &textureDesc);
+                var wgpuTexture = _device.CreateTexture(textureDesc);
 
-                    UploadMipLevel((IntPtr)wgpuTexture, image.Data, 0, image.Data.Length,
-                        image.Width, image.Height, image.Stride, 0, image.Format);
+                UploadMipLevel(wgpuTexture, image.Data, 0, image.Data.Length,
+                    image.Width, image.Height, image.Stride, 0, image.Format);
 
-                    if (image.MipMaps is { Length: > 0 })
+                if (image.MipMaps is { Length: > 0 })
+                {
+                    for (var i = 0; i < image.MipMaps.Length; i++)
                     {
-                        for (var i = 0; i < image.MipMaps.Length; i++)
-                        {
-                            var mipMap = image.MipMaps[i];
-                            UploadMipLevel((IntPtr)wgpuTexture, image.Data, mipMap.DataOffset, mipMap.DataLen,
-                                mipMap.Width, mipMap.Height, mipMap.Stride, (uint)(i + 1), image.Format);
-                        }
+                        var mipMap = image.MipMaps[i];
+                        UploadMipLevel(wgpuTexture, image.Data, mipMap.DataOffset, mipMap.DataLen,
+                            mipMap.Width, mipMap.Height, mipMap.Stride, (uint)(i + 1), image.Format);
                     }
-
-                    var viewDesc = new TextureViewDescriptor
-                    {
-                        Format = TextureFormat.Bgra8Unorm,
-                        Dimension = TextureViewDimension.Dimension2D,
-                        BaseMipLevel = 0,
-                        MipLevelCount = mipLevelCount,
-                        BaseArrayLayer = 0,
-                        ArrayLayerCount = 1,
-                        Aspect = TextureAspect.All
-                    };
-
-                    return ((IntPtr)wgpuTexture, (IntPtr)wgpuDevice.Wgpu.TextureCreateView(wgpuTexture, &viewDesc));
                 }
+
+                var viewDesc = new SlTextureViewDescriptor
+                {
+                    Format = SlTextureFormat.Bgra8Unorm,
+                    Dimension = SlTextureViewDimension.Dimension2D,
+                    BaseMipLevel = 0,
+                    MipLevelCount = mipLevelCount,
+                    BaseArrayLayer = 0,
+                    ArrayLayerCount = 1
+                };
+
+                return (wgpuTexture, wgpuTexture.CreateTextureView(viewDesc));
             }
             catch (Exception ex)
             {
                 Logger.Error?.PrintMsg(LogClass.Application, $"Failed to load texture {file.Name}: {ex.Message}");
-                return (IntPtr.Zero, IntPtr.Zero);
+                return (null, null);
             }
         }
 
-        private unsafe void UploadMipLevel(IntPtr texture, byte[] sourceData, int dataOffset, int dataLen,
+        private void UploadMipLevel(SlTexture texture, byte[] sourceData, int dataOffset, int dataLen,
             int width, int height, int stride, uint mipLevel, ImageFormat format)
         {
             var mipData = new byte[dataLen];
@@ -464,37 +455,28 @@ namespace XNOEdit.Services
 
             var imageData = ConvertToRgba(mipData, width, height, stride, format);
 
-            fixed (byte* pData = imageData)
+            var imageCopyTexture = new SlCopyTextureDescriptor
             {
-                var imageCopyTexture = new ImageCopyTexture
-                {
-                    Texture = (Texture*)texture,
-                    MipLevel = mipLevel,
-                    Origin = new Origin3D { X = 0, Y = 0, Z = 0 },
-                    Aspect = TextureAspect.All
-                };
+                Texture = texture,
+                MipLevel = mipLevel,
+                Origin = new SlOrigin3D { X = 0, Y = 0, Z = 0 }
+            };
 
-                var textureDataLayout = new TextureDataLayout
-                {
-                    Offset = 0,
-                    BytesPerRow = (uint)(width * 4),
-                    RowsPerImage = (uint)height
-                };
+            var textureDataLayout = new SlTextureDataLayout
+            {
+                Offset = 0,
+                BytesPerRow = (uint)(width * 4),
+                RowsPerImage = (uint)height
+            };
 
-                var writeSize = new Extent3D
-                {
-                    Width = (uint)width,
-                    Height = (uint)height,
-                    DepthOrArrayLayers = 1
-                };
+            var writeSize = new SlExtent3D
+            {
+                Width = (uint)width,
+                Height = (uint)height,
+                DepthOrArrayLayers = 1
+            };
 
-                // TODO: Cleanup
-                var wgpu = (_device as WgpuDevice).Wgpu;
-                var queue = (_queue as WgpuQueue).Queue;
-
-                wgpu.QueueWriteTexture(queue, &imageCopyTexture, pData,
-                    (nuint)(width * height * 4), &textureDataLayout, &writeSize);
-            }
+            _queue.WriteTexture(imageCopyTexture, imageData, textureDataLayout, writeSize);
         }
 
         private static byte[] ConvertToRgba(byte[] data, int width, int height, int stride, ImageFormat format)
