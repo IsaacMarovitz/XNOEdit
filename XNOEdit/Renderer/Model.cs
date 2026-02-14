@@ -2,9 +2,7 @@ using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
@@ -20,7 +18,7 @@ namespace XNOEdit.Renderer
         public bool Specular;
     }
 
-    public unsafe class Model : IDisposable
+    public class Model : IDisposable
     {
         private readonly SlDevice _device;
         private readonly List<ModelMesh> _meshes = [];
@@ -315,7 +313,7 @@ namespace XNOEdit.Renderer
         }
 
         public void Draw(
-            RenderPassEncoder* passEncoder,
+            SlRenderPass passEncoder,
             bool wireframe,
             TextureManager textureManager,
             ModelShader shader,
@@ -352,11 +350,8 @@ namespace XNOEdit.Renderer
         private readonly MeshGeometry _geometry;
         private TextureSet _textureSet;
         private SlBuffer<PerMeshUniforms> _meshUniformBuffer;
-        private BindGroup* _meshBindGroup;
-        private BindGroup* _textureBindGroup;
-
-        // TODO: Clean this up
-        private WebGPU _wgpu => (_device as WgpuDevice).Wgpu;
+        private SlBindGroup _meshBindGroup;
+        private SlBindGroup _textureBindGroup;
 
         public ModelMesh(
             SlDevice device,
@@ -408,7 +403,7 @@ namespace XNOEdit.Renderer
         }
 
         public void Draw(
-            RenderPassEncoder* passEncoder,
+            SlRenderPass passEncoder,
             bool wireframe,
             TextureManager textureManager,
             ModelShader shader,
@@ -417,18 +412,17 @@ namespace XNOEdit.Renderer
             if (!Visible) return;
 
             _geometry.BindVertexBuffer(passEncoder, 0);
-            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 1, _meshBindGroup, 0, null);
+            passEncoder.SetBindGroup(1, _meshBindGroup);
 
             var mainTexture = textureManager.GetView(_textureSet.MainTexture);
             var blendTexture = textureManager.GetView(_textureSet.BlendMap);
             var normalTexture = textureManager.GetView(_textureSet.NormalMap);
             var lightmapTexture = textureManager.GetView(_textureSet.LightMap);
 
-            if (_textureBindGroup != null)
-                _wgpu.BindGroupRelease(_textureBindGroup);
+            _textureBindGroup?.Dispose();
 
             _textureBindGroup = shader.GetTextureBindGroup(mainTexture, blendTexture, normalTexture, lightmapTexture);
-            _wgpu.RenderPassEncoderSetBindGroup(passEncoder, 2, _textureBindGroup, 0, null);
+            passEncoder.SetBindGroup(2, _textureBindGroup);
 
             _geometry.Draw(passEncoder, wireframe, instanceCount);
         }
@@ -437,9 +431,7 @@ namespace XNOEdit.Renderer
         {
             _geometry.Dispose();
             _meshUniformBuffer?.Dispose();
-
-            if (_meshBindGroup != null)
-                _wgpu.BindGroupRelease(_meshBindGroup);
+            _meshBindGroup?.Dispose();
         }
     }
 }

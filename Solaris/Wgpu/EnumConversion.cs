@@ -3,7 +3,7 @@ using Solaris.RHI;
 
 namespace Solaris.Wgpu
 {
-    public static class EnumConversion
+    internal static class EnumConversion
     {
         public static BufferUsage Convert(this SlBufferUsage usage)
         {
@@ -182,6 +182,156 @@ namespace Solaris.Wgpu
                 SlFilterMode.Nearest => MipmapFilterMode.Nearest,
                 SlFilterMode.Linear => MipmapFilterMode.Linear,
                 _ => throw new ArgumentOutOfRangeException(nameof(filterMode), filterMode, null)
+            };
+        }
+
+        public static PresentMode Convert(this SlPresentMode presentMode)
+        {
+            return presentMode switch
+            {
+                SlPresentMode.Fifo => PresentMode.Fifo,
+                SlPresentMode.Immediate => PresentMode.Immediate,
+                SlPresentMode.Mailbox => PresentMode.Mailbox,
+                _ => throw new ArgumentOutOfRangeException(nameof(presentMode), presentMode, null)
+            };
+        }
+
+        public static IndexFormat Convert(this SlIndexFormat indexFormat)
+        {
+            return indexFormat switch
+            {
+                SlIndexFormat.Uint16 => IndexFormat.Uint16,
+                SlIndexFormat.Uint32 => IndexFormat.Uint32,
+                _ => throw new ArgumentOutOfRangeException(nameof(indexFormat), indexFormat, null)
+            };
+        }
+
+        public static LoadOp Convert(this SlLoadOp loadOp)
+        {
+            return loadOp switch
+            {
+                SlLoadOp.Clear => LoadOp.Clear,
+                SlLoadOp.Load => LoadOp.Load,
+                _ => throw new ArgumentOutOfRangeException(nameof(loadOp), loadOp, null)
+            };
+        }
+
+        public static StoreOp Convert(this SlStoreOp storeOp)
+        {
+            return storeOp switch
+            {
+                SlStoreOp.Store => StoreOp.Store,
+                SlStoreOp.Discard => StoreOp.Discard,
+                _ => throw new ArgumentOutOfRangeException(nameof(storeOp), storeOp, null)
+            };
+        }
+
+        public static BufferBindingType Convert(this SlBufferBindingType bindingType)
+        {
+            return bindingType switch
+            {
+                SlBufferBindingType.Uniform => BufferBindingType.Uniform,
+                SlBufferBindingType.Storage => BufferBindingType.Storage,
+                SlBufferBindingType.ReadOnlyStorage => BufferBindingType.ReadOnlyStorage,
+                _ => throw new ArgumentOutOfRangeException(nameof(bindingType), bindingType, null)
+            };
+        }
+
+        public static TextureSampleType Convert(this SlTextureSampleType sampleType)
+        {
+            return sampleType switch
+            {
+                SlTextureSampleType.Float => TextureSampleType.Float,
+                SlTextureSampleType.UnfilterableFloat => TextureSampleType.UnfilterableFloat,
+                SlTextureSampleType.Depth => TextureSampleType.Depth,
+                SlTextureSampleType.Sint => TextureSampleType.Sint,
+                SlTextureSampleType.Uint => TextureSampleType.Uint,
+                _ => throw new ArgumentOutOfRangeException(nameof(sampleType), sampleType, null)
+            };
+        }
+
+        public static SamplerBindingType Convert(this SlSamplerBindingType samplerBindingType)
+        {
+            return samplerBindingType switch
+            {
+                SlSamplerBindingType.Filtering => SamplerBindingType.Filtering,
+                SlSamplerBindingType.NonFiltering => SamplerBindingType.NonFiltering,
+                SlSamplerBindingType.Comparison => SamplerBindingType.Comparison,
+                _ => throw new ArgumentOutOfRangeException(nameof(samplerBindingType), samplerBindingType, null)
+            };
+        }
+
+        public static ShaderStage Convert(this SlShaderStage stage)
+        {
+            var result = ShaderStage.None;
+
+            if (stage.HasFlag(SlShaderStage.Vertex)) result |= ShaderStage.Vertex;
+            if (stage.HasFlag(SlShaderStage.Fragment)) result |= ShaderStage.Fragment;
+            if (stage.HasFlag(SlShaderStage.Compute)) result |= ShaderStage.Compute;
+
+            return result;
+        }
+
+        public static VertexStepMode Convert(this SlVertexStepMode stepMode)
+        {
+            return stepMode switch
+            {
+                SlVertexStepMode.Vertex => VertexStepMode.Vertex,
+                SlVertexStepMode.Instance => VertexStepMode.Instance,
+                _ => throw new ArgumentOutOfRangeException(nameof(stepMode), stepMode, null)
+            };
+        }
+
+        public static VertexFormat Convert(this SlVertexFormat format)
+        {
+            return format switch
+            {
+                SlVertexFormat.Float32 => VertexFormat.Float32,
+                SlVertexFormat.Float32x2 => VertexFormat.Float32x2,
+                SlVertexFormat.Float32x3 => VertexFormat.Float32x3,
+                SlVertexFormat.Float32x4 => VertexFormat.Float32x4,
+                SlVertexFormat.Uint8x4 => VertexFormat.Uint8x4,
+                SlVertexFormat.Unorm8x4 => VertexFormat.Unorm8x4,
+                SlVertexFormat.Sint32 => VertexFormat.Sint32,
+                SlVertexFormat.Sint32x2 => VertexFormat.Sint32x2,
+                SlVertexFormat.Sint32x3 => VertexFormat.Sint32x3,
+                SlVertexFormat.Sint32x4 => VertexFormat.Sint32x4,
+                SlVertexFormat.Uint32 => VertexFormat.Uint32,
+                SlVertexFormat.Uint32x2 => VertexFormat.Uint32x2,
+                SlVertexFormat.Uint32x3 => VertexFormat.Uint32x3,
+                SlVertexFormat.Uint32x4 => VertexFormat.Uint32x4,
+                _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
+            };
+        }
+
+        public static BlendOperation Convert(this SlBlendOperation operation)
+        {
+            return operation switch
+            {
+                SlBlendOperation.Add => BlendOperation.Add,
+                SlBlendOperation.Subtract => BlendOperation.Subtract,
+                SlBlendOperation.ReverseSubtract => BlendOperation.ReverseSubtract,
+                SlBlendOperation.Min => BlendOperation.Min,
+                SlBlendOperation.Max => BlendOperation.Max,
+                _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null)
+            };
+        }
+
+        public static BlendFactor Convert(this SlBlendFactor factor)
+        {
+            return factor switch
+            {
+                SlBlendFactor.Zero => BlendFactor.Zero,
+                SlBlendFactor.One => BlendFactor.One,
+                SlBlendFactor.Src => BlendFactor.Src,
+                SlBlendFactor.OneMinusSrc => BlendFactor.OneMinusSrc,
+                SlBlendFactor.SrcAlpha => BlendFactor.SrcAlpha,
+                SlBlendFactor.OneMinusSrcAlpha => BlendFactor.OneMinusSrcAlpha,
+                SlBlendFactor.Dst => BlendFactor.Dst,
+                SlBlendFactor.OneMinusDst => BlendFactor.OneMinusDst,
+                SlBlendFactor.DstAlpha => BlendFactor.DstAlpha,
+                SlBlendFactor.OneMinusDstAlpha => BlendFactor.OneMinusDstAlpha,
+                _ => throw new ArgumentOutOfRangeException(nameof(factor), factor, null)
             };
         }
     }

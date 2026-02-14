@@ -1,10 +1,6 @@
 using System.Numerics;
-using Silk.NET.WebGPU;
-using Silk.NET.WebGPU.Extensions.WGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 using XNOEdit.Renderer.Shaders;
-using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer.Renderers
 {
@@ -14,12 +10,12 @@ namespace XNOEdit.Renderer.Renderers
         public Vector3 SunColor;
     }
 
-    public unsafe class SkyboxRenderer : WgpuRenderer<SkyboxParameters>
+    public class SkyboxRenderer : Renderer<SkyboxParameters>
     {
         private readonly SlBuffer<float> _vertexBuffer;
 
         public SkyboxRenderer(SlDevice device)
-            : base(device, CreateShader(device))
+            : base(CreateShader(device))
         {
             var vertices = new[]
             {
@@ -39,7 +35,7 @@ namespace XNOEdit.Renderer.Renderers
 
         public override void Draw(
             SlQueue queue,
-            RenderPassEncoder* passEncoder,
+            SlRenderPass passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
             SkyboxParameters skyboxParameters)
@@ -55,11 +51,10 @@ namespace XNOEdit.Renderer.Renderers
             };
 
             ((SkyboxShader)Shader).UpdateUniforms(queue, in uniforms);
-            // TODO: Clean this up
-            var wgpu = (Device as WgpuDevice).Wgpu;
-            wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline("default"));
-            wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, (Buffer*)_vertexBuffer.GetHandle(), 0, _vertexBuffer.Size);
-            wgpu.RenderPassEncoderDraw(passEncoder, 4, 1, 0, 0);
+
+            passEncoder.SetPipeline(Shader.GetPipeline());
+            passEncoder.SetVertexBuffer(0, _vertexBuffer);
+            passEncoder.Draw(4);
         }
 
         public override void Dispose()

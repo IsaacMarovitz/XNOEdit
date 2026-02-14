@@ -5,11 +5,8 @@ using System.Text;
 using Hexa.NET.ImGui;
 using SDL3;
 using Silk.NET.Core.Native;
-using Silk.NET.WebGPU;
 using Solaris.Builders;
 using Solaris.RHI;
-using Solaris.Wgpu;
-using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
@@ -20,30 +17,25 @@ namespace XNOEdit.Renderer
         private readonly IntPtr _window;
         private readonly uint _framesInFlight;
 
-        private ShaderModule* _shaderModule;
+        private SlShaderModule _shaderModule;
         private SlSampler _fontSampler;
 
-        private BindGroupLayout* _commonBindGroupLayout;
-        private BindGroupLayout* _imageBindGroupLayout;
-        private RenderPipeline* _renderPipeline;
+        private SlBindGroupLayout _commonBindGroupLayout;
+        private SlBindGroupLayout _imageBindGroupLayout;
+        private SlRenderPipeline _renderPipeline;
 
-        private BindGroup* _commonBindGroup;
+        private SlBindGroup _commonBindGroup;
 
         private SlBuffer<Uniforms> _uniformsBuffer;
 
         private WindowRenderBuffers _windowRenderBuffers;
 
-        private readonly Dictionary<nint, IntPtr> _textureBindGroups = [];
-        private readonly Dictionary<nint, IntPtr> _gpuTextures = [];
+        private readonly Dictionary<nint, SlBindGroup> _textureBindGroups = [];
+        private readonly Dictionary<nint, (SlTextureView View, SlTexture Texture)> _gpuTextures = [];
 
         private SetClipboardTextDelegate _setClipboardText;
         private GetClipboardTextDelegate _getClipboardText;
         private IntPtr _clipboardText;
-
-        // TODO: Clean this up
-        private WgpuDevice _wgpuDevice => _device as WgpuDevice;
-        private WebGPU _wgpu => _wgpuDevice.Wgpu;
-
 
         public ImGuiController(
             SlDevice device,
@@ -64,7 +56,7 @@ namespace XNOEdit.Renderer
             ImGui.NewFrame();
         }
 
-        public void Render(RenderPassEncoder* encoder)
+        public void Render(SlRenderPass encoder)
         {
             ImGui.Render();
             DrawImGui(encoder);
@@ -76,35 +68,29 @@ namespace XNOEdit.Renderer
 
             if (_textureBindGroups.TryGetValue(id, out var existing))
             {
-                _wgpu.BindGroupRelease((BindGroup*)existing);
+                existing.Dispose();
             }
 
-            BindGroupEntry imageEntry = new()
+            SlBindGroupEntry imageEntry = new()
             {
-                Binding = 0,
-                Buffer = null,
-                Offset = 0,
-                Size = 0,
-                Sampler = null,
-                TextureView = (TextureView*)view.GetHandle(),
+                TextureView = view
             };
 
-            BindGroupDescriptor imageDesc = new()
+            SlBindGroupDescriptor imageDesc = new()
             {
                 Layout = _imageBindGroupLayout,
-                EntryCount = 1,
-                Entries = &imageEntry
+                Entries = [imageEntry]
             };
 
-            var bindGroup = _wgpu.DeviceCreateBindGroup(_wgpuDevice, in imageDesc);
-            _textureBindGroups[id] = (IntPtr)bindGroup;
+            var bindGroup = _device.CreateBindGroup(imageDesc);
+            _textureBindGroups[id] = bindGroup;
         }
 
         public void UnbindImGuiTextureView(IntPtr view)
         {
             if (_textureBindGroups.Remove(view, out var bindGroup))
             {
-                _wgpu.BindGroupRelease((BindGroup*)bindGroup);
+                bindGroup.Dispose();
             }
         }
 
@@ -141,25 +127,16 @@ namespace XNOEdit.Renderer
 
         private void InitShaders()
         {
-            var src = SilkMarshal.StringToPtr(EmbeddedResources.ReadAllText("XNOEdit/Shaders/ImGui.wgsl"));
-            var shaderName = SilkMarshal.StringToPtr("ImGui Shader");
+            var source = EmbeddedResources.ReadAllText("XNOEdit/Shaders/ImGui.wgsl");
 
-            ShaderModuleWGSLDescriptor wgslDescriptor = new()
+            SlShaderModuleDescriptor descriptor = new()
             {
-                Code = (byte*)src,
-                Chain = new ChainedStruct(sType: SType.ShaderModuleWgslDescriptor)
+                Source = source,
+                Language = SlShaderLanguage.Wgsl,
+                Label = "ImGui Shader"
             };
 
-            ShaderModuleDescriptor descriptor = new()
-            {
-                Label = (byte*)shaderName,
-                NextInChain = (ChainedStruct*)(&wgslDescriptor)
-            };
-
-            _shaderModule = _wgpu.DeviceCreateShaderModule(_wgpuDevice, in descriptor);
-
-            SilkMarshal.Free(src);
-            SilkMarshal.Free(shaderName);
+            _shaderModule = _device.CreateShaderModule(descriptor);
         }
 
         private void InitSampler()
@@ -180,101 +157,95 @@ namespace XNOEdit.Renderer
 
         private void InitBindGroupLayouts()
         {
-            var commonBgLayoutEntries = stackalloc BindGroupLayoutEntry[2];
+            var commonBgLayoutEntries = new SlBindGroupLayoutEntry[2];
 
-            commonBgLayoutEntries[0] = new BindGroupLayoutEntry
+            commonBgLayoutEntries[0] = new SlBindGroupLayoutEntry
             {
                 Binding = 0,
-                Visibility = ShaderStage.Vertex | ShaderStage.Fragment,
-                Buffer = new BufferBindingLayout { Type = BufferBindingType.Uniform },
+                Visibility = SlShaderStage.Vertex | SlShaderStage.Fragment,
+                Type = SlBindingType.Buffer,
+                BufferType = SlBufferBindingType.Uniform
             };
 
-            commonBgLayoutEntries[1] = new BindGroupLayoutEntry
+            commonBgLayoutEntries[1] = new SlBindGroupLayoutEntry
             {
                 Binding = 1,
-                Visibility = ShaderStage.Fragment,
-                Sampler = new SamplerBindingLayout { Type = SamplerBindingType.Filtering },
+                Visibility = SlShaderStage.Fragment,
+                Type = SlBindingType.Sampler,
+                SamplerType = SlSamplerBindingType.Filtering
             };
 
-            var imageBgLayoutEntries = stackalloc BindGroupLayoutEntry[1];
-
-            imageBgLayoutEntries[0] = new BindGroupLayoutEntry
+            var imageBgLayoutEntry = new SlBindGroupLayoutEntry
             {
                 Binding = 0,
-                Visibility = ShaderStage.Fragment,
-                Texture = new TextureBindingLayout
-                {
-                    SampleType = TextureSampleType.Float,
-                    ViewDimension = TextureViewDimension.Dimension2D
-                },
+                Visibility = SlShaderStage.Fragment,
+                Type = SlBindingType.Texture,
+                TextureSampleType = SlTextureSampleType.Float,
+                TextureDimension = SlTextureViewDimension.Dimension2D
             };
 
-            BindGroupLayoutDescriptor commonBgLayoutDesc = new()
+            SlBindGroupLayoutDescriptor commonBgLayoutDesc = new()
             {
-                EntryCount = 2,
                 Entries = commonBgLayoutEntries,
             };
 
-            BindGroupLayoutDescriptor imageBgLayoutDesc = new()
+            SlBindGroupLayoutDescriptor imageBgLayoutDesc = new()
             {
-                EntryCount = 1,
-                Entries = imageBgLayoutEntries,
+                Entries = [imageBgLayoutEntry],
             };
 
-            _commonBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_wgpuDevice, in commonBgLayoutDesc);
-            _imageBindGroupLayout = _wgpu.DeviceCreateBindGroupLayout(_wgpuDevice, in imageBgLayoutDesc);
+            _commonBindGroupLayout = _device.CreateBindGroupLayout(commonBgLayoutDesc);
+            _imageBindGroupLayout = _device.CreateBindGroupLayout(imageBgLayoutDesc);
         }
 
         private void InitPipeline()
         {
-            if (_renderPipeline != null)
-                _wgpu.RenderPipelineRelease(_renderPipeline);
+            _renderPipeline?.Dispose();
 
-            var vertexAttrib = stackalloc VertexAttribute[3];
+            var vertexAttrib = new SlVertexAttribute[3];
 
-            vertexAttrib[0] = new VertexAttribute
+            vertexAttrib[0] = new SlVertexAttribute
             {
-                Format = VertexFormat.Float32x3,
+                Format = SlVertexFormat.Float32x3,
                 Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Pos)),
                 ShaderLocation = 0
             };
 
-            vertexAttrib[1] = new VertexAttribute
+            vertexAttrib[1] = new SlVertexAttribute
             {
-                Format = VertexFormat.Float32x3,
+                Format = SlVertexFormat.Float32x3,
                 Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Uv)),
                 ShaderLocation = 1
             };
 
-            vertexAttrib[2] = new VertexAttribute
+            vertexAttrib[2] = new SlVertexAttribute
             {
-                Format = VertexFormat.Unorm8x4,
+                Format = SlVertexFormat.Unorm8x4,
                 Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Col)),
                 ShaderLocation = 2
             };
 
-            VertexBufferLayout vbLayout = new()
+            var vbLayout = new SlVertexBufferLayout
             {
-                ArrayStride = (ulong)sizeof(ImDrawVert),
-                StepMode = VertexStepMode.Vertex,
-                AttributeCount = 3,
+                Stride = (ulong)sizeof(ImDrawVert),
+                StepMode = SlVertexStepMode.Vertex,
                 Attributes = vertexAttrib
             };
 
             var pipelineBuilder = new RenderPipelineBuilder(_device)
                 .WithBindGroupLayout(_commonBindGroupLayout)
                 .WithBindGroupLayout(_imageBindGroupLayout)
-                .WithCustomBlend(new BlendState
+                .WithCustomBlend(new SlBlendState
                 {
-                    Color = new BlendComponent
+                    Color = new SlBlendComponent
                     {
-                        Operation = BlendOperation.Add, SrcFactor = BlendFactor.SrcAlpha,
-                        DstFactor = BlendFactor.OneMinusSrcAlpha
+                        Operation = SlBlendOperation.Add, SrcFactor = SlBlendFactor.SrcAlpha,
+                        DstFactor = SlBlendFactor.OneMinusSrcAlpha
                     },
-                    Alpha = new BlendComponent
+                    Alpha = new SlBlendComponent
                     {
-                        Operation = BlendOperation.Add, SrcFactor = BlendFactor.One,
-                        DstFactor = BlendFactor.OneMinusSrcAlpha
+                        Operation = SlBlendOperation.Add, SrcFactor = SlBlendFactor.One,
+                        DstFactor = SlBlendFactor.OneMinusSrcAlpha
                     }
                 })
                 .WithTopology(SlPrimitiveTopology.TriangleList)
@@ -292,34 +263,32 @@ namespace XNOEdit.Renderer
 
         private void InitBindGroups()
         {
-            var bindGroupEntries = stackalloc BindGroupEntry[2];
+            var bindGroupEntries = new SlBindGroupEntry[2];
 
-            bindGroupEntries[0] = new BindGroupEntry
+            bindGroupEntries[0] = new SlBindGroupEntry
             {
                 Binding = 0,
-                Buffer = (Buffer*)_uniformsBuffer.GetHandle(),
-                Offset = 0,
-                Size = (ulong)Align(sizeof(Uniforms), 16),
-                Sampler = null
+                Buffer = new SlBufferBinding
+                {
+                    Handle = _uniformsBuffer.GetHandle(),
+                    Offset = 0,
+                    Size = (ulong)Align(sizeof(Uniforms), 16),
+                },
             };
 
-            bindGroupEntries[1] = new BindGroupEntry
+            bindGroupEntries[1] = new SlBindGroupEntry
             {
                 Binding = 1,
-                Buffer = null,
-                Offset = 0,
-                Size = 0,
-                Sampler = (Sampler*)_fontSampler.GetHandle()
+                Sampler = _fontSampler
             };
 
-            BindGroupDescriptor bgCommonDesc = new()
+            SlBindGroupDescriptor bgCommonDesc = new()
             {
                 Layout = _commonBindGroupLayout,
-                EntryCount = 2,
                 Entries = bindGroupEntries
             };
 
-            _commonBindGroup = _wgpu.DeviceCreateBindGroup(_wgpuDevice, in bgCommonDesc);
+            _commonBindGroup = _device.CreateBindGroup(bgCommonDesc);
         }
 
         private void ProcessTextureRequest(ImTextureDataPtr texture)
@@ -397,7 +366,7 @@ namespace XNOEdit.Renderer
 
             BindImGuiTextureView(view);
 
-            _gpuTextures[(IntPtr)view.GetHandle()] = (IntPtr)texture.GetHandle();
+            _gpuTextures[(IntPtr)view.GetHandle()] = (view, texture);
 
             tex.SetTexID(view.GetHandle());
             tex.SetStatus(ImTextureStatus.Ok);
@@ -405,7 +374,6 @@ namespace XNOEdit.Renderer
 
         private void UpdateTexture(ImTextureDataPtr tex)
         {
-            // For partial updates - usually just recreate for simplicity
             DestroyTexture(tex);
             CreateTexture(tex);
         }
@@ -418,11 +386,10 @@ namespace XNOEdit.Renderer
             {
                 UnbindImGuiTextureView(id);
 
-                if (_gpuTextures.Remove(id, out var texture))
+                if (_gpuTextures.Remove(id, out var entry))
                 {
-                    _wgpu.TextureViewRelease((TextureView*)id);
-                    _wgpu.TextureDestroy((Texture*)texture);
-                    _wgpu.TextureRelease((Texture*)texture);
+                    entry.View.Dispose();
+                    entry.Texture.Dispose();
                 }
             }
 
@@ -641,7 +608,7 @@ namespace XNOEdit.Renderer
             io.DeltaTime = deltaSeconds;
         }
 
-        private void DrawImGui(RenderPassEncoder* encoder)
+        private void DrawImGui(SlRenderPass encoder)
         {
             var drawData = ImGui.GetDrawData();
             drawData.ScaleClipRects(ImGui.GetIO().DisplayFramebufferScale);
@@ -714,7 +681,7 @@ namespace XNOEdit.Renderer
             };
 
             _uniformsBuffer.UpdateData(_queue, in uniforms);
-            _wgpu.RenderPassEncoderSetPipeline(encoder, _renderPipeline);
+            encoder.SetPipeline(_renderPipeline);
 
             if (drawData.TotalVtxCount > 0)
             {
@@ -723,19 +690,17 @@ namespace XNOEdit.Renderer
                         IndexBufferGpu: not null
                     })
                 {
-                    _wgpu.RenderPassEncoderSetVertexBuffer(encoder, 0, (Buffer*)frameRenderBuffer.VertexBufferGpu.GetHandle(), 0, frameRenderBuffer.VertexBufferGpu.Size);
-                    _wgpu.RenderPassEncoderSetIndexBuffer(encoder, (Buffer*)frameRenderBuffer.IndexBufferGpu.GetHandle(), IndexFormat.Uint16, 0, frameRenderBuffer.IndexBufferGpu.Size);
-                    uint dynamicOffsets = 0;
-                    _wgpu.RenderPassEncoderSetBindGroup(encoder, 0, _commonBindGroup, 0, in dynamicOffsets);
+                    encoder.SetVertexBuffer(0, frameRenderBuffer.VertexBufferGpu);
+                    encoder.SetIndexBuffer(frameRenderBuffer.IndexBufferGpu, SlIndexFormat.Uint16);
+                    encoder.SetBindGroup(0, _commonBindGroup);
                 }
             }
 
-            _wgpu.RenderPassEncoderSetViewport(encoder, 0, 0, drawData.FramebufferScale.X * drawData.DisplaySize.X, drawData.FramebufferScale.Y * drawData.DisplaySize.Y, 0, 1);
+            encoder.SetViewport(0, 0, drawData.FramebufferScale.X * drawData.DisplaySize.X, drawData.FramebufferScale.Y * drawData.DisplaySize.Y, 0, 1);
 
             if (_textureBindGroups.Count > 0)
             {
-                uint defaultOffsets = 0;
-                _wgpu.RenderPassEncoderSetBindGroup(encoder, 1, (BindGroup*)_textureBindGroups.Values.First(), 0, in defaultOffsets);
+                encoder.SetBindGroup(1, _textureBindGroups.Values.First());
             }
 
             var vtxOffset = 0;
@@ -750,9 +715,7 @@ namespace XNOEdit.Renderer
                     {
                         if (_textureBindGroups.TryGetValue(cmd.GetTexID(), out var value))
                         {
-                            uint dynamicOffsets = 0;
-                            _wgpu.RenderPassEncoderSetBindGroup(encoder, 1, (BindGroup*)value, 0,
-                                in dynamicOffsets);
+                            encoder.SetBindGroup(1, value);
                         }
                     }
 
@@ -764,10 +727,10 @@ namespace XNOEdit.Renderer
 
                     SDL.GetWindowSizeInPixels(_window, out var width, out var height);
 
-                    _wgpu.RenderPassEncoderSetScissorRect(encoder, (uint)clipMin.X, (uint)clipMin.Y,
+                    encoder.SetScissorRect((uint)clipMin.X, (uint)clipMin.Y,
                         (uint)Math.Clamp(clipMax.X - clipMin.X, 0, width),
                         (uint)Math.Clamp(clipMax.Y - clipMin.Y, 0, height));
-                    _wgpu.RenderPassEncoderDrawIndexed(encoder, cmd.ElemCount, 1, (uint)(idxOffset + cmd.IdxOffset), (int)(vtxOffset + cmd.VtxOffset), 0);
+                    encoder.DrawIndexed(cmd.ElemCount, 1, (uint)(idxOffset + cmd.IdxOffset), (int)(vtxOffset + cmd.VtxOffset));
                 }
 
                 vtxOffset += cmdList.VtxBuffer.Size;
@@ -819,30 +782,26 @@ namespace XNOEdit.Renderer
 
             foreach (var bg in _textureBindGroups.Values)
             {
-                _wgpu.BindGroupRelease((BindGroup*)bg);
+                bg.Dispose();
             }
             _textureBindGroups.Clear();
 
-            foreach (var entry in _gpuTextures)
+            foreach (var entry in _gpuTextures.Values)
             {
-                _wgpu.TextureViewRelease((TextureView*)entry.Key);
-                _wgpu.TextureDestroy((Texture*)entry.Value);
-                _wgpu.TextureRelease((Texture*)entry.Value);
+                entry.View.Dispose();
+                entry.Texture.Dispose();
             }
             _gpuTextures.Clear();
 
-            _wgpu.BindGroupRelease(_commonBindGroup);
-
+            _commonBindGroup.Dispose();
             _uniformsBuffer.Dispose();
-
-            _wgpu.RenderPipelineRelease(_renderPipeline);
-
-            _wgpu.BindGroupLayoutRelease(_commonBindGroupLayout);
-            _wgpu.BindGroupLayoutRelease(_imageBindGroupLayout);
+            _renderPipeline.Dispose();
+            _commonBindGroupLayout.Dispose();
+            _imageBindGroupLayout.Dispose();
 
             _fontSampler?.Dispose();
 
-            _wgpu.ShaderModuleRelease(_shaderModule);
+            _shaderModule.Dispose();
 
             _queue?.Dispose();
         }

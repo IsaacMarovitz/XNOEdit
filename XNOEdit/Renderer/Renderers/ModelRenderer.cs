@@ -1,10 +1,7 @@
 using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
-using Silk.NET.WebGPU;
-using Silk.NET.WebGPU.Extensions.WGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
 
@@ -22,7 +19,7 @@ namespace XNOEdit.Renderer.Renderers
         public TextureManager TextureManager;
     }
 
-    public unsafe class ModelRenderer : WgpuRenderer<ModelParameters>
+    public class ModelRenderer : Renderer<ModelParameters>
     {
         private readonly Model _model;
 
@@ -32,7 +29,7 @@ namespace XNOEdit.Renderer.Renderers
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
             ArcFile shaderArchive)
-            : base(device, CreateShader(device))
+            : base(CreateShader(device))
         {
             _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (ModelShader)Shader);
         }
@@ -54,7 +51,7 @@ namespace XNOEdit.Renderer.Renderers
 
         public override void Draw(
             SlQueue queue,
-            RenderPassEncoder* passEncoder,
+            SlRenderPass passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
             ModelParameters modelParameters)
@@ -78,8 +75,7 @@ namespace XNOEdit.Renderer.Renderers
             modelShader.UpdatePerFrameUniforms(queue, in perFrameUniforms);
 
             var pipeline = modelShader.GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
-            // TODO: Clean this up
-            (Device as WgpuDevice).Wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
+            passEncoder.SetPipeline(pipeline);
 
             _model.Draw(passEncoder, modelParameters.Wireframe, modelParameters.TextureManager, modelShader);
         }

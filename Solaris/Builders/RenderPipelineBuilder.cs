@@ -1,33 +1,30 @@
-using Silk.NET.Core.Native;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 
 namespace Solaris.Builders
 {
-    public unsafe class RenderPipelineBuilder(SlDevice device)
+    public class RenderPipelineBuilder(SlDevice device)
     {
-        private ShaderModule* _shaderModule;
+        private SlShaderModule _shaderModule;
         private string _vertexEntry = "vs_main";
         private string _fragmentEntry = "fs_main";
         private SlPrimitiveTopology _topology = SlPrimitiveTopology.TriangleList;
         private SlCullMode _cullMode = SlCullMode.None;
         private SlFrontFace _frontFace = SlFrontFace.CounterClockwise;
-        private readonly List<VertexBufferLayout> _vertexLayouts = [];
-        private readonly List<IntPtr> _bindGroupLayouts = [];
+        private readonly List<SlVertexBufferLayout> _vertexLayouts = [];
+        private readonly List<SlBindGroupLayout> _bindGroupLayouts = [];
 
         private bool _hasDepth;
         private bool _depthWrite = true;
         private SlCompareFunction _depthCompare = SlCompareFunction.Greater;
 
         private bool _hasBlend;
-        private BlendState _blendState;
+        private SlBlendState _blendState;
 
-        private const TextureFormat DepthTextureFormat = TextureFormat.Depth32float;
+        private const SlTextureFormat DepthTextureFormat = SlTextureFormat.Depth32float;
 
-        public static implicit operator RenderPipeline*(RenderPipelineBuilder b) => b.Build();
+        public static implicit operator SlRenderPipeline(RenderPipelineBuilder b) => b.Build();
 
-        public RenderPipelineBuilder WithShader(ShaderModule* module)
+        public RenderPipelineBuilder WithShader(SlShaderModule module)
         {
             _shaderModule = module;
             return this;
@@ -53,25 +50,25 @@ namespace Solaris.Builders
             return this;
         }
 
-        public RenderPipelineBuilder WithVertexLayout(VertexBufferLayout layout)
+        public RenderPipelineBuilder WithVertexLayout(SlVertexBufferLayout layout)
         {
             _vertexLayouts.Add(layout);
             return this;
         }
 
-        public RenderPipelineBuilder WithVertexLayouts(params VertexBufferLayout[] layouts)
+        public RenderPipelineBuilder WithVertexLayouts(SlVertexBufferLayout[] layouts)
         {
             _vertexLayouts.AddRange(layouts);
             return this;
         }
 
-        public RenderPipelineBuilder WithBindGroupLayout(BindGroupLayout* layout)
+        public RenderPipelineBuilder WithBindGroupLayout(SlBindGroupLayout layout)
         {
-            _bindGroupLayouts.Add((IntPtr)layout);
+            _bindGroupLayouts.Add(layout);
             return this;
         }
 
-        public RenderPipelineBuilder WithBindGroupLayouts(IntPtr[] layout)
+        public RenderPipelineBuilder WithBindGroupLayouts(SlBindGroupLayout[] layout)
         {
             _bindGroupLayouts.AddRange(layout);
             return this;
@@ -90,170 +87,59 @@ namespace Solaris.Builders
         public RenderPipelineBuilder WithAlphaBlend()
         {
             _hasBlend = true;
-            _blendState = new BlendState
+            _blendState = new SlBlendState
             {
-                Color = new BlendComponent
+                Color = new SlBlendComponent
                 {
-                    Operation = BlendOperation.Add,
-                    SrcFactor = BlendFactor.SrcAlpha,
-                    DstFactor = BlendFactor.OneMinusSrcAlpha
+                    Operation = SlBlendOperation.Add,
+                    SrcFactor = SlBlendFactor.SrcAlpha,
+                    DstFactor = SlBlendFactor.OneMinusSrcAlpha
                 },
-                Alpha = new BlendComponent
+                Alpha = new SlBlendComponent
                 {
-                    Operation = BlendOperation.Add,
-                    SrcFactor = BlendFactor.One,
-                    DstFactor = BlendFactor.OneMinusSrcAlpha
+                    Operation = SlBlendOperation.Add,
+                    SrcFactor = SlBlendFactor.One,
+                    DstFactor = SlBlendFactor.OneMinusSrcAlpha
                 }
             };
             return this;
         }
 
-        public RenderPipelineBuilder WithCustomBlend(BlendState blendState)
+        public RenderPipelineBuilder WithCustomBlend(SlBlendState blendState)
         {
             _hasBlend = true;
             _blendState = blendState;
             return this;
         }
 
-        public RenderPipeline* Build()
+        public SlRenderPipeline Build()
         {
-            // TODO: Cleanup
-            var _wgpuDevice = device as WgpuDevice;
-            var _wgpu = _wgpuDevice.Wgpu;
-
             if (_shaderModule == null)
                 throw new InvalidOperationException("Shader module must be set");
 
-            // Create pipeline layout
-            var layouts = _bindGroupLayouts.ToArray();
-            var layoutDesc = new PipelineLayoutDescriptor();
-
-            PipelineLayout* pipelineLayout;
-            if (layouts.Length > 0)
+            var variant = new SlPipelineVariantDescriptor
             {
-                fixed (IntPtr* pLayouts = layouts)
-                {
-                    layoutDesc.BindGroupLayoutCount = (uint)layouts.Length;
-                    layoutDesc.BindGroupLayouts = (BindGroupLayout**)pLayouts;
-                    pipelineLayout = _wgpu.DeviceCreatePipelineLayout(_wgpuDevice, &layoutDesc);
-                }
-            }
-            else
+                Topology = _topology,
+                CullMode = _cullMode,
+                FrontFace = _frontFace,
+                DepthWrite = _depthWrite,
+                DepthCompare = _depthCompare,
+            };
+
+            var descriptor = new SlRenderPipelineDescriptor
             {
-                pipelineLayout = _wgpu.DeviceCreatePipelineLayout(_wgpuDevice, &layoutDesc);
-            }
+                Shader = _shaderModule,
+                VertexEntryPoint = _vertexEntry,
+                FragmentEntryPoint = _fragmentEntry,
+                VertexBufferLayouts = _vertexLayouts.ToArray(),
+                BindGroupLayouts = _bindGroupLayouts.ToArray(),
+                Variant = variant,
+                ColorFormat = SlDevice.SurfaceFormat,
+                DepthFormat = _hasDepth ? DepthTextureFormat : null,
+                BlendState = _hasBlend ? _blendState : null,
+            };
 
-            var vertexEntry = SilkMarshal.StringToPtr(_vertexEntry);
-            var fragmentEntry = SilkMarshal.StringToPtr(_fragmentEntry);
-
-            try
-            {
-                // Vertex state
-                var vertexLayouts = _vertexLayouts.ToArray();
-                VertexState vertexState;
-
-                if (vertexLayouts.Length > 0)
-                {
-                    fixed (VertexBufferLayout* pLayouts = vertexLayouts)
-                    {
-                        vertexState = new VertexState
-                        {
-                            Module = _shaderModule,
-                            EntryPoint = (byte*)vertexEntry,
-                            BufferCount = (uint)vertexLayouts.Length,
-                            Buffers = pLayouts
-                        };
-                    }
-                }
-                else
-                {
-                    vertexState = new VertexState
-                    {
-                        Module = _shaderModule,
-                        EntryPoint = (byte*)vertexEntry,
-                        BufferCount = 0,
-                        Buffers = null
-                    };
-                }
-
-                var colorTarget = new ColorTargetState
-                {
-                    Format = TextureFormat.Bgra8Unorm,
-                    WriteMask = ColorWriteMask.All,
-                    Blend = null
-                };
-
-                if (_hasBlend)
-                {
-                    var blendState = _blendState;
-                    colorTarget.Blend = &blendState;
-                }
-
-                var fragmentState = new FragmentState
-                {
-                    Module = _shaderModule,
-                    EntryPoint = (byte*)fragmentEntry,
-                    TargetCount = 1,
-                    Targets = &colorTarget
-                };
-
-                DepthStencilState depthStencil = default;
-                if (_hasDepth)
-                {
-                    depthStencil = new DepthStencilState
-                    {
-                        Format = DepthTextureFormat,
-                        DepthWriteEnabled = _depthWrite,
-                        DepthCompare = _depthCompare.Convert(),
-                        StencilFront = new StencilFaceState
-                        {
-                            Compare = CompareFunction.Always,
-                            FailOp = StencilOperation.Keep,
-                            DepthFailOp = StencilOperation.Keep,
-                            PassOp = StencilOperation.Keep
-                        },
-                        StencilBack = new StencilFaceState
-                        {
-                            Compare = CompareFunction.Always,
-                            FailOp = StencilOperation.Keep,
-                            DepthFailOp = StencilOperation.Keep,
-                            PassOp = StencilOperation.Keep
-                        },
-                        StencilReadMask = 0xFFFFFFFF,
-                        StencilWriteMask = 0xFFFFFFFF
-                    };
-                }
-
-                var pipelineDesc = new RenderPipelineDescriptor
-                {
-                    Layout = pipelineLayout,
-                    Vertex = vertexState,
-                    Fragment = &fragmentState,
-                    Primitive = new PrimitiveState
-                    {
-                        Topology = _topology.Convert(),
-                        FrontFace = _frontFace.Convert(),
-                        CullMode = _cullMode.Convert(),
-                    },
-                    Multisample = new MultisampleState
-                    {
-                        Count = 1,
-                        Mask = ~0u,
-                        AlphaToCoverageEnabled = false
-                    },
-                    DepthStencil = _hasDepth ? &depthStencil : null
-                };
-
-                var pipeline = _wgpu.DeviceCreateRenderPipeline(_wgpuDevice, &pipelineDesc);
-                _wgpu.PipelineLayoutRelease(pipelineLayout);
-
-                return pipeline;
-            }
-            finally
-            {
-                SilkMarshal.Free(vertexEntry);
-                SilkMarshal.Free(fragmentEntry);
-            }
+            return device.CreateRenderPipeline(descriptor);
         }
     }
 }

@@ -1,7 +1,6 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
 using XNOEdit.Fonts;
 using XNOEdit.Logging;
@@ -244,7 +243,7 @@ namespace XNOEdit.Managers
 
         public unsafe void OnRender(
             Matrix4x4 view, Matrix4x4 projection,
-            double deltaTime, ref RenderSettings settings, RenderPassEncoder* pass, TextureManager textureManager)
+            double deltaTime, ref RenderSettings settings, SlRenderPass pass, TextureManager textureManager)
         {
             Controller?.Update((float)deltaTime);
 

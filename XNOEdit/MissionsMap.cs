@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using XNOEdit.Logging;
 
 namespace XNOEdit
 {

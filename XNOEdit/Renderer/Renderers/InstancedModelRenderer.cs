@@ -2,13 +2,9 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
-using Silk.NET.WebGPU;
-using Silk.NET.WebGPU.Extensions.WGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
-using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer.Renderers
 {
@@ -46,7 +42,7 @@ namespace XNOEdit.Renderer.Renderers
         public TextureManager TextureManager;
     }
 
-    public unsafe class InstancedModelRenderer : WgpuRenderer<InstancedModelParameters>
+    public unsafe class InstancedModelRenderer : Renderer<InstancedModelParameters>
     {
         private readonly SlDevice _device;
         private readonly Model _model;
@@ -62,7 +58,7 @@ namespace XNOEdit.Renderer.Renderers
             TextureListChunk? textureListChunk,
             EffectListChunk? effectListChunk,
             ArcFile? shaderArchive)
-            : base(device, CreateShader(device))
+            : base(CreateShader(device))
         {
             _device = device;
             _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (InstancedModelShader)Shader);
@@ -89,7 +85,7 @@ namespace XNOEdit.Renderer.Renderers
 
         public override void Draw(
             SlQueue queue,
-            RenderPassEncoder* passEncoder,
+            SlRenderPass passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
             InstancedModelParameters parameters)
@@ -116,18 +112,8 @@ namespace XNOEdit.Renderer.Renderers
             shader.UpdatePerFrameUniforms(queue, in perFrameUniforms);
 
             var pipeline = shader.GetPipeline(parameters.CullBackfaces, parameters.Wireframe);
-
-            // TODO: Clean this up
-            var wgpu = (Device as WgpuDevice).Wgpu;
-            wgpu.RenderPassEncoderSetPipeline(passEncoder, pipeline);
-
-            // Bind instance buffer
-            wgpu.RenderPassEncoderSetVertexBuffer(
-                passEncoder,
-                1,
-                (Buffer*)_instanceBuffer.GetHandle(),
-                0,
-                (ulong)(_instances.Length * sizeof(InstanceData)));
+            passEncoder.SetPipeline(pipeline);
+            passEncoder.SetVertexBuffer(1, _instanceBuffer);
 
             _model.Draw(passEncoder, parameters.Wireframe, parameters.TextureManager, shader, _instances.Length);
         }

@@ -9,7 +9,6 @@ using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using SDL3;
 using Silk.NET.WebGPU;
-using Silk.NET.WebGPU.Extensions.WGPU;
 using Solaris.RHI;
 using Solaris.Wgpu;
 using XNOEdit.Logging;
@@ -535,25 +534,15 @@ namespace XNOEdit
 
         private static void OnRender(double deltaTime)
         {
-            // TODO: Cleanup
-            var wgpuDevice = (_device as WgpuDevice);
-            var wgpu = wgpuDevice.Wgpu;
-
-            SurfaceTexture surfaceTexture;
-            wgpu.SurfaceGetCurrentTexture(wgpuDevice.GetSurface(), &surfaceTexture);
-
-            if (surfaceTexture.Status != SurfaceGetCurrentTextureStatus.Success)
-            {
-                return;
-            }
+            var surface = _device.GetSurface();
+            var surfaceTexture = surface.GetCurrentTexture();
 
             if (_camera == null)
             {
                 return;
             }
 
-            var commandEncoderDesc = new CommandEncoderDescriptor();
-            var encoder = wgpu.DeviceCreateCommandEncoder(wgpuDevice, &commandEncoderDesc);
+            var encoder = _device.CreateCommandEncoder();
 
             UIManager.ViewportPanel.PrepareFrame();
 
@@ -593,74 +582,66 @@ namespace XNOEdit
                     Lightmap = _settings.Lightmap,
                 });
 
-            wgpu.RenderPassEncoderEnd(scenePass);
-            wgpu.RenderPassEncoderRelease(scenePass);
+            scenePass.End();
+            scenePass.Dispose();
 
-            var textureViewDesc = new TextureViewDescriptor
+            var textureViewDesc = new SlTextureViewDescriptor
             {
-                Format = _device.SurfaceFormat.Convert(),
-                Dimension = TextureViewDimension.Dimension2D,
+                Format = SlDevice.SurfaceFormat,
+                Dimension = SlTextureViewDimension.Dimension2D,
                 BaseMipLevel = 0,
                 MipLevelCount = 1,
                 BaseArrayLayer = 0,
                 ArrayLayerCount = 1,
             };
 
-            var backbuffer = wgpu.TextureCreateView(surfaceTexture.Texture, &textureViewDesc);
+            var backbuffer = surfaceTexture.CreateTextureView(textureViewDesc);
 
-            var uiColorAttachment = new RenderPassColorAttachment
+            var uiColorAttachment = new SlColorAttachment
             {
                 View = backbuffer,
-                LoadOp = LoadOp.Clear,
-                StoreOp = StoreOp.Store,
-                ClearValue = new Color { R = 0.15, G = 0.15, B = 0.15, A = 1.0 }
+                LoadOp = SlLoadOp.Clear,
+                StoreOp = SlStoreOp.Store,
+                ClearValue = new SlColor { R = 0.15, G = 0.15, B = 0.15, A = 1.0 }
             };
 
-            var uiRenderPassDesc = new RenderPassDescriptor
+            var uiRenderPassDesc = new SlRenderPassDescriptor
             {
-                ColorAttachmentCount = 1,
-                ColorAttachments = &uiColorAttachment,
+                ColorAttachments = [uiColorAttachment],
                 DepthStencilAttachment = null
             };
 
-            var uiPass = wgpu.CommandEncoderBeginRenderPass(encoder, &uiRenderPassDesc);
+            var uiPass = encoder.BeginRenderPass(uiRenderPassDesc);
 
             UIManager.OnRender(
                 view, projection,
                 deltaTime, ref _settings, uiPass, _textureManager);
 
-            wgpu.RenderPassEncoderEnd(uiPass);
+            uiPass.End();
 
-            var commandBuffer = wgpu.CommandEncoderFinish(encoder, null);
-            // TODO: Cleanup
-            var wgpuQueue = (_queue as WgpuQueue);
-            wgpu.QueueSubmit(wgpuQueue.Queue, 1, &commandBuffer);
+            var commandBuffer = encoder.Finish();
+            _queue.Submit(commandBuffer);
 
-            wgpu.SurfacePresent(wgpuDevice.GetSurface());
-            wgpu.TextureViewRelease(backbuffer);
-            wgpu.CommandBufferRelease(commandBuffer);
-            wgpu.CommandEncoderRelease(encoder);
-            wgpu.RenderPassEncoderRelease(uiPass);
+            surface.Present();
+            backbuffer.Dispose();
+            commandBuffer.Dispose();
+            encoder.Dispose();
+            uiPass.Dispose();
         }
 
         private static void OnFramebufferResize(Vector2 size)
         {
-            // TODO: Cleanup
-            var wgpuDevice = (_device as WgpuDevice);
-            var wgpu = wgpuDevice.Wgpu;
-
-            var surfaceConfig = new SurfaceConfiguration
+            var surface = _device.GetSurface();
+            var surfaceDescriptor = new SlSurfaceDescriptor
             {
-                Device = wgpuDevice,
-                Format = _device.SurfaceFormat.Convert(),
-                Usage = TextureUsage.RenderAttachment,
+                Format = SlDevice.SurfaceFormat,
+                Usage = SlTextureUsage.RenderAttachment,
                 Width = (uint)size.X,
                 Height = (uint)size.Y,
-                PresentMode = PresentMode.Fifo,
-                AlphaMode = CompositeAlphaMode.Auto
+                PresentMode = SlPresentMode.Fifo
             };
 
-            wgpu.SurfaceConfigure(wgpuDevice.GetSurface(), &surfaceConfig);
+            surface.Configure(surfaceDescriptor);
 
             _depthTextureView?.Dispose();
             _depthTexture?.Dispose();

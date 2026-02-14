@@ -3,7 +3,7 @@ using Solaris.RHI;
 
 namespace Solaris.Wgpu
 {
-    public unsafe class WgpuTextureView : SlTextureView
+    internal unsafe class WgpuTextureView : SlTextureView
     {
         private readonly WebGPU _wgpu;
         public TextureView* TextureView { get; }

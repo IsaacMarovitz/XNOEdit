@@ -205,4 +205,266 @@ namespace Solaris.RHI
         public uint BytesPerRow;
         public uint RowsPerImage;
     }
+
+    public struct SlSurfaceDescriptor
+    {
+        public uint Width;
+        public uint Height;
+        public SlTextureFormat Format;
+        public SlTextureUsage Usage;
+        public SlPresentMode PresentMode;
+    }
+
+    public enum SlPresentMode
+    {
+        Fifo,
+        Immediate,
+        Mailbox,
+    }
+
+    public enum SlIndexFormat
+    {
+        Uint16,
+        Uint32,
+    }
+
+    public struct SlRenderPassDescriptor
+    {
+        public SlColorAttachment[] ColorAttachments;
+        public SlDepthStencilAttachment? DepthStencilAttachment;
+    }
+
+    public struct SlColorAttachment
+    {
+        public SlTextureView View;
+        public SlLoadOp LoadOp;
+        public SlStoreOp StoreOp;
+        public SlColor ClearValue;
+    }
+
+    public struct SlDepthStencilAttachment
+    {
+        public SlTextureView View;
+        public SlLoadOp DepthLoadOp;
+        public SlStoreOp DepthStoreOp;
+        public float DepthClearValue;
+    }
+
+    public enum SlLoadOp
+    {
+        Clear,
+        Load,
+    }
+
+    public enum SlStoreOp
+    {
+        Store,
+        Discard,
+    }
+
+    public struct SlColor
+    {
+        public double R, G, B, A;
+
+        public SlColor(double r, double g, double b, double a = 1.0)
+        {
+            R = r; G = g; B = b; A = a;
+        }
+    }
+
+    public struct SlBindGroupLayoutDescriptor
+    {
+        public SlBindGroupLayoutEntry[] Entries;
+    }
+
+    public struct SlBindGroupLayoutEntry
+    {
+        public uint Binding;
+        public SlShaderStage Visibility;
+        public SlBindingType Type;
+
+        // Only relevant for buffer bindings
+        public SlBufferBindingType BufferType;
+
+        // Only relevant for texture bindings
+        public SlTextureViewDimension TextureDimension;
+        public SlTextureSampleType TextureSampleType;
+
+        // Only relevant for sampler bindings
+        public SlSamplerBindingType SamplerType;
+    }
+
+    public enum SlBindingType
+    {
+        Invalid,
+        Buffer,
+        Texture,
+        Sampler,
+    }
+
+    public enum SlBufferBindingType
+    {
+        Uniform,
+        Storage,
+        ReadOnlyStorage,
+    }
+
+    public enum SlTextureSampleType
+    {
+        Float,
+        UnfilterableFloat,
+        Depth,
+        Sint,
+        Uint,
+    }
+
+    public enum SlSamplerBindingType
+    {
+        Filtering,
+        NonFiltering,
+        Comparison,
+    }
+
+    [Flags]
+    public enum SlShaderStage
+    {
+        None     = 0,
+        Vertex   = 1 << 0,
+        Fragment = 1 << 1,
+        Compute  = 1 << 2,
+    }
+
+    public struct SlBindGroupDescriptor
+    {
+        public SlBindGroupLayout Layout;
+        public SlBindGroupEntry[] Entries;
+    }
+
+    public struct SlBindGroupEntry
+    {
+        public uint Binding;
+
+        // Set exactly one of these — the rest should be null/default
+        public SlBufferBinding? Buffer;
+        public SlTextureView? TextureView;
+        public SlSampler? Sampler;
+    }
+
+    public struct SlBufferBinding
+    {
+        public unsafe void* Handle; // from SlBuffer.GetHandle()
+        public ulong Offset;
+        public ulong Size;
+    }
+
+    public struct SlShaderModuleDescriptor
+    {
+        public string Label;
+
+        /// <summary>
+        /// Shader source — interpretation is backend-specific.
+        /// WGSL string for WebGPU, SPIR-V bytes for Vulkan, MSL for Metal, HLSL/DXIL for D3D.
+        /// </summary>
+        public object Source;
+
+        /// <summary>
+        /// Hint for which language the source is in.
+        /// </summary>
+        public SlShaderLanguage Language;
+    }
+
+    public enum SlShaderLanguage
+    {
+        Wgsl,
+        SpirV,
+        Msl,
+        Hlsl,
+    }
+
+    public struct SlRenderPipelineDescriptor
+    {
+        public SlShaderModule Shader;
+        public string VertexEntryPoint;
+        public string FragmentEntryPoint;
+        public SlVertexBufferLayout[] VertexBufferLayouts;
+        public SlBindGroupLayout[] BindGroupLayouts;
+        public SlPipelineVariantDescriptor Variant;
+        public SlTextureFormat ColorFormat;
+        public SlTextureFormat? DepthFormat;
+        public SlBlendState? BlendState;
+    }
+
+    public struct SlVertexBufferLayout
+    {
+        public ulong Stride;
+        public SlVertexStepMode StepMode;
+        public SlVertexAttribute[] Attributes;
+    }
+
+    public enum SlVertexStepMode
+    {
+        Vertex,
+        Instance,
+    }
+
+    public struct SlVertexAttribute
+    {
+        public SlVertexFormat Format;
+        public ulong Offset;
+        public uint ShaderLocation;
+    }
+
+    public enum SlVertexFormat
+    {
+        Float32,
+        Float32x2,
+        Float32x3,
+        Float32x4,
+        Uint8x4,
+        Unorm8x4,
+        Sint32,
+        Sint32x2,
+        Sint32x3,
+        Sint32x4,
+        Uint32,
+        Uint32x2,
+        Uint32x3,
+        Uint32x4,
+    }
+
+    public struct SlBlendState
+    {
+        public SlBlendComponent Color;
+        public SlBlendComponent Alpha;
+    }
+
+    public struct SlBlendComponent
+    {
+        public SlBlendOperation Operation;
+        public SlBlendFactor SrcFactor;
+        public SlBlendFactor DstFactor;
+    }
+
+    public enum SlBlendOperation
+    {
+        Add,
+        Subtract,
+        ReverseSubtract,
+        Min,
+        Max,
+    }
+
+    public enum SlBlendFactor
+    {
+        Zero,
+        One,
+        Src,
+        OneMinusSrc,
+        SrcAlpha,
+        OneMinusSrcAlpha,
+        Dst,
+        OneMinusDst,
+        DstAlpha,
+        OneMinusDstAlpha,
+    }
 }
