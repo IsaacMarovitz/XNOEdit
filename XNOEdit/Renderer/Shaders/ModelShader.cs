@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Builders;
+using Solaris.Builders;
 using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer.Shaders

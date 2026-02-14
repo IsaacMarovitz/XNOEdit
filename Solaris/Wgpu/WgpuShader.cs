@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using Silk.NET.Core.Native;
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Builders;
+using Solaris.Builders;
 
 namespace XNOEdit.Renderer.Wgpu
 {

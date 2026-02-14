@@ -6,7 +6,7 @@ using Hexa.NET.ImGui;
 using SDL3;
 using Silk.NET.Core.Native;
 using Silk.NET.WebGPU;
-using XNOEdit.Renderer.Builders;
+using Solaris.Builders;
 using XNOEdit.Renderer.Wgpu;
 
 namespace XNOEdit.Renderer

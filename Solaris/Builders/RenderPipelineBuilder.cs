@@ -2,7 +2,7 @@ using Silk.NET.Core.Native;
 using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Wgpu;
 
-namespace XNOEdit.Renderer.Builders
+namespace Solaris.Builders
 {
     public unsafe class RenderPipelineBuilder
     {

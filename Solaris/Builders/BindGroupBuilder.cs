@@ -2,7 +2,7 @@ using Silk.NET.WebGPU;
 using XNOEdit.Renderer.Wgpu;
 using Buffer = Silk.NET.WebGPU.Buffer;
 
-namespace XNOEdit.Renderer.Builders
+namespace Solaris.Builders
 {
     public unsafe class BindGroupBuilder
     {
