@@ -3,7 +3,7 @@ using Solaris.RHI;
 
 namespace Solaris.Wgpu
 {
-    public unsafe class WgpuQueue : SlQueue
+    internal unsafe class WgpuQueue : SlQueue
     {
         private readonly WebGPU _wgpu;
         public Queue* Queue { get; }

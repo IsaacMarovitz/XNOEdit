@@ -3,7 +3,7 @@ using Solaris.RHI;
 
 namespace Solaris.Wgpu
 {
-    public static class EnumConversion
+    internal static class EnumConversion
     {
         public static BufferUsage Convert(this SlBufferUsage usage)
         {
