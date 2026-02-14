@@ -5,7 +5,7 @@ using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace Solaris.Wgpu
 {
-    public unsafe class WgpuBuffer<T> : SlBuffer<T> where T : unmanaged
+    internal unsafe class WgpuBuffer<T> : SlBuffer<T> where T : unmanaged
     {
         private readonly WebGPU _wgpu;
         private readonly Buffer* _handle;

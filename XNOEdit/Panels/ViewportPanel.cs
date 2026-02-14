@@ -1,9 +1,7 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 using XNOEdit.Renderer;
 
 namespace XNOEdit.Panels
@@ -119,35 +117,31 @@ namespace XNOEdit.Panels
             ViewportSize = new Vector2(width, height);
         }
 
-        public RenderPassEncoder* BeginRenderPass(CommandEncoder* encoder)
+        public SlRenderPass BeginRenderPass(SlCommandEncoder encoder)
         {
-            // TODO: Cleanup
-            var wgpu = (_device as WgpuDevice)!.Wgpu;
-
-            var colorAttachment = new RenderPassColorAttachment
+            var colorAttachment = new SlColorAttachment
             {
-                View = (TextureView*)_colorTextureView.GetHandle(),
-                LoadOp = LoadOp.Clear,
-                StoreOp = StoreOp.Store,
-                ClearValue = new Color { R = 0.1, G = 0.1, B = 0.1, A = 1.0 }
+                View = _colorTextureView,
+                LoadOp = SlLoadOp.Clear,
+                StoreOp = SlStoreOp.Store,
+                ClearValue = new SlColor { R = 0.1, G = 0.1, B = 0.1, A = 1.0 }
             };
 
-            var depthAttachment = new RenderPassDepthStencilAttachment
+            var depthAttachment = new SlDepthStencilAttachment
             {
-                View = (TextureView*)_depthTextureView.GetHandle(),
-                DepthLoadOp = LoadOp.Clear,
-                DepthStoreOp = StoreOp.Store,
+                View = _depthTextureView,
+                DepthLoadOp = SlLoadOp.Clear,
+                DepthStoreOp = SlStoreOp.Store,
                 DepthClearValue = 0.0f // Reverse-Z
             };
 
-            var renderPassDesc = new RenderPassDescriptor
+            var renderPassDesc = new SlRenderPassDescriptor
             {
-                ColorAttachmentCount = 1,
-                ColorAttachments = &colorAttachment,
-                DepthStencilAttachment = &depthAttachment
+                ColorAttachments = [colorAttachment],
+                DepthStencilAttachment = depthAttachment
             };
 
-            return wgpu.CommandEncoderBeginRenderPass(encoder, &renderPassDesc);
+            return encoder.BeginRenderPass(renderPassDesc);
         }
 
         public void Render(Matrix4x4 view, Matrix4x4 projection, bool renderGuizmos)

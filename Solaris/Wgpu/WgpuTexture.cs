@@ -3,15 +3,17 @@ using Solaris.RHI;
 
 namespace Solaris.Wgpu
 {
-    public unsafe class WgpuTexture : SlTexture
+    internal unsafe class WgpuTexture : SlTexture
     {
         private readonly WebGPU _wgpu;
+        private readonly bool _owned;
         public Texture* Texture { get; }
 
-        internal WgpuTexture(WebGPU wgpu, Texture* texture)
+        internal WgpuTexture(WebGPU wgpu, Texture* texture, bool owned = true)
         {
             _wgpu = wgpu;
             Texture = texture;
+            _owned = owned;
         }
 
         public override void* GetHandle()
@@ -37,7 +39,7 @@ namespace Solaris.Wgpu
 
         public override void Dispose()
         {
-            if (Texture != null)
+            if (Texture != null && _owned)
             {
                 _wgpu.TextureDestroy(Texture);
                 _wgpu.TextureRelease(Texture);

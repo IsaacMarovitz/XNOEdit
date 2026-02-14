@@ -1,10 +1,7 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using Silk.NET.WebGPU;
 using Solaris.Builders;
 using Solaris.RHI;
-using Solaris.Wgpu;
-using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer.Shaders
 {
@@ -35,19 +32,19 @@ namespace XNOEdit.Renderer.Shaders
         public float Specular;
     }
 
-    public unsafe class ModelShader : WgpuShader
+    public unsafe class ModelShader : Shader
     {
         private SlBuffer<PerFrameUniforms>? _perFrameUniformBuffer;
-        private BindGroup* _perFrameBindGroup;
+        private SlBindGroup _perFrameBindGroup;
 
         private SlSampler _sampler;
         private SlTexture _defaultTexture;
         private SlTextureView _defaultTextureView;
 
-        private BindGroupLayout* _perFrameLayout;
-        private BindGroupLayout* _perMeshLayout;
-        private BindGroupLayout* _textureLayout;
-        private BindGroup* _defaultTextureBindGroup;
+        private SlBindGroupLayout _perFrameLayout;
+        private SlBindGroupLayout _perMeshLayout;
+        private SlBindGroupLayout _textureLayout;
+        private SlBindGroup _defaultTextureBindGroup;
 
         public ModelShader(
             SlDevice device,
@@ -184,199 +181,162 @@ namespace XNOEdit.Renderer.Shaders
             RegisterBindGroup(_textureLayout, _defaultTextureBindGroup);
         }
 
-        private BindGroupLayout* CreatePerMeshBindGroupLayout()
+        private SlBindGroupLayout CreatePerMeshBindGroupLayout()
         {
-            var entry = new BindGroupLayoutEntry
+            var entry = new SlBindGroupLayoutEntry
             {
                 Binding = 0,
-                Visibility = ShaderStage.Vertex | ShaderStage.Fragment,
-                Buffer = new BufferBindingLayout
-                {
-                    Type = BufferBindingType.Uniform,
-                    MinBindingSize = 0
-                }
+                Visibility = SlShaderStage.Vertex | SlShaderStage.Fragment,
+                BufferType = SlBufferBindingType.Uniform
             };
 
-            var layoutDesc = new BindGroupLayoutDescriptor
+            var layoutDesc = new SlBindGroupLayoutDescriptor
             {
-                EntryCount = 1,
-                Entries = &entry
+                Entries = [entry]
             };
 
-            // TODO: Cleanup
-            var wgpuDevice = Device as WgpuDevice;
-            return wgpuDevice.Wgpu.DeviceCreateBindGroupLayout(wgpuDevice, &layoutDesc);
+            return Device.CreateBindGroupLayout(layoutDesc);
         }
 
-        public BindGroup* CreatePerMeshBindGroup(SlBuffer<PerMeshUniforms> uniformBuffer)
+        public SlBindGroup CreatePerMeshBindGroup(SlBuffer<PerMeshUniforms> uniformBuffer)
         {
             var layout = GetBindGroupLayout(1);
 
-            var entry = new BindGroupEntry
+            var entry = new SlBindGroupEntry
             {
                 Binding = 0,
-                Buffer = (Buffer*)uniformBuffer.GetHandle(),
-                Offset = 0,
-                Size = uniformBuffer.Size
+                Buffer = new SlBufferBinding
+                {
+                    Handle = uniformBuffer.GetHandle(),
+                    Offset = 0,
+                    Size = uniformBuffer.Size
+                }
             };
 
-            var bindGroupDesc = new BindGroupDescriptor
+            var bindGroupDesc = new SlBindGroupDescriptor
             {
                 Layout = layout,
-                EntryCount = 1,
-                Entries = &entry
+                Entries = [entry]
             };
 
-            // TODO: Cleanup
-            var wgpuDevice = Device as WgpuDevice;
-            return wgpuDevice.Wgpu.DeviceCreateBindGroup(wgpuDevice, &bindGroupDesc);
+            return Device.CreateBindGroup(bindGroupDesc);
         }
 
-        private BindGroupLayout* CreateTextureBindGroupLayout()
+        private SlBindGroupLayout CreateTextureBindGroupLayout()
         {
-            var entries = stackalloc BindGroupLayoutEntry[5];
+            var entries = new SlBindGroupLayoutEntry[5];
 
-            entries[0] = new BindGroupLayoutEntry
+            entries[0] = new SlBindGroupLayoutEntry
             {
                 Binding = 0,
-                Visibility = ShaderStage.Fragment,
-                Sampler = new SamplerBindingLayout
-                {
-                    Type = SamplerBindingType.Filtering
-                }
+                Visibility = SlShaderStage.Fragment,
+                SamplerType = SlSamplerBindingType.Filtering
             };
 
-            entries[1] = new BindGroupLayoutEntry
+            entries[1] = new SlBindGroupLayoutEntry
             {
                 Binding = 1,
-                Visibility = ShaderStage.Fragment,
-                Texture = new TextureBindingLayout
-                {
-                    SampleType = TextureSampleType.Float,
-                    ViewDimension = TextureViewDimension.Dimension2D,
-                    Multisampled = false
-                }
+                Visibility = SlShaderStage.Fragment,
+                TextureSampleType = SlTextureSampleType.Float,
+                TextureDimension = SlTextureViewDimension.Dimension2D
             };
 
-            entries[2] = new BindGroupLayoutEntry
+            entries[2] = new SlBindGroupLayoutEntry
             {
                 Binding = 2,
-                Visibility = ShaderStage.Fragment,
-                Texture = new TextureBindingLayout
-                {
-                    SampleType = TextureSampleType.Float,
-                    ViewDimension = TextureViewDimension.Dimension2D,
-                    Multisampled = false
-                }
+                Visibility = SlShaderStage.Fragment,
+                TextureSampleType = SlTextureSampleType.Float,
+                TextureDimension = SlTextureViewDimension.Dimension2D
             };
 
-            entries[3] = new BindGroupLayoutEntry
+            entries[3] = new SlBindGroupLayoutEntry
             {
                 Binding = 3,
-                Visibility = ShaderStage.Fragment,
-                Texture = new TextureBindingLayout
-                {
-                    SampleType = TextureSampleType.Float,
-                    ViewDimension = TextureViewDimension.Dimension2D,
-                    Multisampled = false
-                }
+                Visibility = SlShaderStage.Fragment,
+                TextureSampleType = SlTextureSampleType.Float,
+                TextureDimension = SlTextureViewDimension.Dimension2D
             };
 
-            entries[4] = new BindGroupLayoutEntry
+            entries[4] = new SlBindGroupLayoutEntry
             {
                 Binding = 4,
-                Visibility = ShaderStage.Fragment,
-                Texture = new TextureBindingLayout
-                {
-                    SampleType = TextureSampleType.Float,
-                    ViewDimension = TextureViewDimension.Dimension2D,
-                    Multisampled = false
-                }
+                Visibility = SlShaderStage.Fragment,
+                TextureSampleType = SlTextureSampleType.Float,
+                TextureDimension = SlTextureViewDimension.Dimension2D
             };
 
-            var layoutDesc = new BindGroupLayoutDescriptor
+            var layoutDesc = new SlBindGroupLayoutDescriptor
             {
-                EntryCount = 5,
                 Entries = entries
             };
 
-            // TODO: Cleanup
-            var wgpuDevice = Device as WgpuDevice;
-            return wgpuDevice.Wgpu.DeviceCreateBindGroupLayout(wgpuDevice, &layoutDesc);
+            return Device.CreateBindGroupLayout(layoutDesc);
         }
 
-        public BindGroup* CreateTextureBindGroup(
-            BindGroupLayout* layout,
+        public SlBindGroup CreateTextureBindGroup(
+            SlBindGroupLayout layout,
             SlTextureView? mainTextureView,
             SlTextureView? blendTextureView,
             SlTextureView? normalTextureView,
             SlTextureView? lightmapTextureView)
         {
-            var entries = stackalloc BindGroupEntry[5];
+            var entries = new SlBindGroupEntry[5];
 
-            entries[0] = new BindGroupEntry
+            entries[0] = new SlBindGroupEntry
             {
                 Binding = 0,
-                Sampler = (Sampler*)_sampler.GetHandle()
+                Sampler = _sampler
             };
 
-            TextureView* defaultTextureView = (TextureView*)_defaultTextureView.GetHandle();
-
-            entries[1] = new BindGroupEntry
+            entries[1] = new SlBindGroupEntry
             {
                 Binding = 1,
-                TextureView = mainTextureView == null ? defaultTextureView : (TextureView*)mainTextureView.GetHandle()
+                TextureView = mainTextureView ?? _defaultTextureView
             };
 
-            entries[2] = new BindGroupEntry
+            entries[2] = new SlBindGroupEntry
             {
                 Binding = 2,
-                TextureView = blendTextureView == null ? defaultTextureView : (TextureView*)blendTextureView.GetHandle()
+                TextureView = blendTextureView ?? _defaultTextureView
             };
 
-            entries[3] = new BindGroupEntry
+            entries[3] = new SlBindGroupEntry
             {
                 Binding = 3,
-                TextureView = normalTextureView == null ? defaultTextureView : (TextureView*)normalTextureView.GetHandle()
+                TextureView = normalTextureView ?? _defaultTextureView
             };
 
-            entries[4] = new BindGroupEntry
+            entries[4] = new SlBindGroupEntry
             {
                 Binding = 4,
-                TextureView = lightmapTextureView == null ? defaultTextureView : (TextureView*)lightmapTextureView.GetHandle()
+                TextureView = lightmapTextureView ?? _defaultTextureView
             };
 
-            var bindGroupDesc = new BindGroupDescriptor
+            var bindGroupDesc = new SlBindGroupDescriptor
             {
                 Layout = layout,
-                EntryCount = 5,
                 Entries = entries
             };
 
-            // TODO: Cleanup
-            var wgpuDevice = Device as WgpuDevice;
-            return wgpuDevice.Wgpu.DeviceCreateBindGroup(wgpuDevice, &bindGroupDesc);
+            return Device.CreateBindGroup(bindGroupDesc);
         }
 
-        protected override VertexBufferLayout[] CreateVertexLayouts()
+        protected override SlVertexBufferLayout[] CreateVertexLayouts()
         {
-            var vertexAttrib = new VertexAttribute[5];
-            vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0,  ShaderLocation = 0 };
-            vertexAttrib[1] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };
-            vertexAttrib[2] = new VertexAttribute { Format = VertexFormat.Float32x4, Offset = 24, ShaderLocation = 2 };
-            vertexAttrib[3] = new VertexAttribute { Format = VertexFormat.Float32x2, Offset = 40, ShaderLocation = 3 };
-            vertexAttrib[4] = new VertexAttribute { Format = VertexFormat.Float32x2, Offset = 48, ShaderLocation = 4 };
-
-            Attributes = GCHandle.Alloc(vertexAttrib, GCHandleType.Pinned);
+            var vertexAttrib = new SlVertexAttribute[5];
+            vertexAttrib[0] = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 0,  ShaderLocation = 0 };
+            vertexAttrib[1] = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };
+            vertexAttrib[2] = new SlVertexAttribute { Format = SlVertexFormat.Float32x4, Offset = 24, ShaderLocation = 2 };
+            vertexAttrib[3] = new SlVertexAttribute { Format = SlVertexFormat.Float32x2, Offset = 40, ShaderLocation = 3 };
+            vertexAttrib[4] = new SlVertexAttribute { Format = SlVertexFormat.Float32x2, Offset = 48, ShaderLocation = 4 };
 
             return
             [
-                new VertexBufferLayout
+                new SlVertexBufferLayout
                 {
-                    ArrayStride = 56,
-                    StepMode = VertexStepMode.Vertex,
-                    AttributeCount = (uint)vertexAttrib.Length,
-                    Attributes = (VertexAttribute*)Attributes.AddrOfPinnedObject()
+                    Stride = 56,
+                    StepMode = SlVertexStepMode.Vertex,
+                    Attributes = vertexAttrib
                 }
             ];
         }
@@ -386,7 +346,7 @@ namespace XNOEdit.Renderer.Shaders
             _perFrameUniformBuffer?.UpdateData(queue, in uniforms);
         }
 
-        public BindGroup* GetTextureBindGroup(
+        public SlBindGroup GetTextureBindGroup(
             SlTextureView mainTextureView,
             SlTextureView blendTextureView,
             SlTextureView normalTextureView,
@@ -396,7 +356,7 @@ namespace XNOEdit.Renderer.Shaders
             return CreateTextureBindGroup(layout, mainTextureView, blendTextureView, normalTextureView, lightmapTextureView);
         }
 
-        public RenderPipeline* GetPipeline(bool cullBackfaces, bool wireframe)
+        public SlRenderPipeline GetPipeline(bool cullBackfaces, bool wireframe)
         {
             if (wireframe)
                 return GetPipeline("wireframe");

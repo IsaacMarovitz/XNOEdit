@@ -1,29 +1,27 @@
 using System.Runtime.InteropServices;
-using Silk.NET.Core.Native;
-using Silk.NET.WebGPU;
 using Solaris.Builders;
 using Solaris.RHI;
 
-namespace Solaris.Wgpu
+namespace XNOEdit.Renderer
 {
-    public abstract unsafe class WgpuShader : IDisposable
+    public abstract class Shader : IDisposable
     {
         protected readonly SlDevice Device;
-        private readonly ShaderModule* _shaderModule;
+        private readonly SlShaderModule _shaderModule;
 
-        private readonly List<IntPtr> _bindGroupLayouts = [];
-        private readonly List<IntPtr> _bindGroups = [];
+        private readonly List<SlBindGroupLayout> _bindGroupLayouts = [];
+        private readonly List<SlBindGroup> _bindGroups = [];
 
         public int BindGroupCount => _bindGroups.Count;
 
-        private readonly Dictionary<string, IntPtr> _pipelines;
-        private readonly VertexBufferLayout[] _vertexLayouts;
+        private readonly Dictionary<string, SlRenderPipeline> _pipelines;
+        private readonly SlVertexBufferLayout[] _vertexLayouts;
         protected GCHandle Attributes;
 
         private readonly List<IDisposable> _resources;
         private bool _disposed;
 
-        protected WgpuShader(
+        protected Shader(
             SlDevice device,
             string shaderSource,
             string label,
@@ -31,7 +29,7 @@ namespace Solaris.Wgpu
         {
             Device = device;
             _resources = [];
-            _pipelines = new Dictionary<string, IntPtr>();
+            _pipelines = new Dictionary<string, SlRenderPipeline>();
 
             _shaderModule = CreateShaderModule(device, shaderSource, label);
             _vertexLayouts = CreateVertexLayouts();
@@ -43,11 +41,11 @@ namespace Solaris.Wgpu
             foreach (var (name, descriptor) in pipelineVariants)
             {
                 var pipeline = CreatePipeline(descriptor);
-                _pipelines[name] = (IntPtr)pipeline;
+                _pipelines[name] = pipeline;
             }
         }
 
-        protected abstract VertexBufferLayout[] CreateVertexLayouts();
+        protected abstract SlVertexBufferLayout[] CreateVertexLayouts();
 
         /// <summary>
         /// Derived classes override this to create their bind group layouts and bind groups.
@@ -59,40 +57,40 @@ namespace Solaris.Wgpu
         /// Register a bind group layout and its corresponding bind group.
         /// Must be called in order: group 0, then 1, then 2, etc.
         /// </summary>
-        protected void RegisterBindGroup(BindGroupLayout* layout, BindGroup* bindGroup)
+        protected void RegisterBindGroup(SlBindGroupLayout layout, SlBindGroup bindGroup)
         {
-            _bindGroupLayouts.Add((IntPtr)layout);
-            _bindGroups.Add((IntPtr)bindGroup);
+            _bindGroupLayouts.Add(layout);
+            _bindGroups.Add(bindGroup);
         }
 
-        public BindGroupLayout* GetBindGroupLayout(int index)
+        public SlBindGroupLayout GetBindGroupLayout(int index)
         {
             if (index < 0 || index >= _bindGroupLayouts.Count)
                 throw new ArgumentOutOfRangeException(nameof(index));
 
-            return (BindGroupLayout*)_bindGroupLayouts[index];
+            return _bindGroupLayouts[index];
         }
 
         /// <summary>
         /// Get a specific bind group by index
         /// </summary>
-        public BindGroup* GetBindGroup(int index = 0)
+        public SlBindGroup GetBindGroup(int index = 0)
         {
             if (index < 0 || index >= _bindGroups.Count)
                 throw new ArgumentOutOfRangeException(nameof(index));
 
-            return (BindGroup*)_bindGroups[index];
+            return _bindGroups[index];
         }
 
-        public RenderPipeline* GetPipeline(string variant = "default")
+        public SlRenderPipeline GetPipeline(string variant = "default")
         {
             if (_pipelines.TryGetValue(variant, out var pipeline))
-                return (RenderPipeline*)pipeline;
+                return pipeline;
 
             throw new KeyNotFoundException($"Pipeline variant '{variant}' not found");
         }
 
-        private RenderPipeline* CreatePipeline(SlPipelineVariantDescriptor descriptor)
+        private SlRenderPipeline CreatePipeline(SlPipelineVariantDescriptor descriptor)
         {
             var builder = new RenderPipelineBuilder(Device)
                 .WithShader(_shaderModule)
@@ -108,34 +106,16 @@ namespace Solaris.Wgpu
             return builder;
         }
 
-        private static ShaderModule* CreateShaderModule(SlDevice device, string source, string label)
+        private static SlShaderModule CreateShaderModule(SlDevice device, string source, string label)
         {
-            var src = SilkMarshal.StringToPtr(source);
-            var shaderName = SilkMarshal.StringToPtr(label);
-            var wgpuDevice = device as WgpuDevice;
-
-            try
+            var descriptor = new SlShaderModuleDescriptor
             {
-                var wgslDescriptor = new ShaderModuleWGSLDescriptor
-                {
-                    Chain = new ChainedStruct { SType = SType.ShaderModuleWgslDescriptor },
-                    Code = (byte*)src
-                };
+                Label = label,
+                Source = source,
+                Language = SlShaderLanguage.Wgsl
+            };
 
-                var descriptor = new ShaderModuleDescriptor
-                {
-                    Label = (byte*)shaderName,
-                    NextInChain = (ChainedStruct*)&wgslDescriptor
-                };
-
-                return wgpuDevice.Wgpu.DeviceCreateShaderModule(wgpuDevice, &descriptor);
-            }
-            finally
-            {
-                SilkMarshal.Free(src);
-                if (shaderName != 0)
-                    SilkMarshal.Free(shaderName);
-            }
+            return device.CreateShaderModule(descriptor);
         }
 
         protected void RegisterResource(IDisposable? resource)
@@ -154,43 +134,36 @@ namespace Solaris.Wgpu
                 catch { /* Swallow */ }
             }
 
-            // TODO: Clean this up
-            var wgpu = (Device as WgpuDevice).Wgpu;
-
             foreach (var pipeline in _pipelines.Values)
             {
-                if (pipeline != IntPtr.Zero)
-                    wgpu.RenderPipelineRelease((RenderPipeline*)pipeline);
+                pipeline.Dispose();
             }
 
             if (Attributes.IsAllocated)
                 Attributes.Free();
 
             // Release all bind groups and layouts
-            foreach (BindGroup* bindGroup in _bindGroups)
+            foreach (var bindGroup in _bindGroups)
             {
-                if ((IntPtr)bindGroup != IntPtr.Zero)
-                    wgpu.BindGroupRelease(bindGroup);
+                bindGroup.Dispose();
             }
 
-            foreach (BindGroupLayout* layout in _bindGroupLayouts)
+            foreach (var layout in _bindGroupLayouts)
             {
-                if ((IntPtr)layout != IntPtr.Zero)
-                    wgpu.BindGroupLayoutRelease(layout);
+                layout.Dispose();
             }
 
-            if (_shaderModule != null)
-                wgpu.ShaderModuleRelease(_shaderModule);
+            _shaderModule.Dispose();
 
             _disposed = true;
         }
     }
 
-    public unsafe class WgpuShader<TUniforms> : WgpuShader where TUniforms : unmanaged
+    public unsafe class Shader<TUniforms> : Shader where TUniforms : unmanaged
     {
         private SlBuffer<TUniforms> _uniformBuffer;
 
-        protected WgpuShader(
+        protected Shader(
             SlDevice device,
             string shaderSource,
             string label,
@@ -199,7 +172,7 @@ namespace Solaris.Wgpu
         {
         }
 
-        protected override VertexBufferLayout[] CreateVertexLayouts()
+        protected override SlVertexBufferLayout[] CreateVertexLayouts()
         {
             throw new NotImplementedException();
         }

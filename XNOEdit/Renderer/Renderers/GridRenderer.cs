@@ -1,9 +1,6 @@
 using System.Numerics;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 using XNOEdit.Renderer.Shaders;
-using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer.Renderers
 {
@@ -14,13 +11,13 @@ namespace XNOEdit.Renderer.Renderers
         public float FadeDistance;
     }
 
-    public unsafe class GridRenderer : WgpuRenderer<GridParameters>
+    public unsafe class GridRenderer : Renderer<GridParameters>
     {
         private readonly SlBuffer<float> _vertexBuffer;
         private readonly int _lineCount;
 
         public GridRenderer(SlDevice device, float size = 100.0f, int divisions = 100)
-            : base(device, CreateShader(device))
+            : base(CreateShader(device))
         {
             var vertices = CreateGridVertices(size, divisions);
             _lineCount = (divisions + 1) * 2 * 2;
@@ -65,7 +62,7 @@ namespace XNOEdit.Renderer.Renderers
 
         public override void Draw(
             SlQueue queue,
-            RenderPassEncoder* passEncoder,
+            SlRenderPass passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
             GridParameters gridParameters)
@@ -84,11 +81,9 @@ namespace XNOEdit.Renderer.Renderers
 
             ((GridShader)Shader).UpdateUniforms(queue, in uniforms);
 
-            // TODO: Clean this up
-            var wgpu = (Device as WgpuDevice).Wgpu;
-            wgpu.RenderPassEncoderSetPipeline(passEncoder, Shader.GetPipeline());
-            wgpu.RenderPassEncoderSetVertexBuffer(passEncoder, 0, (Buffer*)_vertexBuffer.GetHandle(), 0, _vertexBuffer.Size);
-            wgpu.RenderPassEncoderDraw(passEncoder, (uint)_lineCount, 1, 0, 0);
+            passEncoder.SetPipeline(Shader.GetPipeline());
+            passEncoder.SetVertexBuffer(0, _vertexBuffer);
+            passEncoder.Draw((uint)_lineCount, 1);
         }
 
         public override void Dispose()

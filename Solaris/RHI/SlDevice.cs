@@ -3,7 +3,7 @@ namespace Solaris.RHI
     public abstract class SlDevice : IDisposable
     {
         private const int UniformBufferAlignment = 256;
-        public readonly SlTextureFormat SurfaceFormat = SlTextureFormat.Bgra8Unorm;
+        public const SlTextureFormat SurfaceFormat = SlTextureFormat.Bgra8Unorm;
 
         public abstract SlQueue GetQueue();
 
@@ -21,7 +21,6 @@ namespace Solaris.RHI
         /// </summary>
         public abstract SlBuffer<T> CreateBuffer<T>(SlBufferDescriptor descriptor) where T : unmanaged;
 
-
         /// <summary>
         /// Create a uniform buffer (convenience method)
         /// </summary>
@@ -36,6 +35,18 @@ namespace Solaris.RHI
 
             return CreateBuffer<T>(desc);
         }
+
+        public abstract SlSurface GetSurface();
+
+        public abstract SlCommandEncoder CreateCommandEncoder();
+
+        public abstract SlShaderModule CreateShaderModule(SlShaderModuleDescriptor descriptor);
+
+        public abstract SlBindGroupLayout CreateBindGroupLayout(SlBindGroupLayoutDescriptor descriptor);
+
+        public abstract SlBindGroup CreateBindGroup(SlBindGroupDescriptor descriptor);
+
+        public abstract SlRenderPipeline CreateRenderPipeline(SlRenderPipelineDescriptor descriptor);
 
         public abstract void Dispose();
     }

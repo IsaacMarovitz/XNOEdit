@@ -1,8 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 
 namespace XNOEdit.Renderer.Shaders
 {
@@ -15,7 +13,7 @@ namespace XNOEdit.Renderer.Shaders
         public Vector4 SunColor;
     }
 
-    public unsafe class SkyboxShader : WgpuShader<SkyboxUniforms>
+    public unsafe class SkyboxShader : Shader<SkyboxUniforms>
     {
         public SkyboxShader(
             SlDevice device,
@@ -38,21 +36,17 @@ namespace XNOEdit.Renderer.Shaders
         {
         }
 
-        protected override VertexBufferLayout[] CreateVertexLayouts()
+        protected override SlVertexBufferLayout[] CreateVertexLayouts()
         {
-            var vertexAttrib = new VertexAttribute[1];
-            vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 };
-
-            Attributes = GCHandle.Alloc(vertexAttrib, GCHandleType.Pinned);
+            var vertexAttribute = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 };
 
             return
             [
-                new VertexBufferLayout
+                new SlVertexBufferLayout
                 {
-                    ArrayStride = 12,
-                    StepMode = VertexStepMode.Vertex,
-                    AttributeCount = (uint)vertexAttrib.Length,
-                    Attributes = (VertexAttribute*)Attributes.AddrOfPinnedObject()
+                    Stride = 12,
+                    StepMode = SlVertexStepMode.Vertex,
+                    Attributes = [vertexAttribute]
                 }
             ];
         }

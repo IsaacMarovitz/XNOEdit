@@ -1,7 +1,4 @@
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
-using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace XNOEdit.Renderer
 {
@@ -18,9 +15,6 @@ namespace XNOEdit.Renderer
 
         public uint IndexCount { get; private set; }
         public uint WireframeIndexCount { get; private set; }
-
-        // TODO: Clean this up
-        private WebGPU _wgpu => (_device as WgpuDevice).Wgpu;
 
         public MeshGeometry(SlDevice device)
         {
@@ -147,43 +141,31 @@ namespace XNOEdit.Renderer
         /// <summary>
         /// Binds vertex buffer to the render pass
         /// </summary>
-        public void BindVertexBuffer(RenderPassEncoder* passEncoder, uint slot)
+        public void BindVertexBuffer(SlRenderPass passEncoder, uint slot)
         {
             if (_sharedVertexBuffer == null) return;
 
-            _wgpu.RenderPassEncoderSetVertexBuffer(
-                passEncoder, slot, (Buffer*)_sharedVertexBuffer.GetHandle(), 0, _sharedVertexBuffer.Size);
+            passEncoder.SetVertexBuffer(slot, _sharedVertexBuffer);
         }
 
         /// <summary>
         /// Draws the geometry (triangles or wireframe)
         /// </summary>
-        public void Draw(RenderPassEncoder* passEncoder, bool wireframe = false, int instanceCount = 1)
+        public void Draw(SlRenderPass passEncoder, bool wireframe = false, int instanceCount = 1)
         {
             if (wireframe)
             {
                 if (_wireframeIndexBuffer == null || WireframeIndexCount == 0) return;
 
-                _wgpu.RenderPassEncoderSetIndexBuffer(
-                    passEncoder,
-                    (Buffer*)_wireframeIndexBuffer.GetHandle(),
-                    IndexFormat.Uint16,
-                    0,
-                    _wireframeIndexBuffer.Size);
-                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, WireframeIndexCount, (uint)instanceCount, 0, 0, 0);
+                passEncoder.SetIndexBuffer(_wireframeIndexBuffer, SlIndexFormat.Uint16);
+                passEncoder.DrawIndexed(WireframeIndexCount, (uint)instanceCount);
             }
             else
             {
                 if (_indexBuffer == null || IndexCount == 0) return;
 
-                _wgpu.RenderPassEncoderSetIndexBuffer(
-                    passEncoder,
-                    (Buffer*)_indexBuffer.GetHandle(),
-                    IndexFormat.Uint16,
-                    0,
-                    _indexBuffer.Size);
-
-                _wgpu.RenderPassEncoderDrawIndexed(passEncoder, IndexCount, (uint)instanceCount, 0, 0, 0);
+                passEncoder.SetIndexBuffer(_indexBuffer, SlIndexFormat.Uint16);
+                passEncoder.DrawIndexed(IndexCount, (uint)instanceCount);
             }
         }
 

@@ -1,5 +1,4 @@
 using System.Numerics;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
 using XNOEdit.Renderer.Renderers;
 
@@ -54,9 +53,9 @@ namespace XNOEdit.Renderer.Scene
             _renderers[xnoIndex].SetVisible(objectIndex, meshIndex, visibility);
         }
 
-        public unsafe void Render(
+        public void Render(
             SlQueue queue,
-            RenderPassEncoder* passEncoder,
+            SlRenderPass passEncoder,
             Matrix4x4 view,
             Matrix4x4 projection,
             ModelParameters modelParameters)

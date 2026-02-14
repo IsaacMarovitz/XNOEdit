@@ -9,7 +9,7 @@ namespace Solaris.Wgpu
 {
     public unsafe class WgpuDevice : SlDevice
     {
-        private readonly Surface* _surface;
+        private readonly WgpuSurface _surface;
         private readonly Instance* _instance;
         private readonly Adapter* _adapter;
 
@@ -41,7 +41,7 @@ namespace Solaris.Wgpu
             var adapterOptions = new RequestAdapterOptions
             {
                 PowerPreference = PowerPreference.HighPerformance,
-                CompatibleSurface = _surface
+                CompatibleSurface = _surface.Handle
             };
 
             Adapter* adapter = null;
@@ -93,24 +93,43 @@ namespace Solaris.Wgpu
 
             SDL.GetWindowSizeInPixels(window, out var width, out var height);
 
-            // Configure surface
-            var surfaceConfig = new SurfaceConfiguration
+            var surfaceConfig = new SlSurfaceDescriptor
             {
-                Device = Device,
-                Format = TextureFormat.Bgra8Unorm,
-                Usage = TextureUsage.RenderAttachment,
+                Format = SlTextureFormat.Bgra8Unorm,
+                Usage = SlTextureUsage.RenderAttachment,
                 Width = (uint)width,
                 Height = (uint)height,
-                PresentMode = PresentMode.Fifo,
-                AlphaMode = CompositeAlphaMode.Auto
+                PresentMode = SlPresentMode.Fifo
             };
-
-            Wgpu.SurfaceConfigure(_surface, &surfaceConfig);
+            _surface.SetDevice(Device);
+            _surface.Configure(surfaceConfig);
         }
 
-        public Surface* GetSurface()
+        public override SlSurface GetSurface() => _surface;
+
+        public override SlCommandEncoder CreateCommandEncoder()
         {
-            return _surface;
+            return new WgpuCommandEncoder(this);
+        }
+
+        public override SlShaderModule CreateShaderModule(SlShaderModuleDescriptor descriptor)
+        {
+            return new WgpuShaderModule(this, descriptor);
+        }
+
+        public override SlBindGroupLayout CreateBindGroupLayout(SlBindGroupLayoutDescriptor descriptor)
+        {
+            return new WgpuBindGroupLayout(this, descriptor);
+        }
+
+        public override SlBindGroup CreateBindGroup(SlBindGroupDescriptor descriptor)
+        {
+            return new WgpuBindGroup(this, descriptor);
+        }
+
+        public override SlRenderPipeline CreateRenderPipeline(SlRenderPipelineDescriptor descriptor)
+        {
+            return new WgpuRenderPipeline(this, descriptor);
         }
 
         public override SlQueue GetQueue()
@@ -202,8 +221,7 @@ namespace Solaris.Wgpu
 
         public override void Dispose()
         {
-            if (_surface != null)
-                Wgpu.SurfaceRelease(_surface);
+            _surface?.Dispose();
 
             if (Device != null)
                 Wgpu.DeviceRelease(Device);
@@ -215,7 +233,7 @@ namespace Solaris.Wgpu
                 Wgpu.InstanceRelease(_instance);
         }
 
-        private static Surface* CreateWebGpuSurface(IntPtr window, WebGPU wgpu, Instance* instance)
+        private WgpuSurface CreateWebGpuSurface(IntPtr window, WebGPU wgpu, Instance* instance)
         {
             var windowProperties = SDL.GetWindowProperties(window);
             var descriptor = new SurfaceDescriptor
@@ -310,7 +328,7 @@ namespace Solaris.Wgpu
                 throw new PlatformNotSupportedException("Cannot init WGPU surface for you platform.");
             }
 
-            return wgpu.InstanceCreateSurface(instance, descriptor);
+            return new WgpuSurface(wgpu, wgpu.InstanceCreateSurface(instance, descriptor), Device);
         }
 
         private static ulong AlignUp(ulong value, int alignment)

@@ -1,8 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
 
 namespace XNOEdit.Renderer.Shaders
 {
@@ -17,7 +15,7 @@ namespace XNOEdit.Renderer.Shaders
         public float FadeEnd;
     }
 
-    public unsafe class GridShader : WgpuShader<GridUniforms>
+    public class GridShader : Shader<GridUniforms>
     {
         public GridShader(
             SlDevice device,
@@ -41,22 +39,19 @@ namespace XNOEdit.Renderer.Shaders
         {
         }
 
-        protected override VertexBufferLayout[] CreateVertexLayouts()
+        protected override SlVertexBufferLayout[] CreateVertexLayouts()
         {
-            var vertexAttrib = new VertexAttribute[2];
-            vertexAttrib[0] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 0,  ShaderLocation = 0 };  // Position
-            vertexAttrib[1] = new VertexAttribute { Format = VertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };  // Color
-
-            Attributes = GCHandle.Alloc(vertexAttrib, GCHandleType.Pinned);
+            var vertexAttributes = new SlVertexAttribute[2];
+            vertexAttributes[0] = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 0,  ShaderLocation = 0 };  // Position
+            vertexAttributes[1] = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };  // Color
 
             return
             [
-                new VertexBufferLayout
+                new SlVertexBufferLayout
                 {
-                    ArrayStride = 24,
-                    StepMode = VertexStepMode.Vertex,
-                    AttributeCount = (uint)vertexAttrib.Length,
-                    Attributes = (VertexAttribute*)Attributes.AddrOfPinnedObject()
+                    Stride = 24,
+                    StepMode = SlVertexStepMode.Vertex,
+                    Attributes = vertexAttributes
                 }
             ];
         }

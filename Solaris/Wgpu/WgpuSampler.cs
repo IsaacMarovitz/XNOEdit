@@ -3,7 +3,7 @@ using Solaris.RHI;
 
 namespace Solaris.Wgpu
 {
-    public unsafe class WgpuSampler : SlSampler
+    internal unsafe class WgpuSampler : SlSampler
     {
         private readonly WebGPU _wgpu;
         public Sampler* Sampler { get; }

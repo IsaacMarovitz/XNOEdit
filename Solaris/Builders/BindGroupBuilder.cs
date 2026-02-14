@@ -1,82 +1,67 @@
-using Silk.NET.WebGPU;
 using Solaris.RHI;
-using Solaris.Wgpu;
-using Buffer = Silk.NET.WebGPU.Buffer;
 
 namespace Solaris.Builders
 {
     public unsafe class BindGroupBuilder
     {
         private readonly SlDevice _device;
-        private readonly List<BindGroupLayoutEntry> _layoutEntries = [];
-        private readonly List<BindGroupEntry> _entries = [];
-        private BindGroupLayout* _layout;
+        private readonly List<SlBindGroupLayoutEntry> _layoutEntries = [];
+        private readonly List<SlBindGroupEntry> _entries = [];
+        private SlBindGroupLayout? _layout;
 
         public BindGroupBuilder(SlDevice device)
         {
             _device = device;
         }
 
-        public BindGroupBuilder AddUniformBuffer(
+        public BindGroupBuilder AddUniformBuffer<T>(
             uint binding,
-            Buffer* buffer,
-            ulong size,
-            ShaderStage visibility = ShaderStage.Vertex | ShaderStage.Fragment)
+            SlBuffer<T> buffer,
+            SlShaderStage visibility = SlShaderStage.Vertex | SlShaderStage.Fragment) where T : unmanaged
         {
-            _layoutEntries.Add(new BindGroupLayoutEntry
+            _layoutEntries.Add(new SlBindGroupLayoutEntry
             {
                 Binding = binding,
                 Visibility = visibility,
-                Buffer = new BufferBindingLayout
-                {
-                    Type = BufferBindingType.Uniform,
-                    MinBindingSize = 0
-                }
+                BufferType = SlBufferBindingType.Uniform
             });
 
-            _entries.Add(new BindGroupEntry
+            _entries.Add(new SlBindGroupEntry
             {
                 Binding = binding,
-                Buffer = buffer,
-                Offset = 0,
-                Size = size
+                Buffer = new SlBufferBinding
+                {
+                    Size = buffer.Size,
+                    Offset = 0,
+                    Handle = buffer.GetHandle()
+                }
             });
 
             return this;
         }
 
-        public BindGroupBuilder AddUniformBuffer<T>(
+        public BindGroupBuilder AddStorageBuffer<T>(
             uint binding,
             SlBuffer<T> buffer,
-            ShaderStage visibility = ShaderStage.Vertex | ShaderStage.Fragment) where T : unmanaged
+            SlShaderStage visibility = SlShaderStage.Vertex | SlShaderStage.Fragment,
+            bool readOnly = false) where T : unmanaged
         {
-            return AddUniformBuffer(binding, (Buffer*)buffer.GetHandle(), buffer.Size, visibility);
-        }
-
-        public BindGroupBuilder AddStorageBuffer(
-            uint binding,
-            Buffer* buffer,
-            ulong size,
-            ShaderStage visibility = ShaderStage.Vertex | ShaderStage.Fragment,
-            bool readOnly = false)
-        {
-            _layoutEntries.Add(new BindGroupLayoutEntry
+            _layoutEntries.Add(new SlBindGroupLayoutEntry
             {
                 Binding = binding,
                 Visibility = visibility,
-                Buffer = new BufferBindingLayout
-                {
-                    Type = readOnly ? BufferBindingType.ReadOnlyStorage : BufferBindingType.Storage,
-                    MinBindingSize = 0
-                }
+                BufferType = readOnly ? SlBufferBindingType.ReadOnlyStorage : SlBufferBindingType.Storage,
             });
 
-            _entries.Add(new BindGroupEntry
+            _entries.Add(new SlBindGroupEntry
             {
                 Binding = binding,
-                Buffer = buffer,
-                Offset = 0,
-                Size = size
+                Buffer = new SlBufferBinding
+                {
+                    Size = buffer.Size,
+                    Offset = 0,
+                    Handle = buffer.GetHandle()
+                }
             });
 
             return this;
@@ -84,23 +69,20 @@ namespace Solaris.Builders
 
         public BindGroupBuilder AddTexture(
             uint binding,
-            TextureView* textureView,
-            ShaderStage visibility = ShaderStage.Fragment,
-            TextureSampleType sampleType = TextureSampleType.Float,
-            TextureViewDimension dimension = TextureViewDimension.Dimension2D)
+            SlTextureView textureView,
+            SlShaderStage visibility = SlShaderStage.Fragment,
+            SlTextureSampleType sampleType = SlTextureSampleType.Float,
+            SlTextureViewDimension dimension = SlTextureViewDimension.Dimension2D)
         {
-            _layoutEntries.Add(new BindGroupLayoutEntry
+            _layoutEntries.Add(new SlBindGroupLayoutEntry
             {
                 Binding = binding,
                 Visibility = visibility,
-                Texture = new TextureBindingLayout
-                {
-                    SampleType = sampleType,
-                    ViewDimension = dimension
-                }
+                TextureSampleType = sampleType,
+                TextureDimension = dimension
             });
 
-            _entries.Add(new BindGroupEntry
+            _entries.Add(new SlBindGroupEntry
             {
                 Binding = binding,
                 TextureView = textureView
@@ -111,21 +93,18 @@ namespace Solaris.Builders
 
         public BindGroupBuilder AddSampler(
             uint binding,
-            Sampler* sampler,
-            ShaderStage visibility = ShaderStage.Fragment,
-            SamplerBindingType type = SamplerBindingType.Filtering)
+            SlSampler sampler,
+            SlShaderStage visibility = SlShaderStage.Fragment,
+            SlSamplerBindingType type = SlSamplerBindingType.Filtering)
         {
-            _layoutEntries.Add(new BindGroupLayoutEntry
+            _layoutEntries.Add(new SlBindGroupLayoutEntry
             {
                 Binding = binding,
                 Visibility = visibility,
-                Sampler = new SamplerBindingLayout
-                {
-                    Type = type
-                }
+                SamplerType = type,
             });
 
-            _entries.Add(new BindGroupEntry
+            _entries.Add(new SlBindGroupEntry
             {
                 Binding = binding,
                 Sampler = sampler
@@ -134,50 +113,36 @@ namespace Solaris.Builders
             return this;
         }
 
-        public BindGroupLayout* BuildLayout()
+        public SlBindGroupLayout BuildLayout()
         {
             if (_layout != null)
                 return _layout;
 
             var entries = _layoutEntries.ToArray();
 
-            // TODO: Clean this up
-            var wgpuDevice = _device as WgpuDevice;
-
-            fixed (BindGroupLayoutEntry* pEntries = entries)
+            var desc = new SlBindGroupLayoutDescriptor
             {
-                var desc = new BindGroupLayoutDescriptor
-                {
-                    EntryCount = (uint)entries.Length,
-                    Entries = pEntries
-                };
+                Entries = entries
+            };
 
-                _layout = wgpuDevice.Wgpu.DeviceCreateBindGroupLayout(wgpuDevice, &desc);
-                return _layout;
-            }
+            _layout = _device.CreateBindGroupLayout(desc);
+            return _layout;
         }
 
-        public BindGroup* BuildBindGroup()
+        public SlBindGroup BuildBindGroup()
         {
             if (_layout == null)
                 BuildLayout();
 
             var entries = _entries.ToArray();
 
-            // TODO: Clean this up
-            var wgpuDevice = _device as WgpuDevice;
-
-            fixed (BindGroupEntry* pEntries = entries)
+            var desc = new SlBindGroupDescriptor
             {
-                var desc = new BindGroupDescriptor
-                {
-                    Layout = _layout,
-                    EntryCount = (uint)entries.Length,
-                    Entries = pEntries
-                };
+                Layout = _layout,
+                Entries = entries
+            };
 
-                return wgpuDevice.Wgpu.DeviceCreateBindGroup(wgpuDevice, &desc);
-            }
+            return _device.CreateBindGroup(desc);
         }
     }
 }
