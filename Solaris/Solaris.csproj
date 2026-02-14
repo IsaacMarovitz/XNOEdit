@@ -8,14 +8,6 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Nullable>enable</Nullable>
     </PropertyGroup>
-
-    <ItemGroup>
-        <PackageReference Include="SDL3-CS" Version="3.3.2.1" />
-        <PackageReference Include="SDL3-CS.Native" Version="3.3.2" />
-        <PackageReference Include="Silk.NET.WebGPU" Version="2.22.0" />
-        <PackageReference Include="Silk.NET.WebGPU.Extensions.WGPU" Version="2.22.0" />
-        <PackageReference Include="Silk.NET.WebGPU.Native.WGPU" Version="2.22.0" />
-    </ItemGroup>
     
     <ItemGroup>
         <ProjectReference Include="..\XNOEdit.Logging\XNOEdit.Logging.csproj" />

@@ -2,7 +2,7 @@ using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
-using Solaris.RHI;
+using Solaris;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;

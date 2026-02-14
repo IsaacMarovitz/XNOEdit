@@ -1,5 +1,5 @@
 using System.Numerics;
-using Solaris.RHI;
+using Solaris;
 using XNOEdit.Renderer.Shaders;
 
 namespace XNOEdit.Renderer.Renderers

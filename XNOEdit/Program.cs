@@ -8,8 +8,7 @@ using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using SDL3;
-using Silk.NET.WebGPU;
-using Solaris.RHI;
+using Solaris;
 using Solaris.Wgpu;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
@@ -92,7 +91,9 @@ namespace XNOEdit
 
             GameFolderLoaded += LoadGameFolderResources;
 
-            InitializeWgpu();
+            WgpuBackend.Register();
+
+            InitializeDevice(SlBackend.Wgpu);
             CreateDepthTexture();
 
             _camera = new Camera();
@@ -245,10 +246,12 @@ namespace XNOEdit
             return SDL.AppResult.Continue;
         }
 
-        private static void InitializeWgpu()
+        private static void InitializeDevice(SlBackend backend)
         {
-            _device = new WgpuDevice(WebGPU.GetApi(), _window);
+            _device = SlDeviceFactory.Create(backend, _window);
             _queue = _device.GetQueue();
+
+            Logger.Info?.PrintMsg(LogClass.Application, $"Solaris Backend: {backend}");
         }
 
         private static void CreateDepthTexture()

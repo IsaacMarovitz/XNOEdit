@@ -1,5 +1,3 @@
-using Solaris.RHI;
-
 namespace Solaris.Builders
 {
     public unsafe class BindGroupBuilder

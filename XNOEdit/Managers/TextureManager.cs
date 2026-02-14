@@ -1,4 +1,4 @@
-using Solaris.RHI;
+using Solaris;
 using XNOEdit.Renderer;
 
 namespace XNOEdit.Managers

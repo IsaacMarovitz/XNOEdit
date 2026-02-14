@@ -1,4 +1,4 @@
-using Solaris.RHI;
+using Solaris;
 
 namespace XNOEdit.Services
 {

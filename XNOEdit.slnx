@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="Marathon/Marathon/Marathon.csproj" />
+  <Project Path="Solaris.Wgpu/Solaris.Wgpu.csproj" />
   <Project Path="Solaris/Solaris.csproj" />
   <Project Path="XNOEdit.Logging/XNOEdit.Logging.csproj" />
   <Project Path="XNOEdit/XNOEdit.csproj" />

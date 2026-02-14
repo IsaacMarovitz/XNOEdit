@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using Solaris.RHI;
+using Solaris;
 
 namespace XNOEdit.Renderer.Shaders
 {

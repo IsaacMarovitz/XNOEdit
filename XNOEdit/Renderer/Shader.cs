@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
+using Solaris;
 using Solaris.Builders;
-using Solaris.RHI;
 
 namespace XNOEdit.Renderer
 {

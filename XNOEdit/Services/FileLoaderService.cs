@@ -5,7 +5,7 @@ using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using Pfim;
-using Solaris.RHI;
+using Solaris;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
 using XNOEdit.Renderer.Renderers;

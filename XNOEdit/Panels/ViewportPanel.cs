@@ -1,7 +1,7 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
-using Solaris.RHI;
+using Solaris;
 using XNOEdit.Renderer;
 
 namespace XNOEdit.Panels

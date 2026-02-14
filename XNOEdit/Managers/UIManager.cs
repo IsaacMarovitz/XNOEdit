@@ -1,7 +1,7 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
-using Solaris.RHI;
+using Solaris;
 using XNOEdit.Fonts;
 using XNOEdit.Logging;
 using XNOEdit.Panels;

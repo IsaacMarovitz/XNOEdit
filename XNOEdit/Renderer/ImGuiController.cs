@@ -5,8 +5,8 @@ using System.Text;
 using Hexa.NET.ImGui;
 using SDL3;
 using Silk.NET.Core.Native;
+using Solaris;
 using Solaris.Builders;
-using Solaris.RHI;
 
 namespace XNOEdit.Renderer
 {
