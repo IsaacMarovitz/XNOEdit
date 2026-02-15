@@ -5,14 +5,16 @@ namespace Solaris.Wgpu
     internal unsafe class WgpuCommandEncoder : SlCommandEncoder
     {
         private readonly WgpuDevice _device;
-        internal CommandEncoder* Handle { get; }
+        private readonly CommandEncoder* _handle;
+
+        public static implicit operator CommandEncoder*(WgpuCommandEncoder encoder) => encoder._handle;
 
         public WgpuCommandEncoder(WgpuDevice device)
         {
             _device = device;
 
             var desc = new CommandEncoderDescriptor();
-            Handle = _device.Wgpu.DeviceCreateCommandEncoder(_device, &desc);
+            _handle = _device.Wgpu.DeviceCreateCommandEncoder(_device, &desc);
         }
 
         public override SlRenderPass BeginRenderPass(SlRenderPassDescriptor descriptor)
@@ -27,7 +29,7 @@ namespace Solaris.Wgpu
 
                 colorAttachments[i] = new RenderPassColorAttachment
                 {
-                    View = wgpuView.TextureView,
+                    View = wgpuView,
                     LoadOp = src.LoadOp.Convert(),
                     StoreOp = src.StoreOp.Convert(),
                     ClearValue = new Color
@@ -50,7 +52,7 @@ namespace Solaris.Wgpu
 
                 depthAttachment = new RenderPassDepthStencilAttachment
                 {
-                    View = wgpuView.TextureView,
+                    View = wgpuView,
                     DepthLoadOp = ds.DepthLoadOp.Convert(),
                     DepthStoreOp = ds.DepthStoreOp.Convert(),
                     DepthClearValue = ds.DepthClearValue,
@@ -70,20 +72,20 @@ namespace Solaris.Wgpu
                 DepthStencilAttachment = depthPtr,
             };
 
-            var encoder = _device.Wgpu.CommandEncoderBeginRenderPass(Handle, &passDesc);
+            var encoder = _device.Wgpu.CommandEncoderBeginRenderPass(_handle, &passDesc);
             return new WgpuRenderPass(_device, encoder);
         }
 
         public override SlCommandBuffer Finish()
         {
-            var handle = _device.Wgpu.CommandEncoderFinish(Handle, null);
+            var handle = _device.Wgpu.CommandEncoderFinish(_handle, null);
             return new WgpuCommandBuffer(_device.Wgpu, handle);
         }
 
         public override void Dispose()
         {
-            if (Handle != null)
-                _device.Wgpu.CommandEncoderRelease(Handle);
+            if (_handle != null)
+                _device.Wgpu.CommandEncoderRelease(_handle);
         }
     }
 }

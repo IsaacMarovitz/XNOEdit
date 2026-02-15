@@ -5,12 +5,14 @@ namespace Solaris.Wgpu
     internal unsafe class WgpuQueue : SlQueue
     {
         private readonly WebGPU _wgpu;
-        public Queue* Queue { get; }
+        private readonly Queue* _queue;
+
+        public static implicit operator Queue*(WgpuQueue queue) => queue._queue;
 
         internal WgpuQueue(WebGPU wgpu, Queue* queue)
         {
             _wgpu = wgpu;
-            Queue = queue;
+            _queue = queue;
         }
 
         public override void WriteTexture(SlCopyTextureDescriptor descriptor, Span<byte> data, SlTextureDataLayout layout, SlExtent3D extent)
@@ -23,7 +25,7 @@ namespace Solaris.Wgpu
         {
             var wgpuDescriptor = new ImageCopyTexture
             {
-                Texture = (descriptor.Texture as WgpuTexture)!.Texture,
+                Texture = (descriptor.Texture as WgpuTexture)!,
                 MipLevel = descriptor.MipLevel,
                 Origin = new Origin3D(descriptor.Origin.X, descriptor.Origin.Y, descriptor.Origin.Z)
             };
@@ -37,19 +39,19 @@ namespace Solaris.Wgpu
 
             var wgpuExtent = new Extent3D(extent.Width, extent.Height, extent.DepthOrArrayLayers);
 
-            _wgpu.QueueWriteTexture(Queue, &wgpuDescriptor, data, size, &wgpuLayout, &wgpuExtent);
+            _wgpu.QueueWriteTexture(_queue, &wgpuDescriptor, data, size, &wgpuLayout, &wgpuExtent);
         }
 
         public override void Submit(SlCommandBuffer commandBuffer)
         {
-            var wgpuCommandBuffer = (commandBuffer as WgpuCommandBuffer)!.CommandBuffer;
-            _wgpu.QueueSubmit(Queue, 1, &wgpuCommandBuffer);
+            CommandBuffer* wgpuCommandBuffer = (commandBuffer as WgpuCommandBuffer)!;
+            _wgpu.QueueSubmit(_queue, 1, &wgpuCommandBuffer);
         }
 
         public override void Dispose()
         {
-            if (Queue != null)
-                _wgpu.QueueRelease(Queue);
+            if (_queue != null)
+                _wgpu.QueueRelease(_queue);
         }
     }
 }

@@ -11,11 +11,11 @@ namespace Solaris.Wgpu
         private readonly WgpuSurface _surface;
         private readonly Instance* _instance;
         private readonly Adapter* _adapter;
+        private readonly Device* _handle;
 
         public readonly WebGPU Wgpu;
-        private Device* Device { get; }
 
-        public static implicit operator Device*(WgpuDevice device) => device.Device;
+        public static implicit operator Device*(WgpuDevice device) => device._handle;
 
         private const int CopyBufferAlignment = 4;
 
@@ -40,7 +40,7 @@ namespace Solaris.Wgpu
             var adapterOptions = new RequestAdapterOptions
             {
                 PowerPreference = PowerPreference.HighPerformance,
-                CompatibleSurface = _surface.Handle
+                CompatibleSurface = _surface
             };
 
             Adapter* adapter = null;
@@ -87,7 +87,7 @@ namespace Solaris.Wgpu
                     }),
                     null);
 
-                Device = device;
+                _handle = device;
             }
 
             SDL.GetWindowSizeInPixels(window, out var width, out var height);
@@ -100,7 +100,6 @@ namespace Solaris.Wgpu
                 Height = (uint)height,
                 PresentMode = SlPresentMode.Fifo
             };
-            _surface.SetDevice(Device);
             _surface.Configure(surfaceConfig);
         }
 
@@ -133,47 +132,17 @@ namespace Solaris.Wgpu
 
         public override SlQueue GetQueue()
         {
-            return new WgpuQueue(Wgpu, Wgpu.DeviceGetQueue(Device));
+            return new WgpuQueue(Wgpu, Wgpu.DeviceGetQueue(_handle));
         }
 
         public override SlTexture CreateTexture(SlTextureDescriptor descriptor)
         {
-            var wgpuDescriptor = new TextureDescriptor
-            {
-                Size = new Extent3D
-                {
-                    Width = descriptor.Size.Width,
-                    Height = descriptor.Size.Height,
-                    DepthOrArrayLayers = descriptor.Size.DepthOrArrayLayers
-                },
-                MipLevelCount = descriptor.MipLevelCount,
-                SampleCount = descriptor.SampleCount,
-                Dimension = descriptor.Dimension.Convert(),
-                Format = descriptor.Format.Convert(),
-                Usage = descriptor.Usage.Convert(),
-            };
-
-            var texture = Wgpu.DeviceCreateTexture(Device, &wgpuDescriptor);
-            return new WgpuTexture(Wgpu, texture);
+            return new WgpuTexture(this, descriptor);
         }
 
         public override SlSampler CreateSampler(SlSamplerDescriptor descriptor)
         {
-            var wgpuDescriptor = new SamplerDescriptor
-            {
-                AddressModeU = descriptor.AddressModeU.Convert(),
-                AddressModeV = descriptor.AddressModeV.Convert(),
-                AddressModeW = descriptor.AddressModeW.Convert(),
-                MagFilter = descriptor.MagFilter.Convert(),
-                MinFilter = descriptor.MinFilter.Convert(),
-                MipmapFilter = descriptor.MipmapFilter.MipmapConvert(),
-                LodMaxClamp = descriptor.LodMaxClamp,
-                LodMinClamp = descriptor.LodMinClamp,
-                MaxAnisotropy = descriptor.MaxAnisotropy,
-            };
-
-            var sampler = Wgpu.DeviceCreateSampler(Device, &wgpuDescriptor);
-            return new WgpuSampler(Wgpu, sampler);
+            return new WgpuSampler(this, descriptor);
         }
 
         public override SlBuffer<T> CreateBuffer<T>(Span<T> data, SlBufferUsage usage)
@@ -189,7 +158,7 @@ namespace Solaris.Wgpu
                 MappedAtCreation = true
             };
 
-            var handle = Wgpu.DeviceCreateBuffer(Device, &descriptor);
+            var handle = Wgpu.DeviceCreateBuffer(_handle, &descriptor);
 
             // Write initial data
             var mappedRange = Wgpu.BufferGetMappedRange(handle, 0, (nuint)size);
@@ -213,7 +182,7 @@ namespace Solaris.Wgpu
                 MappedAtCreation = false
             };
 
-            var handle = Wgpu.DeviceCreateBuffer(Device, &wgpuDescriptor);
+            var handle = Wgpu.DeviceCreateBuffer(_handle, &wgpuDescriptor);
 
             return new WgpuBuffer<T>(handle, size, Wgpu);
         }
@@ -222,8 +191,8 @@ namespace Solaris.Wgpu
         {
             _surface?.Dispose();
 
-            if (Device != null)
-                Wgpu.DeviceRelease(Device);
+            if (_handle != null)
+                Wgpu.DeviceRelease(_handle);
 
             if (_adapter != null)
                 Wgpu.AdapterRelease(_adapter);
@@ -327,7 +296,7 @@ namespace Solaris.Wgpu
                 throw new PlatformNotSupportedException("Cannot init WGPU surface for you platform.");
             }
 
-            return new WgpuSurface(wgpu, wgpu.InstanceCreateSurface(instance, descriptor), Device);
+            return new WgpuSurface(this, wgpu.InstanceCreateSurface(instance, descriptor));
         }
 
         private static ulong AlignUp(ulong value, int alignment)

@@ -6,7 +6,9 @@ namespace Solaris.Wgpu
     internal unsafe class WgpuBindGroup : SlBindGroup
     {
         private readonly WgpuDevice _device;
-        internal BindGroup* Handle { get; }
+        private readonly BindGroup* _handle;
+
+        public static implicit operator BindGroup*(WgpuBindGroup bindGroup) => bindGroup._handle;
 
         public WgpuBindGroup(WgpuDevice device, SlBindGroupDescriptor descriptor)
         {
@@ -34,28 +36,28 @@ namespace Solaris.Wgpu
                 }
                 else if (src.TextureView != null)
                 {
-                    entries[i].TextureView = (TextureView*)src.TextureView.GetHandle();
+                    entries[i].TextureView = (WgpuTextureView)src.TextureView;
                 }
                 else if (src.Sampler != null)
                 {
-                    entries[i].Sampler = (Sampler*)src.Sampler.GetHandle();
+                    entries[i].Sampler = (WgpuSampler)src.Sampler;
                 }
             }
 
             var desc = new BindGroupDescriptor
             {
-                Layout = layout.Handle,
+                Layout = layout,
                 EntryCount = (uint)entryCount,
                 Entries = entries,
             };
 
-            Handle = _device.Wgpu.DeviceCreateBindGroup(_device, in desc);
+            _handle = _device.Wgpu.DeviceCreateBindGroup(_device, in desc);
         }
 
         public override void Dispose()
         {
-            if (Handle != null)
-                _device.Wgpu.BindGroupRelease(Handle);
+            if (_handle != null)
+                _device.Wgpu.BindGroupRelease(_handle);
         }
     }
 }

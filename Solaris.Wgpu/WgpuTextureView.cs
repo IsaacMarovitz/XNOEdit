@@ -4,24 +4,38 @@ namespace Solaris.Wgpu
 {
     internal unsafe class WgpuTextureView : SlTextureView
     {
-        private readonly WebGPU _wgpu;
-        public TextureView* TextureView { get; }
+        private readonly WgpuDevice _device;
+        private readonly TextureView* _handle;
 
-        internal WgpuTextureView(WebGPU wgpu, TextureView* textureView)
+        public static implicit operator TextureView*(WgpuTextureView textureView) => textureView._handle;
+
+        internal WgpuTextureView(WgpuDevice device, WgpuTexture texture, SlTextureViewDescriptor descriptor)
         {
-            _wgpu = wgpu;
-            TextureView = textureView;
+            _device = device;
+
+            var wgpuDescriptor = new TextureViewDescriptor
+            {
+                Format = descriptor.Format.Convert(),
+                Dimension = descriptor.Dimension.Convert(),
+                BaseMipLevel = descriptor.BaseMipLevel,
+                MipLevelCount = descriptor.MipLevelCount,
+                BaseArrayLayer = descriptor.BaseArrayLayer,
+                ArrayLayerCount = descriptor.ArrayLayerCount,
+                Aspect = TextureAspect.All
+            };
+
+            _handle = _device.Wgpu.TextureCreateView(texture, &wgpuDescriptor);
         }
 
         public override void* GetHandle()
         {
-            return TextureView;
+            return _handle;
         }
 
         public override void Dispose()
         {
-            if (TextureView != null)
-                _wgpu.TextureViewRelease(TextureView);
+            if (_handle != null)
+                _device.Wgpu.TextureViewRelease(_handle);
         }
     }
 }

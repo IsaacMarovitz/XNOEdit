@@ -4,36 +4,31 @@ namespace Solaris.Wgpu
 {
     internal unsafe class WgpuSurface : SlSurface
     {
-        private readonly WebGPU _api;
-        private Device* _device;
-        internal Surface* Handle { get; }
+        private readonly WgpuDevice _device;
+        private readonly Surface* _handle;
 
-        public WgpuSurface(WebGPU api, Surface* handle, Device* device)
+        public static implicit operator Surface*(WgpuSurface surface) => surface._handle;
+
+        public WgpuSurface(WgpuDevice device, Surface* handle)
         {
-            _api = api;
             _device = device;
-            Handle = handle;
+            _handle = handle;
         }
 
         public override SlTexture? GetCurrentTexture()
         {
             SurfaceTexture surfaceTexture;
-            _api.SurfaceGetCurrentTexture(Handle, &surfaceTexture);
+            _device.Wgpu.SurfaceGetCurrentTexture(_handle, &surfaceTexture);
 
             if (surfaceTexture.Status != SurfaceGetCurrentTextureStatus.Success)
                 return null;
 
-            return new WgpuTexture(_api, surfaceTexture.Texture, owned: false);
+            return new WgpuTexture(_device, surfaceTexture.Texture, owned: false);
         }
 
         public override void Present()
         {
-            _api.SurfacePresent(Handle);
-        }
-
-        public void SetDevice(Device* device)
-        {
-            _device = device;
+            _device.Wgpu.SurfacePresent(_handle);
         }
 
         public override void Configure(SlSurfaceDescriptor descriptor)
@@ -49,15 +44,15 @@ namespace Solaris.Wgpu
                 AlphaMode = CompositeAlphaMode.Auto,
             };
 
-            _api.SurfaceConfigure(Handle, &config);
+            _device.Wgpu.SurfaceConfigure(_handle, &config);
         }
 
         public override void Dispose()
         {
-            if (Handle != null)
+            if (_handle != null)
             {
-                _api.SurfaceUnconfigure(Handle);
-                _api.SurfaceRelease(Handle);
+                _device.Wgpu.SurfaceUnconfigure(_handle);
+                _device.Wgpu.SurfaceRelease(_handle);
             }
         }
     }

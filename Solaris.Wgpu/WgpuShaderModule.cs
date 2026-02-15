@@ -6,7 +6,9 @@ namespace Solaris.Wgpu
     internal unsafe class WgpuShaderModule : SlShaderModule
     {
         private readonly WgpuDevice _device;
-        internal ShaderModule* Handle { get; }
+        private readonly ShaderModule* _handle;
+
+        public static implicit operator ShaderModule*(WgpuShaderModule module) => module._handle;
 
         public WgpuShaderModule(WgpuDevice device, SlShaderModuleDescriptor descriptor)
         {
@@ -37,7 +39,7 @@ namespace Solaris.Wgpu
                     NextInChain = (ChainedStruct*)(&wgslDesc),
                 };
 
-                Handle = _device.Wgpu.DeviceCreateShaderModule(_device, in desc);
+                _handle = _device.Wgpu.DeviceCreateShaderModule(_device, in desc);
             }
             finally
             {
@@ -49,8 +51,8 @@ namespace Solaris.Wgpu
 
         public override void Dispose()
         {
-            if (Handle != null)
-                _device.Wgpu.ShaderModuleRelease(Handle);
+            if (_handle != null)
+                _device.Wgpu.ShaderModuleRelease(_handle);
         }
     }
 }

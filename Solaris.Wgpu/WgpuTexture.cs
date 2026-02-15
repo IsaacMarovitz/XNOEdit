@@ -4,44 +4,53 @@ namespace Solaris.Wgpu
 {
     internal unsafe class WgpuTexture : SlTexture
     {
-        private readonly WebGPU _wgpu;
+        private readonly WgpuDevice _device;
         private readonly bool _owned;
-        public Texture* Texture { get; }
+        private readonly Texture* _handle;
 
-        internal WgpuTexture(WebGPU wgpu, Texture* texture, bool owned = true)
+        public static implicit operator Texture*(WgpuTexture texture) => texture._handle;
+
+        internal WgpuTexture(WgpuDevice device, Texture* handle, bool owned = true)
         {
-            _wgpu = wgpu;
-            Texture = texture;
+            _device = device;
             _owned = owned;
+            _handle = handle;
         }
 
-        public override void* GetHandle()
+        internal WgpuTexture(WgpuDevice device, SlTextureDescriptor descriptor)
         {
-            return Texture;
+            _device = device;
+            _owned = true;
+
+            var wgpuDescriptor = new TextureDescriptor
+            {
+                Size = new Extent3D
+                {
+                    Width = descriptor.Size.Width,
+                    Height = descriptor.Size.Height,
+                    DepthOrArrayLayers = descriptor.Size.DepthOrArrayLayers
+                },
+                MipLevelCount = descriptor.MipLevelCount,
+                SampleCount = descriptor.SampleCount,
+                Dimension = descriptor.Dimension.Convert(),
+                Format = descriptor.Format.Convert(),
+                Usage = descriptor.Usage.Convert(),
+            };
+
+            _handle = _device.Wgpu.DeviceCreateTexture(_device, &wgpuDescriptor);
         }
 
         public override SlTextureView CreateTextureView(SlTextureViewDescriptor descriptor)
         {
-            var wgpuDescriptor = new TextureViewDescriptor
-            {
-                Format = descriptor.Format.Convert(),
-                Dimension = descriptor.Dimension.Convert(),
-                BaseMipLevel = descriptor.BaseMipLevel,
-                MipLevelCount = descriptor.MipLevelCount,
-                BaseArrayLayer = descriptor.BaseArrayLayer,
-                ArrayLayerCount = descriptor.ArrayLayerCount,
-                Aspect = TextureAspect.All
-            };
-
-            return new WgpuTextureView(_wgpu, _wgpu.TextureCreateView(Texture, &wgpuDescriptor));
+            return new WgpuTextureView(_device, this, descriptor);
         }
 
         public override void Dispose()
         {
-            if (Texture != null && _owned)
+            if (_handle != null && _owned)
             {
-                _wgpu.TextureDestroy(Texture);
-                _wgpu.TextureRelease(Texture);
+                _device.Wgpu.TextureDestroy(this);
+                _device.Wgpu.TextureRelease(this);
             }
         }
     }

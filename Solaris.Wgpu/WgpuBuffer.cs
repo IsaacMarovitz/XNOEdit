@@ -9,6 +9,8 @@ namespace Solaris.Wgpu
         private readonly WebGPU _wgpu;
         private readonly Buffer* _handle;
 
+        public static implicit operator Buffer*(WgpuBuffer<T> buffer) => buffer._handle;
+
         internal WgpuBuffer(Buffer* handle, ulong size, WebGPU wgpu)
         {
             _wgpu = wgpu;
@@ -23,7 +25,7 @@ namespace Solaris.Wgpu
 
         public override void UpdateData(SlQueue queue, Span<T> data, ulong offset = 0)
         {
-            var wgpuQueue = (queue as WgpuQueue)!.Queue;
+            var wgpuQueue = (queue as WgpuQueue)!;
             var dataBytes = MemoryMarshal.AsBytes(data);
             fixed (byte* pData = dataBytes)
             {
@@ -33,7 +35,7 @@ namespace Solaris.Wgpu
 
         public override void UpdateData(SlQueue queue, in T data, ulong offset = 0)
         {
-            var wgpuQueue = (queue as WgpuQueue)!.Queue;
+            var wgpuQueue = (queue as WgpuQueue)!;
             fixed (T* pData = &data)
             {
                 _wgpu.QueueWriteBuffer(wgpuQueue, _handle, offset, pData, (nuint)sizeof(T));

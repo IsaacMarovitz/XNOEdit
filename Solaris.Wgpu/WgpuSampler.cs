@@ -4,25 +4,36 @@ namespace Solaris.Wgpu
 {
     internal unsafe class WgpuSampler : SlSampler
     {
-        private readonly WebGPU _wgpu;
-        public Sampler* Sampler { get; }
+        private readonly WgpuDevice _device;
+        private readonly Sampler* _handle;
 
-        internal WgpuSampler(WebGPU wgpu, Sampler* sampler)
-        {
-            _wgpu = wgpu;
-            Sampler = sampler;
-        }
+        public static implicit operator Sampler*(WgpuSampler sampler) => sampler._handle;
 
-        public override void* GetHandle()
+        internal WgpuSampler(WgpuDevice device, SlSamplerDescriptor descriptor)
         {
-            return Sampler;
+            _device = device;
+
+            var wgpuDescriptor = new SamplerDescriptor
+            {
+                AddressModeU = descriptor.AddressModeU.Convert(),
+                AddressModeV = descriptor.AddressModeV.Convert(),
+                AddressModeW = descriptor.AddressModeW.Convert(),
+                MagFilter = descriptor.MagFilter.Convert(),
+                MinFilter = descriptor.MinFilter.Convert(),
+                MipmapFilter = descriptor.MipmapFilter.MipmapConvert(),
+                LodMaxClamp = descriptor.LodMaxClamp,
+                LodMinClamp = descriptor.LodMinClamp,
+                MaxAnisotropy = descriptor.MaxAnisotropy,
+            };
+
+            _handle = _device.Wgpu.DeviceCreateSampler(_device, &wgpuDescriptor);
         }
 
         public override void Dispose()
         {
-            if (Sampler != null)
+            if (_handle != null)
             {
-                _wgpu.SamplerRelease(Sampler);
+                _device.Wgpu.SamplerRelease(_handle);
             }
         }
     }

@@ -6,13 +6,15 @@ namespace Solaris.Wgpu
     internal unsafe class WgpuRenderPipeline : SlRenderPipeline
     {
         private readonly WgpuDevice _device;
-        internal RenderPipeline* Handle { get; }
+        private readonly RenderPipeline* _handle;
+
+        public static implicit operator RenderPipeline*(WgpuRenderPipeline pipeline) => pipeline._handle;
 
         public WgpuRenderPipeline(WgpuDevice device, SlRenderPipelineDescriptor descriptor)
         {
             _device = device;
 
-            var shaderModule = ((WgpuShaderModule)descriptor.Shader).Handle;
+            var shaderModule = (WgpuShaderModule)descriptor.Shader;
 
             var vertexEntry = SilkMarshal.StringToPtr(descriptor.VertexEntryPoint ?? "vs_main");
             var fragmentEntry = SilkMarshal.StringToPtr(descriptor.FragmentEntryPoint ?? "fs_main");
@@ -23,7 +25,7 @@ namespace Solaris.Wgpu
                 var bgLayouts = stackalloc BindGroupLayout*[layoutCount];
 
                 for (var i = 0; i < layoutCount; i++)
-                    bgLayouts[i] = ((WgpuBindGroupLayout)descriptor.BindGroupLayouts![i]).Handle;
+                    bgLayouts[i] = (WgpuBindGroupLayout)descriptor.BindGroupLayouts![i];
 
                 var pipelineLayoutDesc = new PipelineLayoutDescriptor
                 {
@@ -177,7 +179,7 @@ namespace Solaris.Wgpu
                     DepthStencil = depthPtr,
                 };
 
-                Handle = _device.Wgpu.DeviceCreateRenderPipeline(_device, in pipelineDesc);
+                _handle = _device.Wgpu.DeviceCreateRenderPipeline(_device, in pipelineDesc);
 
                 _device.Wgpu.PipelineLayoutRelease(pipelineLayout);
             }
@@ -198,8 +200,8 @@ namespace Solaris.Wgpu
 
         public override void Dispose()
         {
-            if (Handle != null)
-                _device.Wgpu.RenderPipelineRelease(Handle);
+            if (_handle != null)
+                _device.Wgpu.RenderPipelineRelease(_handle);
         }
     }
 }

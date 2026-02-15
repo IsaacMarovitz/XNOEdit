@@ -5,18 +5,20 @@ namespace Solaris.Wgpu
     internal unsafe class WgpuCommandBuffer : SlCommandBuffer
     {
         private readonly WebGPU _wgpu;
-        public CommandBuffer* CommandBuffer { get; }
+        private readonly CommandBuffer* _handle;
 
-        internal WgpuCommandBuffer(WebGPU wgpu, CommandBuffer* commandBuffer)
+        public static implicit operator CommandBuffer*(WgpuCommandBuffer buffer) => buffer._handle;
+
+        internal WgpuCommandBuffer(WebGPU wgpu, CommandBuffer* handle)
         {
             _wgpu = wgpu;
-            CommandBuffer = commandBuffer;
+            _handle = handle;
         }
 
         public override void Dispose()
         {
-            if (CommandBuffer != null)
-                _wgpu.CommandBufferRelease(CommandBuffer);
+            if (_handle != null)
+                _wgpu.CommandBufferRelease(_handle);
         }
     }
 }
