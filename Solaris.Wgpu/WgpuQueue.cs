@@ -5,14 +5,14 @@ namespace Solaris.Wgpu
     internal unsafe class WgpuQueue : SlQueue
     {
         private readonly WebGPU _wgpu;
-        private readonly Queue* _queue;
+        private readonly Queue* _handle;
 
-        public static implicit operator Queue*(WgpuQueue queue) => queue._queue;
+        public static implicit operator Queue*(WgpuQueue queue) => queue._handle;
 
-        internal WgpuQueue(WebGPU wgpu, Queue* queue)
+        internal WgpuQueue(WebGPU wgpu, Queue* handle)
         {
             _wgpu = wgpu;
-            _queue = queue;
+            _handle = handle;
         }
 
         public override void WriteTexture(SlCopyTextureDescriptor descriptor, Span<byte> data, SlTextureDataLayout layout, SlExtent3D extent)
@@ -39,19 +39,19 @@ namespace Solaris.Wgpu
 
             var wgpuExtent = new Extent3D(extent.Width, extent.Height, extent.DepthOrArrayLayers);
 
-            _wgpu.QueueWriteTexture(_queue, &wgpuDescriptor, data, size, &wgpuLayout, &wgpuExtent);
+            _wgpu.QueueWriteTexture(_handle, &wgpuDescriptor, data, size, &wgpuLayout, &wgpuExtent);
         }
 
         public override void Submit(SlCommandBuffer commandBuffer)
         {
             CommandBuffer* wgpuCommandBuffer = (commandBuffer as WgpuCommandBuffer)!;
-            _wgpu.QueueSubmit(_queue, 1, &wgpuCommandBuffer);
+            _wgpu.QueueSubmit(_handle, 1, &wgpuCommandBuffer);
         }
 
         public override void Dispose()
         {
-            if (_queue != null)
-                _wgpu.QueueRelease(_queue);
+            if (_handle != null)
+                _wgpu.QueueRelease(_handle);
         }
     }
 }

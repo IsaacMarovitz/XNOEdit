@@ -18,6 +18,8 @@ namespace Solaris.Wgpu
             Size = size;
         }
 
+        public override ulong GpuAddress { get; }
+
         public override void* GetHandle()
         {
             return _handle;

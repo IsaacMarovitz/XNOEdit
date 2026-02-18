@@ -21,6 +21,7 @@
         <ProjectReference Include="..\Marathon\Marathon\Marathon.csproj" />
         <ProjectReference Include="..\Solaris\Solaris.csproj" />
         <ProjectReference Include="..\Solaris.Wgpu\Solaris.Wgpu.csproj" />
+        <ProjectReference Include="..\Solaris.Metal\Solaris.Metal.csproj" />
         <ProjectReference Include="..\XNOEdit.Logging\XNOEdit.Logging.csproj" />
     </ItemGroup>
 
@@ -31,6 +32,11 @@
         <EmbeddedResource Include="Shaders\Grid.wgsl" />
         <EmbeddedResource Include="Shaders\Skybox.wgsl" />
         <EmbeddedResource Include="Shaders\ImGui.wgsl" />
+        <EmbeddedResource Include="Shaders\InstancedModel.metal" />
+        <EmbeddedResource Include="Shaders\Model.metal" />
+        <EmbeddedResource Include="Shaders\Grid.metal" />
+        <EmbeddedResource Include="Shaders\Skybox.metal" />
+        <EmbeddedResource Include="Shaders\ImGui.metal" />
         <EmbeddedResource Include="Fonts\Inter.ttf" />
         <EmbeddedResource Include="Fonts\FA-Solid.ttf" />
     </ItemGroup>

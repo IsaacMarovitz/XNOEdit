@@ -28,12 +28,7 @@ namespace Solaris.Builders
             _entries.Add(new SlBindGroupEntry
             {
                 Binding = binding,
-                Buffer = new SlBufferBinding
-                {
-                    Size = buffer.Size,
-                    Offset = 0,
-                    Handle = buffer.GetHandle()
-                }
+                Buffer = SlBufferBinding.From(buffer)
             });
 
             return this;
@@ -56,12 +51,7 @@ namespace Solaris.Builders
             _entries.Add(new SlBindGroupEntry
             {
                 Binding = binding,
-                Buffer = new SlBufferBinding
-                {
-                    Size = buffer.Size,
-                    Offset = 0,
-                    Handle = buffer.GetHandle()
-                }
+                Buffer = SlBufferBinding.From(buffer)
             });
 
             return this;

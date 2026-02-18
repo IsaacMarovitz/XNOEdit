@@ -3,6 +3,7 @@ namespace Solaris
     public enum SlBackend
     {
         Wgpu,
+        Metal4
     }
 
     /// <summary>

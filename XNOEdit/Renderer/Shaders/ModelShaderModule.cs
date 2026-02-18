@@ -206,12 +206,7 @@ namespace XNOEdit.Renderer.Shaders
             var entry = new SlBindGroupEntry
             {
                 Binding = 0,
-                Buffer = new SlBufferBinding
-                {
-                    Handle = uniformBuffer.GetHandle(),
-                    Offset = 0,
-                    Size = uniformBuffer.Size
-                }
+                Buffer = SlBufferBinding.From(uniformBuffer)
             };
 
             var bindGroupDesc = new SlBindGroupDescriptor

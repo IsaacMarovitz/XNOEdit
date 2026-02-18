@@ -1,8 +1,10 @@
 namespace Solaris
 {
-    public abstract class SlBuffer<T> : IDisposable where T : unmanaged
+    public abstract class SlBuffer<T> : ISlBuffer, IDisposable where T : unmanaged
     {
         public ulong Size { get; protected set; }
+
+        public abstract ulong GpuAddress { get; }
 
         public abstract unsafe void* GetHandle();
 
@@ -13,5 +15,10 @@ namespace Solaris
         public abstract void UpdateData(SlQueue queue, int index, in T data);
 
         public abstract void Dispose();
+    }
+
+    public interface ISlBuffer
+    {
+        ulong GpuAddress { get; }
     }
 }

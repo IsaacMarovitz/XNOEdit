@@ -10,12 +10,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="SDL3-CS" Version="3.3.2.1" />
-        <PackageReference Include="SDL3-CS.Native" Version="3.3.2" />
+      <PackageReference Include="SharpMetal" Version="1.1.0" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\XNOEdit.Logging\XNOEdit.Logging.csproj" />
+        <ProjectReference Include="../Solaris/Solaris.csproj" />
     </ItemGroup>
 
 </Project>

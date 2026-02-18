@@ -352,9 +352,37 @@ namespace Solaris
 
     public struct SlBufferBinding
     {
-        public unsafe void* Handle; // from SlBuffer.GetHandle()
+        /// <summary>
+        /// CPU-side native handle (used by WebGPU backend).
+        /// </summary>
+        public unsafe void* Handle;
+
+        /// <summary>
+        /// GPU virtual address (used by Metal 4 bindless backend).
+        /// 0 on backends that don't support GPU addresses.
+        /// </summary>
+        public ulong GpuAddress;
+
         public ulong Offset;
         public ulong Size;
+
+        public ISlBuffer Source;
+
+        /// <summary>
+        /// Create a buffer binding from a buffer, automatically populating
+        /// handle, GPU address, and size.
+        /// </summary>
+        public static unsafe SlBufferBinding From<T>(SlBuffer<T> buffer, ulong offset = 0, ulong? size = null) where T : unmanaged
+        {
+            return new SlBufferBinding
+            {
+                Handle = buffer.GetHandle(),
+                GpuAddress = buffer.GpuAddress,
+                Offset = offset,
+                Size = size ?? buffer.Size,
+                Source = buffer
+            };
+        }
     }
 
     public struct SlShaderModuleDescriptor

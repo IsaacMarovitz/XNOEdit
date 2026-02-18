@@ -206,14 +206,14 @@ namespace XNOEdit.Renderer
 
             vertexAttrib[0] = new SlVertexAttribute
             {
-                Format = SlVertexFormat.Float32x3,
+                Format = SlVertexFormat.Float32x2,
                 Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Pos)),
                 ShaderLocation = 0
             };
 
             vertexAttrib[1] = new SlVertexAttribute
             {
-                Format = SlVertexFormat.Float32x3,
+                Format = SlVertexFormat.Float32x2,
                 Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Uv)),
                 ShaderLocation = 1
             };
@@ -273,6 +273,7 @@ namespace XNOEdit.Renderer
                     Handle = _uniformsBuffer.GetHandle(),
                     Offset = 0,
                     Size = (ulong)Align(sizeof(Uniforms), 16),
+                    Source = _uniformsBuffer
                 },
             };
 
