@@ -1,20 +1,19 @@
 using Solaris;
+using Solaris.Graph;
 
 namespace XNOEdit.Renderer
 {
     /// <summary>
     /// Manages vertex and index buffers for mesh geometry
     /// </summary>
-    public unsafe class MeshGeometry : IDisposable
+    public class MeshGeometry : IDisposable
     {
         private readonly SlDevice _device;
 
-        private SlBuffer<float>? _sharedVertexBuffer;
-        private SlBuffer<ushort>? _indexBuffer;
-        private SlBuffer<ushort>? _wireframeIndexBuffer;
+        private SlBuffer? _sharedVertexBuffer;
+        private SlBuffer? _indexBuffer;
 
         public uint IndexCount { get; private set; }
-        public uint WireframeIndexCount { get; private set; }
 
         public MeshGeometry(SlDevice device)
         {
@@ -26,7 +25,7 @@ namespace XNOEdit.Renderer
         /// </summary>
         public static MeshGeometry CreateWithSharedVertices(
             SlDevice device,
-            SlBuffer<float> sharedVertexBuffer,
+            SlBuffer sharedVertexBuffer,
             ushort[] indices)
         {
             var geometry = new MeshGeometry(device);
@@ -40,7 +39,7 @@ namespace XNOEdit.Renderer
         /// </summary>
         public static MeshGeometry CreateFromTriangleStrip(
             SlDevice device,
-            SlBuffer<float> sharedVertexBuffer,
+            SlBuffer sharedVertexBuffer,
             List<ushort> stripLengths,
             List<ushort> indices)
         {
@@ -52,10 +51,6 @@ namespace XNOEdit.Renderer
         {
             IndexCount = (uint)indices.Length;
             _indexBuffer = device.CreateBuffer(indices, SlBufferUsage.Index);
-
-            var wireframeIndices = GenerateWireframeIndices(indices);
-            WireframeIndexCount = (uint)wireframeIndices.Length;
-            _wireframeIndexBuffer = device.CreateBuffer(wireframeIndices, SlBufferUsage.Index);
         }
 
         /// <summary>
@@ -72,7 +67,7 @@ namespace XNOEdit.Renderer
 
                 for (var i = 0; i < count / 2; i++)
                 {
-                    var idx = offset + (i * 2);
+                    var idx = offset + i * 2;
 
                     // First triangle
                     triangles.Add(indices[idx]);
@@ -138,41 +133,15 @@ namespace XNOEdit.Renderer
             lines.Add(a < b ? (a, b) : (b, a));
         }
 
-        /// <summary>
-        /// Binds vertex buffer to the render pass
-        /// </summary>
-        public void BindVertexBuffer(SlRenderPass passEncoder, uint slot)
+        public void Bind(SlPassContext ctx, uint slot, uint stride)
         {
-            if (_sharedVertexBuffer == null) return;
-
-            passEncoder.SetVertexBuffer(slot, _sharedVertexBuffer);
-        }
-
-        /// <summary>
-        /// Draws the geometry (triangles or wireframe)
-        /// </summary>
-        public void Draw(SlRenderPass passEncoder, bool wireframe = false, int instanceCount = 1)
-        {
-            if (wireframe)
-            {
-                if (_wireframeIndexBuffer == null || WireframeIndexCount == 0) return;
-
-                passEncoder.SetIndexBuffer(_wireframeIndexBuffer, SlIndexFormat.Uint16);
-                passEncoder.DrawIndexed(WireframeIndexCount, (uint)instanceCount);
-            }
-            else
-            {
-                if (_indexBuffer == null || IndexCount == 0) return;
-
-                passEncoder.SetIndexBuffer(_indexBuffer, SlIndexFormat.Uint16);
-                passEncoder.DrawIndexed(IndexCount, (uint)instanceCount);
-            }
+            ctx.SetVertexBuffer(slot, _sharedVertexBuffer!.View, stride);
+            ctx.SetIndexBuffer(_indexBuffer!.View);
         }
 
         public void Dispose()
         {
             _indexBuffer?.Dispose();
-            _wireframeIndexBuffer?.Dispose();
             // Don't dispose shared vertex buffer - it's owned elsewhere
         }
     }

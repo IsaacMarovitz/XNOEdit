@@ -1,5 +1,6 @@
 using System.Numerics;
 using Solaris;
+using Solaris.Graph;
 using XNOEdit.Renderer.Renderers;
 
 namespace XNOEdit.Renderer.Scene
@@ -8,20 +9,21 @@ namespace XNOEdit.Renderer.Scene
     {
         private readonly ModelRenderer[] _renderers;
         private readonly Dictionary<string, InstancedModelRenderer> _instancedRenderers = [];
+        private SlDevice _device;
 
         public string? TerrainName { get; }
 
-        public StageScene(ModelRenderer[] renderers, string? terrainName = null)
+        public StageScene(SlDevice device, ModelRenderer[] renderers, string? terrainName = null)
         {
+            _device = device;
             _renderers = renderers;
             TerrainName = terrainName;
         }
 
         public void AddInstancedRenderer(string name, InstancedModelRenderer renderer)
         {
-            // Dispose existing if replacing
             if (_instancedRenderers.TryGetValue(name, out var existing))
-                existing.Dispose();
+                _device.Retire(existing);
 
             _instancedRenderers[name] = renderer;
         }
@@ -54,15 +56,14 @@ namespace XNOEdit.Renderer.Scene
         }
 
         public void Render(
-            SlQueue queue,
-            SlRenderPass passEncoder,
+            SlPassContext ctx,
             Matrix4x4 view,
             Matrix4x4 projection,
             ModelParameters modelParameters)
         {
             foreach (var renderer in _renderers)
             {
-                renderer.Draw(queue, passEncoder, view, projection, modelParameters);
+                renderer.Draw(ctx, view, projection, modelParameters);
             }
 
             var instancedParams = new InstancedModelParameters
@@ -79,7 +80,7 @@ namespace XNOEdit.Renderer.Scene
 
             foreach (var renderer in _instancedRenderers.Values)
             {
-                renderer.Draw(queue, passEncoder, view, projection, instancedParams);
+                renderer.Draw(ctx, view, projection, instancedParams);
             }
         }
 

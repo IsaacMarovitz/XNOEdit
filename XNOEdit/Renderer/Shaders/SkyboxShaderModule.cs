@@ -1,54 +1,44 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Plume;
 using Solaris;
 
 namespace XNOEdit.Renderer.Shaders
 {
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct SkyboxUniforms
+    public struct SkyboxPushConstants
     {
-        public Matrix4x4 View;
-        public Matrix4x4 Projection;
+        public Matrix4x4 InverseViewProjection;
+        public Vector4 CameraPosition;
         public Vector4 SunDirection;
         public Vector4 SunColor;
     }
 
-    public unsafe class SkyboxShader : Shader<SkyboxUniforms>
+    public class SkyboxShader : ShaderModule
     {
-        public SkyboxShader(
-            SlDevice device,
-            string shaderSource)
-            : base(
-                device,
-                shaderSource,
-                "Skybox Shader",
-                pipelineVariants: new Dictionary<string, SlPipelineVariantDescriptor>
+        public const uint VertexStride = 12;
+
+        public SkyboxShader(SlDevice device, ReadOnlySpan<byte> vertex, ReadOnlySpan<byte> pixel)
+            : base(device, vertex, pixel, "Skybox Shader",
+                new Dictionary<string, SlPipelineVariant>
                 {
                     ["default"] = new()
                     {
-                        Topology = SlPrimitiveTopology.TriangleStrip,
-                        CullMode = SlCullMode.None,
-                        FrontFace = SlFrontFace.Clockwise,
+                        Topology = RenderPrimitiveTopology.TriangleStrip,
+                        CullMode = RenderCullMode.None,
+                        FrontFace = RenderFrontFace.Clockwise,
                         DepthWrite = false,
-                        DepthCompare = SlCompareFunction.Always
+                        DepthCompare = RenderComparisonFunction.Always,
+                        DepthTest = false
                     }
                 })
         {
         }
 
-        protected override SlVertexBufferLayout[] CreateVertexLayouts()
-        {
-            var vertexAttribute = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 0, ShaderLocation = 0 };
-
-            return
+        protected override SlVertexLayout CreateVertexLayout() => new(
+            new SlVertexBufferLayout(0, VertexStride, SlVertexStepMode.Vertex,
             [
-                new SlVertexBufferLayout
-                {
-                    Stride = 12,
-                    StepMode = SlVertexStepMode.Vertex,
-                    Attributes = [vertexAttribute]
-                }
-            ];
-        }
+                new SlVertexAttribute("POSITION", 0, 0, RenderFormat.R32G32B32Float, 0),
+            ]));
     }
 }

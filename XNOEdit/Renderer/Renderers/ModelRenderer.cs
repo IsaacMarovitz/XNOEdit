@@ -2,6 +2,7 @@ using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Solaris;
+using Solaris.Graph;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
 
@@ -31,7 +32,13 @@ namespace XNOEdit.Renderer.Renderers
             ArcFile shaderArchive)
             : base(CreateShader(device))
         {
-            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (ModelShader)Shader);
+            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive);
+        }
+
+        public static ModelShader CreateShader(SlDevice device)
+        {
+            return new ModelShader(device, ShaderLibrary.Get(device, "model_vs"),
+                ShaderLibrary.Get(device, "model_ps"));
         }
 
         public bool GetVisible() => _model.GetAnyMeshVisible();
@@ -44,23 +51,13 @@ namespace XNOEdit.Renderer.Renderers
             _model.SetVisible(subobject, meshSet, visibility);
         }
 
-        private static ModelShader CreateShader(SlDevice device)
-        {
-            return new ModelShader(device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/Model.wgsl"));
-        }
-
         public override void Draw(
-            SlQueue queue,
-            SlRenderPass passEncoder,
+            SlPassContext ctx,
             Matrix4x4 view,
             Matrix4x4 projection,
             ModelParameters modelParameters)
         {
-            base.Draw(queue, passEncoder, view, projection, modelParameters);
-
-            var modelShader = (ModelShader)Shader;
-
-            var perFrameUniforms = new PerFrameUniforms
+            var perFrame = new PerFrameUniforms
             {
                 Model = Matrix4x4.Identity,
                 View = view,
@@ -69,15 +66,20 @@ namespace XNOEdit.Renderer.Renderers
                 SunColor = modelParameters.SunColor.AsVector4(),
                 CameraPosition = modelParameters.Position,
                 VertColorStrength = modelParameters.VertColorStrength,
-                Lightmap = modelParameters.Lightmap ? 1.0f: 0.0f,
+                Lightmap = modelParameters.Lightmap ? 1.0f : 0.0f,
             };
 
-            modelShader.UpdatePerFrameUniforms(queue, in perFrameUniforms);
+            var push = new ModelPerFramePush
+            {
+                PerFrameOffset = ctx.UploadConstants(in perFrame),
+                SamplerIndex = ((ModelShader)ShaderModule).Sampler.Slot
+            };
+            ctx.PushConstants(in push);
 
-            var pipeline = modelShader.GetPipeline(modelParameters.CullBackfaces, modelParameters.Wireframe);
-            passEncoder.SetPipeline(pipeline);
+            var variant = modelParameters.CullBackfaces ? "culled" : "default";
+            ctx.SetPipeline(Material.Pipeline(variant, ctx.Signature));
 
-            _model.Draw(passEncoder, modelParameters.Wireframe, modelParameters.TextureManager, modelShader);
+            _model.Draw(ctx, modelParameters.TextureManager);
         }
 
         public override void Dispose()

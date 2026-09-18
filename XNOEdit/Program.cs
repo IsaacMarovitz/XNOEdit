@@ -7,9 +7,10 @@ using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
+using Plume;
 using SDL3;
 using Solaris;
-using Solaris.Wgpu;
+using Solaris.Graph;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.ModelResolver;
@@ -28,9 +29,8 @@ namespace XNOEdit
 
         private static IntPtr _window;
         private static SlDevice _device;
-        private static SlQueue _queue;
-        private static SlTexture _depthTexture;
-        private static SlTextureView _depthTextureView;
+        private static SlFrameGraph _graph;
+        private static SlUploader _uploader;
 
         private static Camera? _camera;
         private static ArcFile? _shaderArchive;
@@ -51,7 +51,6 @@ namespace XNOEdit
         private static float _deltaTime;
         private static bool _mouseCaptured;
         private static Vector2 _captureStartPosition;
-        private const SlTextureFormat DepthTextureFormat = SlTextureFormat.Depth32float;
 
         private static void Main(string[] args)
         {
@@ -85,22 +84,19 @@ namespace XNOEdit
         private static SDL.AppResult AppInit(IntPtr appState, int argc, string[] argv)
         {
             _window = SDL.CreateWindow("XNOEdit", 1280, 720,
-                SDL.WindowFlags.HighPixelDensity | SDL.WindowFlags.Resizable);
+                SDL.WindowFlags.HighPixelDensity | SDL.WindowFlags.Resizable | SDL.WindowFlags.Metal);
 
             SDL.StartTextInput(_window);
 
             GameFolderLoaded += LoadGameFolderResources;
 
-            WgpuBackend.Register();
-
-            InitializeDevice(SlBackend.Wgpu);
-            CreateDepthTexture();
+            InitializeDevice();
 
             _camera = new Camera();
             _grid = new GridRenderer(_device);
             _skybox = new SkyboxRenderer(_device);
 
-            var imguiController = new ImGuiController(_device, _window, 2);
+            var imguiController = new ImGuiController(_device, _uploader, _window);
             UIManager = new UIManager();
             UIManager.OnLoad(imguiController, _device);
             UIManager.EnvironmentPanel?.InitSunAngles(_settings);
@@ -109,8 +105,8 @@ namespace XNOEdit
             UIManager.StagesPanel?.LoadStage += QueueStageLoad;
             UIManager.MissionsPanel?.LoadMission += QueueMissionLoad;
 
-            _textureManager = new TextureManager(imguiController);
-            _fileLoader = new FileLoaderService(_device, _queue);
+            _textureManager = new TextureManager(_device);
+            _fileLoader = new FileLoaderService(_device, _uploader);
 
             Logger.SetEnable(LogLevel.Debug, Configuration.DebugLogs);
 
@@ -246,41 +242,25 @@ namespace XNOEdit
             return SDL.AppResult.Continue;
         }
 
-        private static void InitializeDevice(SlBackend backend)
+        private static void InitializeDevice()
         {
-            _device = SlDeviceFactory.Create(backend, _window);
-            _queue = _device.GetQueue();
+            _device = SlDevice.Create();
 
-            Logger.Info?.PrintMsg(LogClass.Application, $"Solaris Backend: {backend}");
-        }
+            var view = SDL.MetalCreateView(_window);
 
-        private static void CreateDepthTexture()
-        {
-            SDL.GetWindowSize(_window, out var width, out var height);
-
-            var depthTextureDesc = new SlTextureDescriptor
+            var renderWindow = new RenderWindow
             {
-                Size = new SlExtent3D { Width = (uint)width, Height = (uint)height, DepthOrArrayLayers = 1 },
-                MipLevelCount = 1,
-                SampleCount = 1,
-                Dimension = SlTextureDimension.Dimension2D,
-                Format = DepthTextureFormat,
-                Usage = SlTextureUsage.RenderAttachment
+                Window = (void*)SDL.GetPointerProperty(
+                    SDL.GetWindowProperties(_window), SDL.Props.WindowCocoaWindowPointer, IntPtr.Zero),
+                View = (void*)SDL.MetalGetLayer(view),
             };
 
-            _depthTexture = _device.CreateTexture(depthTextureDesc);
+            _graph = new SlFrameGraph(_device, renderWindow, RenderFormat.B8G8R8A8Unorm, maxFrameLatency: 2);
+            _graph.SetVsyncEnabled(true);
 
-            var depthViewDesc = new SlTextureViewDescriptor
-            {
-                Format = DepthTextureFormat,
-                Dimension = SlTextureViewDimension.Dimension2D,
-                BaseMipLevel = 0,
-                MipLevelCount = 1,
-                BaseArrayLayer = 0,
-                ArrayLayerCount = 1
-            };
+            _uploader = new SlUploader(_device);
 
-            _depthTextureView = _depthTexture.CreateTextureView(depthViewDesc);
+            Logger.Info?.PrintMsg(LogClass.Application, $"Solaris Backend: {_device.Backend} ({_device.Name})");
         }
 
         private static void OnRenderSettingsChanged(SettingsToggle toggle)
@@ -385,7 +365,7 @@ namespace XNOEdit
                 DispatchToMainThread(() =>
                 {
                     _scene?.Dispose();
-                    _scene = new StageScene([]);
+                    _scene = new StageScene(_device, []);
                 });
             }
 
@@ -418,7 +398,7 @@ namespace XNOEdit
                 _textureManager.Clear();
                 foreach (var tex in result.Textures)
                 {
-                    _textureManager.Add(tex.Name, tex.Texture, tex.View);
+                    _textureManager.Add(tex.Name, tex.Texture);
                 }
 
                 if (result.ObjectChunk.PrimitiveLists.Count == 0)
@@ -443,7 +423,7 @@ namespace XNOEdit
             _textureManager.Clear();
             foreach (var tex in result.Textures)
             {
-                _textureManager.Add(tex.Name, tex.Texture, tex.View);
+                _textureManager.Add(tex.Name, tex.Texture);
             }
 
             SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}.arc");
@@ -470,7 +450,7 @@ namespace XNOEdit
             };
 
             _scene?.Dispose();
-            _scene = new StageScene(renderers, result.Name);
+            _scene = new StageScene(_device, renderers, result.Name);
             _modelCenter = Vector3.Zero;
 
             SetModelRadius(result.MaxRadius);
@@ -522,7 +502,7 @@ namespace XNOEdit
                 // Add textures to texture manager
                 foreach (var tex in group.ObjectResult.Textures)
                 {
-                    _textureManager.Add(tex.Name, tex.Texture, tex.View);
+                    _textureManager.Add(tex.Name, tex.Texture);
                 }
 
                 loadedCount++;
@@ -535,129 +515,95 @@ namespace XNOEdit
             Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
         }
 
-        private static void OnRender(double deltaTime)
+        private static void OnRender(float deltaTime)
         {
-            var surface = _device.GetSurface();
-            var surfaceTexture = surface.GetCurrentTexture();
-
             if (_camera == null)
             {
                 return;
             }
 
-            var encoder = _device.CreateCommandEncoder();
-
+            // Resize the viewport targets from last frame's ImGui layout, before anything
+            // samples or renders to them.
             UIManager.ViewportPanel.PrepareFrame();
 
             var view = _camera.GetViewMatrix();
             var projection = _camera.GetProjectionMatrix(UIManager.ViewportPanel.GetAspectRatio());
 
-            var scenePass = UIManager.ViewportPanel.BeginRenderPass(encoder);
+            // Build the UI and finalise its draw data.
+            UIManager.BuildUI(view, projection, deltaTime, _settings, _textureManager);
+            ImGui.Render();
 
-            _skybox?.Draw(_queue, scenePass, view, projection,
-                new SkyboxParameters
-                {
-                    SunDirection =  _settings.SunDirection,
-                    SunColor = _settings.SunColor
-                });
+            // Servicing texture requests stages uploads, so both must complete before the
+            // frame opens — a staged atlas is not readable until the flush lands.
+            UIManager.Controller?.PrepareFrame();
+            _uploader.Flush();
 
-            if (_settings.ShowGrid)
+            using var frame = _graph.BeginFrame();
+
+            if (frame == null)
             {
-                _grid?.Draw(_queue, scenePass, view, projection,
-                    new GridParameters
-                    {
-                        Model = Matrix4x4.CreateTranslation(_modelCenter),
-                        Position = _camera.Position,
-                        FadeDistance = _modelRadius * 5.0f
-                    });
+                return;
             }
 
-            _scene?.Render(_queue, scenePass, view, projection,
-                new ModelParameters
+            var viewportColor = frame.ImportTexture(UIManager.ViewportPanel.ColorTarget);
+            var viewportDepth = frame.ImportTexture(UIManager.ViewportPanel.DepthTarget);
+
+            frame.AddPass("Scene")
+                .Color(viewportColor, SlLoadOp.Clear, SlClearValue.Color(0.1f, 0.1f, 0.1f))
+                .Depth(viewportDepth)
+                .Execute(ctx =>
                 {
-                    SunDirection = _settings.SunDirection,
-                    SunColor = _settings.SunColor,
-                    Position =  _camera.Position,
-                    VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
-                    Wireframe = _settings.WireframeMode,
-                    CullBackfaces =  _settings.BackfaceCulling,
-                    TextureManager = _textureManager,
-                    Lightmap = _settings.Lightmap,
+                    _skybox?.Draw(ctx, view, projection,
+                        new SkyboxParameters
+                        {
+                            CameraPosition = _camera.Position,
+                            SunDirection = _settings.SunDirection,
+                            SunColor = _settings.SunColor
+                        });
+
+                    if (_settings.ShowGrid)
+                    {
+                        _grid?.Draw(ctx, view, projection,
+                            new GridParameters
+                            {
+                                Model = Matrix4x4.CreateTranslation(_modelCenter),
+                                Position = _camera.Position,
+                                FadeDistance = _modelRadius * 5.0f
+                            });
+                    }
+
+                    _scene?.Render(ctx, view, projection,
+                        new ModelParameters
+                        {
+                            SunDirection = _settings.SunDirection,
+                            SunColor = _settings.SunColor,
+                            Position = _camera.Position,
+                            VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
+                            Wireframe = _settings.WireframeMode,
+                            CullBackfaces = _settings.BackfaceCulling,
+                            TextureManager = _textureManager,
+                            Lightmap = _settings.Lightmap,
+                        });
                 });
 
-            scenePass.End();
-            scenePass.Dispose();
-
-            var textureViewDesc = new SlTextureViewDescriptor
-            {
-                Format = SlDevice.SurfaceFormat,
-                Dimension = SlTextureViewDimension.Dimension2D,
-                BaseMipLevel = 0,
-                MipLevelCount = 1,
-                BaseArrayLayer = 0,
-                ArrayLayerCount = 1,
-            };
-
-            var backbuffer = surfaceTexture.CreateTextureView(textureViewDesc);
-
-            var uiColorAttachment = new SlColorAttachment
-            {
-                View = backbuffer,
-                LoadOp = SlLoadOp.Clear,
-                StoreOp = SlStoreOp.Store,
-                ClearValue = new SlColor { R = 0.15, G = 0.15, B = 0.15, A = 1.0 }
-            };
-
-            var uiRenderPassDesc = new SlRenderPassDescriptor
-            {
-                ColorAttachments = [uiColorAttachment],
-                DepthStencilAttachment = null
-            };
-
-            var uiPass = encoder.BeginRenderPass(uiRenderPassDesc);
-
-            UIManager.OnRender(
-                view, projection,
-                deltaTime, ref _settings, uiPass, _textureManager);
-
-            uiPass.End();
-
-            var commandBuffer = encoder.Finish();
-            _queue.Submit(commandBuffer);
-
-            surface.Present();
-            backbuffer.Dispose();
-            commandBuffer.Dispose();
-            encoder.Dispose();
-            uiPass.Dispose();
+            frame.AddPass("UI")
+                .Reads(viewportColor)
+                .Color(frame.SwapChainTarget, SlLoadOp.Clear, SlClearValue.Color(0.15f, 0.15f, 0.15f))
+                .Execute(ctx => UIManager.Controller?.Render(ctx));
         }
 
         private static void OnFramebufferResize(Vector2 size)
         {
-            var surface = _device.GetSurface();
-            var surfaceDescriptor = new SlSurfaceDescriptor
-            {
-                Format = SlDevice.SurfaceFormat,
-                Usage = SlTextureUsage.RenderAttachment,
-                Width = (uint)size.X,
-                Height = (uint)size.Y,
-                PresentMode = SlPresentMode.Fifo
-            };
-
-            surface.Configure(surfaceDescriptor);
-
-            _depthTextureView?.Dispose();
-            _depthTexture?.Dispose();
-
-            CreateDepthTexture();
+            _graph.Resize();
         }
 
         private static void AppQuit(IntPtr appState, SDL.AppResult result)
         {
-            SDL.DestroyWindow(_window);
-
             _loadChain?.Cancel();
 
+            _graph?.WaitForIdle();
+
+            _uploader?.Dispose();
             _scene?.Dispose();
             _grid?.Dispose();
             _skybox?.Dispose();
@@ -666,9 +612,7 @@ namespace XNOEdit
 
             UIManager?.Dispose();
 
-            _depthTextureView?.Dispose();
-            _depthTexture?.Dispose();
-            _queue?.Dispose();
+            _graph?.Dispose();
             _device?.Dispose();
 
             SDL.DestroyWindow(_window);

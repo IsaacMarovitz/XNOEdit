@@ -50,7 +50,7 @@ namespace XNOEdit.Managers
             ObjectsPanel = new ObjectsPanel();
             StagesPanel = new StagesPanel(this);
             MissionsPanel = new MissionsPanel();
-            ViewportPanel = new ViewportPanel(device, controller);
+            ViewportPanel = new ViewportPanel(device);
             EnvironmentPanel = new EnvironmentPanel(this);
 
             var io = ImGui.GetIO();
@@ -241,9 +241,9 @@ namespace XNOEdit.Managers
             SetColors(HueForCategory(category));
         }
 
-        public unsafe void OnRender(
+        public unsafe void BuildUI(
             Matrix4x4 view, Matrix4x4 projection,
-            double deltaTime, ref RenderSettings settings, SlRenderPass pass, TextureManager textureManager)
+            double deltaTime, RenderSettings settings, TextureManager textureManager)
         {
             Controller?.Update((float)deltaTime);
 
@@ -281,10 +281,10 @@ namespace XNOEdit.Managers
                 _firstLoop = false;
             }
 
-            RenderMenuBar(ref settings);
+            RenderMenuBar(settings);
 
             if (_environmentWindow)
-                EnvironmentPanel?.Render(ref settings);
+                EnvironmentPanel?.Render(settings);
 
             if (_xnoWindow)
                 XnoPanel?.Render(textureManager);
@@ -305,10 +305,9 @@ namespace XNOEdit.Managers
 
             RenderLoadingOverlay();
             _alertPanel?.Render(deltaTime);
-            Controller?.Render(pass);
         }
 
-        private void RenderMenuBar(ref RenderSettings settings)
+        private void RenderMenuBar(RenderSettings settings)
         {
             if (ImGui.BeginMainMenuBar())
             {

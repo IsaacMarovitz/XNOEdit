@@ -1,0 +1,17 @@
+#pragma once
+
+#include "solaris_common.metali"
+
+struct ImGuiPushConstants
+{
+    float4x4 Mvp;
+    uint TextureIndex;
+    uint SamplerIndex;
+};
+
+struct ImGuiInterpolators
+{
+    float4 Position [[position]];
+    float4 Color;
+    float2 UV;
+};

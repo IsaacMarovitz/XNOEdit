@@ -1,44 +1,29 @@
 using System.Numerics;
 using Solaris;
+using Solaris.Graph;
 
 namespace XNOEdit.Renderer
 {
     public abstract class Renderer<TParameters> : IDisposable where TParameters : struct
     {
-        protected readonly Shader Shader;
+        protected readonly ShaderModule ShaderModule;
 
-        public Renderer(Shader shader)
+        protected SlMaterial Material => ShaderModule.Material;
+
+        public Renderer(ShaderModule shaderModule)
         {
-            Shader = shader;
+            ShaderModule = shaderModule;
         }
 
-        public virtual void Draw(
-            SlQueue queue,
-            SlRenderPass passEncoder,
+        public abstract void Draw(
+            SlPassContext ctx,
             Matrix4x4 view,
             Matrix4x4 projection,
-            TParameters parameters)
-        {
-            BindStaticBindGroups(passEncoder);
-        }
-
-        protected void BindStaticBindGroups(SlRenderPass passEncoder)
-        {
-            for (uint i = 0; i < Shader.BindGroupCount; i++)
-            {
-                var bindGroup = Shader.GetBindGroup((int)i);
-
-                // Only bind non-null bind groups (some may be dynamic, created elsewhere)
-                if (bindGroup != null)
-                {
-                    passEncoder.SetBindGroup(i, bindGroup);
-                }
-            }
-        }
+            TParameters parameters);
 
         public virtual void Dispose()
         {
-            Shader.Dispose();
+            ShaderModule.Dispose();
         }
     }
 }

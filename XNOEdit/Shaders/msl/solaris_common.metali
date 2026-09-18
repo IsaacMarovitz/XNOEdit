@@ -1,0 +1,51 @@
+#pragma once
+
+#include <metal_stdlib>
+
+using namespace metal;
+
+constant constexpr uint SL_TEXTURE_HEAP_SIZE = 16384;
+constant constexpr uint SL_SAMPLER_HEAP_SIZE = 4096;
+
+#define SL_NULL_TEXTURE_2D       0
+#define SL_NULL_TEXTURE_2D_ARRAY 1
+#define SL_NULL_TEXTURE_CUBE     2
+#define SL_WHITE_TEXTURE_2D      3
+
+struct SlTexture2DHeap
+{
+    array<texture2d<float>, SL_TEXTURE_HEAP_SIZE> textures [[id(0)]];
+};
+
+struct SlTexture2DArrayHeap
+{
+    array<texture2d_array<float>, SL_TEXTURE_HEAP_SIZE> textures [[id(0)]];
+};
+
+struct SlTextureCubeHeap
+{
+    array<texturecube<float>, SL_TEXTURE_HEAP_SIZE> textures [[id(0)]];
+};
+
+struct SlSamplerHeap
+{
+    array<sampler, SL_SAMPLER_HEAP_SIZE> samplers [[id(0)]];
+};
+
+struct SlConstantHeap
+{
+    device const float4* constants [[id(0)]];
+};
+
+static inline float4x4 SlLoadMatrix(device const float4* constants, uint element)
+{
+    return float4x4(constants[element + 0], constants[element + 1],
+                    constants[element + 2], constants[element + 3]);
+}
+
+static inline float4 SlSample2D(constant SlTexture2DHeap& textures,
+                                constant SlSamplerHeap& samplers,
+                                uint textureIndex, uint samplerIndex, float2 uv)
+{
+    return textures.textures[textureIndex].sample(samplers.samplers[samplerIndex], uv);
+}

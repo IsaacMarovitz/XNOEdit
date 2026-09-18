@@ -1,5 +1,5 @@
 using System.Numerics;
-using Solaris;
+using Solaris.Graph;
 using XNOEdit.Renderer.Renderers;
 
 namespace XNOEdit.Renderer.Scene
@@ -19,13 +19,12 @@ namespace XNOEdit.Renderer.Scene
         }
 
         public void Render(
-            SlQueue queue,
-            SlRenderPass passEncoder,
+            SlPassContext ctx,
             Matrix4x4 view,
             Matrix4x4 projection,
             ModelParameters modelParameters)
         {
-            _renderer.Draw(queue, passEncoder, view, projection, modelParameters);
+            _renderer.Draw(ctx, view, projection, modelParameters);
         }
 
         public void Dispose()

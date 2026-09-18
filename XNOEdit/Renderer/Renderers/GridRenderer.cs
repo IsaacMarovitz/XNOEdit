@@ -1,5 +1,6 @@
 using System.Numerics;
 using Solaris;
+using Solaris.Graph;
 using XNOEdit.Renderer.Shaders;
 
 namespace XNOEdit.Renderer.Renderers
@@ -11,9 +12,9 @@ namespace XNOEdit.Renderer.Renderers
         public float FadeDistance;
     }
 
-    public unsafe class GridRenderer : Renderer<GridParameters>
+    public class GridRenderer : Renderer<GridParameters>
     {
-        private readonly SlBuffer<float> _vertexBuffer;
+        private readonly SlBuffer _vertexBuffer;
         private readonly int _lineCount;
 
         public GridRenderer(SlDevice device, float size = 100.0f, int divisions = 100)
@@ -26,7 +27,8 @@ namespace XNOEdit.Renderer.Renderers
 
         private static GridShader CreateShader(SlDevice device)
         {
-            return new GridShader(device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/Grid.wgsl"));
+            return new GridShader(device,
+                ShaderLibrary.Get(device, "grid_vs"), ShaderLibrary.Get(device, "grid_ps"));
         }
 
         private static float[] CreateGridVertices(float size, int divisions)
@@ -61,14 +63,11 @@ namespace XNOEdit.Renderer.Renderers
         }
 
         public override void Draw(
-            SlQueue queue,
-            SlRenderPass passEncoder,
+            SlPassContext ctx,
             Matrix4x4 view,
             Matrix4x4 projection,
             GridParameters gridParameters)
         {
-            base.Draw(queue, passEncoder, view, projection, gridParameters);
-
             var uniforms = new GridUniforms
             {
                 Model = gridParameters.Model,
@@ -79,11 +78,12 @@ namespace XNOEdit.Renderer.Renderers
                 FadeEnd = gridParameters.FadeDistance
             };
 
-            ((GridShader)Shader).UpdateUniforms(queue, in uniforms);
+            var offset = ctx.UploadConstants(in uniforms);
 
-            passEncoder.SetPipeline(Shader.GetPipeline());
-            passEncoder.SetVertexBuffer(0, _vertexBuffer);
-            passEncoder.Draw((uint)_lineCount, 1);
+            ctx.SetPipeline(Material.Pipeline(ctx.Signature));
+            ctx.PushConstants(in offset);
+            ctx.SetVertexBuffer(0, _vertexBuffer.View, stride: 24);
+            ctx.Draw((uint)_lineCount);
         }
 
         public override void Dispose()

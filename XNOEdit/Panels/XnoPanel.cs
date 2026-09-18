@@ -77,7 +77,7 @@ namespace XNOEdit.Panels
             ImGui.End();
         }
 
-        private unsafe void RenderObjectChunk(ObjectChunk objectChunk, EffectListChunk? effectListChunk)
+        private void RenderObjectChunk(ObjectChunk objectChunk, EffectListChunk? effectListChunk)
         {
             if (ImGui.BeginTabItem("Object"))
             {
@@ -261,7 +261,7 @@ namespace XNOEdit.Panels
 
                         ImGui.Text($"Type: {texture.Type}");
 
-                        var textureId = textureManager.GetImGuiId(texture.Name);
+                        var textureId = textureManager.GetImGuiTextureId(texture.Name);
                         if (textureId != 0)
                         {
                             ImGui.Image(new ImTextureRef(null, textureId), new Vector2(150, 150));

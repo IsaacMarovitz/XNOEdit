@@ -1,0 +1,15 @@
+#pragma once
+
+#include "solaris_common.metali"
+
+struct GridPushConstants
+{
+    uint ConstantOffset;
+};
+
+struct GridInterpolators
+{
+    float4 Position [[position]];
+    float3 Color;
+    float  Distance;
+};

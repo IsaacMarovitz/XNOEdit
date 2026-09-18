@@ -3,6 +3,7 @@ using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Solaris;
+using Solaris.Graph;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
@@ -22,7 +23,7 @@ namespace XNOEdit.Renderer
     {
         private readonly SlDevice _device;
         private readonly List<ModelMesh> _meshes = [];
-        private readonly Dictionary<int, SlBuffer<float>> _sharedVertexBuffers = new();
+        private readonly Dictionary<int, SlBuffer> _sharedVertexBuffers = new();
         private readonly ArcFile _shaderArchive;
 
         public Model(
@@ -30,13 +31,12 @@ namespace XNOEdit.Renderer
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
-            ArcFile shaderArchive,
-            ModelShader shader)
+            ArcFile shaderArchive)
         {
             _device = device;
             _shaderArchive = shaderArchive;
 
-            LoadModel(objectChunk, textureListChunk, effectListChunk, shader);
+            LoadModel(objectChunk, textureListChunk, effectListChunk);
         }
 
         public bool GetSubobjectVisible(int subobject)
@@ -83,8 +83,7 @@ namespace XNOEdit.Renderer
         private void LoadModel(
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
-            EffectListChunk effectListChunk,
-            ModelShader shader)
+            EffectListChunk effectListChunk)
         {
             // Create shared vertex buffers for each unique VertexList
             for (var i = 0; i < objectChunk.VertexLists.Count; i++)
@@ -209,7 +208,7 @@ namespace XNOEdit.Renderer
                             // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
                         }
 
-                        var mesh = new ModelMesh(_device, buffer, primitiveList, textureSet, material, shader, i, j);
+                        var mesh = new ModelMesh(_device, buffer, primitiveList, textureSet, material, i, j);
                         _meshes.Add(mesh);
                     }
                     catch (Exception ex)
@@ -312,16 +311,11 @@ namespace XNOEdit.Renderer
             };
         }
 
-        public void Draw(
-            SlRenderPass passEncoder,
-            bool wireframe,
-            TextureManager textureManager,
-            ModelShader shader,
-            int instanceCount = 1)
+        public void Draw(SlPassContext ctx, TextureManager textureManager, int instanceCount = 1)
         {
             foreach (var mesh in _meshes)
             {
-                mesh.Draw(passEncoder, wireframe, textureManager, shader, instanceCount);
+                mesh.Draw(ctx, textureManager, instanceCount);
             }
         }
 
@@ -340,30 +334,25 @@ namespace XNOEdit.Renderer
         }
     }
 
-    public unsafe class ModelMesh : IDisposable
+        public class ModelMesh : IDisposable
     {
         public int Subobject { get; private set; }
         public int MeshSet { get; private set; }
         public bool Visible { get; private set; } = true;
 
-        private readonly SlDevice _device;
         private readonly MeshGeometry _geometry;
-        private TextureSet _textureSet;
-        private SlBuffer<PerMeshUniforms> _meshUniformBuffer;
-        private SlBindGroup _meshBindGroup;
-        private SlBindGroup _textureBindGroup;
+        private readonly TextureSet _textureSet;
+        private PerMeshConstants _constants;
 
         public ModelMesh(
             SlDevice device,
-            SlBuffer<float> sharedVbo,
+            SlBuffer sharedVbo,
             PrimitiveList primitiveList,
             TextureSet textureSet,
             Material material,
-            ModelShader shader,
             int subobject,
             int meshSet)
         {
-            _device = device;
             _textureSet = textureSet;
             Subobject = subobject;
             MeshSet = meshSet;
@@ -371,7 +360,7 @@ namespace XNOEdit.Renderer
             _geometry = MeshGeometry.CreateFromTriangleStrip(
                 device, sharedVbo, primitiveList.StripIndices, primitiveList.IndexIndices);
 
-            CreateMeshUniforms(device, material, shader);
+            _constants = BuildConstants(material, textureSet);
         }
 
         public void SetVisible(bool visible)
@@ -379,59 +368,56 @@ namespace XNOEdit.Renderer
             Visible = visible;
         }
 
-        private void CreateMeshUniforms(SlDevice device, Material material, ModelShader shader)
+        /// <summary>
+        /// Flattens the Ninja material into the push constant block. Texture indices are
+        /// left at zero here and filled per draw, since a texture can finish loading
+        /// after the mesh was built.
+        /// </summary>
+        private static PerMeshConstants BuildConstants(Material material, in TextureSet textureSet) => new()
         {
-            _meshUniformBuffer = device.CreateUniform<PerMeshUniforms>();
+            AmbientColor = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient),
+            DiffuseColor = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse),
+            SpecularColor = PropertyUtility.MaterialColorToVec4(material.Colour.Specular),
+            EmissiveColor = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive),
+            SpecularPower = material.Colour.Power,
+            AlphaRef = material.Logic.AlphaRef / 255.0f,
+            Alpha = material.Logic.Alpha ? 1.0f : 0.0f,
+            Blend = material.Logic.Blend ? 1.0f : 0.0f,
+            Specular = textureSet.Specular ? 1.0f : 0.0f,
+        };
 
-            var meshUniforms = new PerMeshUniforms
-            {
-                AmbientColor = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient),
-                DiffuseColor = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse),
-                SpecularColor = PropertyUtility.MaterialColorToVec4(material.Colour.Specular),
-                EmissiveColor = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive),
-                SpecularPower = material.Colour.Power,
-                AlphaRef = material.Logic.AlphaRef / 255.0f,
-                Alpha = material.Logic.Alpha ? 1.0f : 0.0f,
-                Blend = material.Logic.Blend ? 1.0f : 0.0f,
-                Specular = _textureSet.Specular ? 1.0f : 0.0f,
-            };
-
-            var queue = device.GetQueue();
-            _meshUniformBuffer.UpdateData(queue, in meshUniforms);
-            _meshBindGroup = shader.CreatePerMeshBindGroup(_meshUniformBuffer);
-            queue.Dispose();
-        }
-
-        public void Draw(
-            SlRenderPass passEncoder,
-            bool wireframe,
-            TextureManager textureManager,
-            ModelShader shader,
-            int instanceCount = 1)
+        public void Draw(SlPassContext ctx, TextureManager textureManager, int instanceCount = 1)
         {
             if (!Visible) return;
 
-            _geometry.BindVertexBuffer(passEncoder, 0);
-            passEncoder.SetBindGroup(1, _meshBindGroup);
+            var constants = _constants;
 
-            var mainTexture = textureManager.GetView(_textureSet.MainTexture);
-            var blendTexture = textureManager.GetView(_textureSet.BlendMap);
-            var normalTexture = textureManager.GetView(_textureSet.NormalMap);
-            var lightmapTexture = textureManager.GetView(_textureSet.LightMap);
+            constants.MainTextureIndex = ResolveOrWhite(textureManager, _textureSet.MainTexture);
+            constants.BlendMapIndex = ResolveOrWhite(textureManager, _textureSet.BlendMap);
+            constants.LightMapIndex = ResolveOrWhite(textureManager, _textureSet.LightMap);
+            constants.NormalMapIndex = Resolve(textureManager, _textureSet.NormalMap);
 
-            _textureBindGroup?.Dispose();
+            ctx.PushConstants(in constants, ModelPushConstants.PerMeshOffset);
 
-            _textureBindGroup = shader.GetTextureBindGroup(mainTexture, blendTexture, normalTexture, lightmapTexture);
-            passEncoder.SetBindGroup(2, _textureBindGroup);
+            _geometry.Bind(ctx, slot: 0, ModelShader.VertexStride);
+            ctx.DrawIndexed(_geometry.IndexCount, (uint)instanceCount);
+        }
 
-            _geometry.Draw(passEncoder, wireframe, instanceCount);
+        private static uint Resolve(TextureManager textureManager, string? name)
+            => textureManager.GetIndex(name).Packed;
+
+        private static uint ResolveOrWhite(TextureManager textureManager, string? name)
+        {
+            var index = textureManager.GetIndex(name);
+
+            return index == SlTextureIndex.NullTexture2D
+                ? SlTextureIndex.WhiteTexture2D.Packed
+                : index.Packed;
         }
 
         public void Dispose()
         {
             _geometry.Dispose();
-            _meshUniformBuffer?.Dispose();
-            _meshBindGroup?.Dispose();
         }
     }
 }

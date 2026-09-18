@@ -1,48 +1,39 @@
+using Plume;
 using Solaris;
 
 namespace XNOEdit.Renderer.Shaders
 {
+    /// <summary>
+    /// The instanced variant of <see cref="ModelShader"/>. Shares its pipeline variants
+    /// and per-mesh constant layout; the only difference is a second vertex buffer at
+    /// slot 1 carrying a per-instance transform.
+    /// </summary>
     public class InstancedModelShader : ModelShader
     {
-        public InstancedModelShader(
-            SlDevice device,
-            string shaderSource)
-            : base(device, shaderSource)
+        /// <summary>Stride of the per-instance buffer: one 4x4 transform.</summary>
+        public const uint InstanceStride = 64;
+
+        public InstancedModelShader(SlDevice device, ReadOnlySpan<byte> vertex, ReadOnlySpan<byte> pixel)
+            : base(device, vertex, pixel, "Instanced Model Shader")
         {
         }
 
-        protected override SlVertexBufferLayout[] CreateVertexLayouts()
-        {
-            // Vertex attributes (same as base)
-            var vertexAttributes = new SlVertexAttribute[5];
-            vertexAttributes[0] = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 0,  ShaderLocation = 0 };
-            vertexAttributes[1] = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };
-            vertexAttributes[2] = new SlVertexAttribute { Format = SlVertexFormat.Float32x4, Offset = 24, ShaderLocation = 2 };
-            vertexAttributes[3] = new SlVertexAttribute { Format = SlVertexFormat.Float32x2, Offset = 40, ShaderLocation = 3 };
-            vertexAttributes[4] = new SlVertexAttribute { Format = SlVertexFormat.Float32x2, Offset = 48, ShaderLocation = 4 };
-
-            // Instance attributes (mat4x4 as 4 vec4s)
-            var instanceAttributes = new SlVertexAttribute[4];
-            instanceAttributes[0] = new SlVertexAttribute { Format = SlVertexFormat.Float32x4, Offset = 0,  ShaderLocation = 5 };
-            instanceAttributes[1] = new SlVertexAttribute { Format = SlVertexFormat.Float32x4, Offset = 16, ShaderLocation = 6 };
-            instanceAttributes[2] = new SlVertexAttribute { Format = SlVertexFormat.Float32x4, Offset = 32, ShaderLocation = 7 };
-            instanceAttributes[3] = new SlVertexAttribute { Format = SlVertexFormat.Float32x4, Offset = 48, ShaderLocation = 8 };
-
-            return
+        protected override SlVertexLayout CreateVertexLayout() => new(
+            new SlVertexBufferLayout(0, VertexStride, SlVertexStepMode.Vertex,
             [
-                new SlVertexBufferLayout
-                {
-                    Stride = 56,
-                    StepMode = SlVertexStepMode.Vertex,
-                    Attributes = vertexAttributes
-                },
-                new SlVertexBufferLayout
-                {
-                    Stride = 64, // sizeof(Matrix4x4)
-                    StepMode = SlVertexStepMode.Instance,
-                    Attributes = instanceAttributes
-                }
-            ];
-        }
+                new SlVertexAttribute("POSITION", 0, 0, RenderFormat.R32G32B32Float, 0),
+                new SlVertexAttribute("NORMAL", 0, 1, RenderFormat.R32G32B32Float, 12),
+                new SlVertexAttribute("COLOR", 0, 2, RenderFormat.R32G32B32A32Float, 24),
+                new SlVertexAttribute("TEXCOORD", 0, 3, RenderFormat.R32G32Float, 40),
+                new SlVertexAttribute("TEXCOORD", 1, 4, RenderFormat.R32G32Float, 48),
+            ]),
+            new SlVertexBufferLayout(1, InstanceStride, SlVertexStepMode.Instance,
+            [
+                // A mat4x4 crosses four attribute slots; one row each.
+                new SlVertexAttribute("INSTANCE", 0, 5, RenderFormat.R32G32B32A32Float, 0),
+                new SlVertexAttribute("INSTANCE", 1, 6, RenderFormat.R32G32B32A32Float, 16),
+                new SlVertexAttribute("INSTANCE", 2, 7, RenderFormat.R32G32B32A32Float, 32),
+                new SlVertexAttribute("INSTANCE", 3, 8, RenderFormat.R32G32B32A32Float, 48),
+            ]));
     }
 }
