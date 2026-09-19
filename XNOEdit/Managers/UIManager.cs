@@ -301,7 +301,7 @@ namespace XNOEdit.Managers
                 MissionsPanel?.Render();
             }
 
-            ViewportPanel?.Render(view, projection, _guizmos);
+            ViewportPanel?.Render(view, _guizmos);
 
             RenderLoadingOverlay();
             _alertPanel?.Render(deltaTime);

@@ -27,6 +27,6 @@ void shaderMain(
 
     output.UV0 = uv0;
     output.UV1 = uv1;
-    output.Color = lerp(float4(1.0, 1.0, 1.0, 1.0), color, vertColorStrength);
+    output.Color = float4(lerp(float3(1.0, 1.0, 1.0), color.rgb, vertColorStrength), color.a);
     output.Position = mul(mul(worldPos, view), projection);
 }

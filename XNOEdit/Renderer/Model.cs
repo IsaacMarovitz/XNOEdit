@@ -393,8 +393,8 @@ namespace XNOEdit.Renderer
             var constants = _constants;
 
             constants.MainTextureIndex = ResolveOrWhite(textureManager, _textureSet.MainTexture);
-            constants.BlendMapIndex = ResolveOrWhite(textureManager, _textureSet.BlendMap);
             constants.LightMapIndex = ResolveOrWhite(textureManager, _textureSet.LightMap);
+            constants.BlendMapIndex = Resolve(textureManager, _textureSet.BlendMap);
             constants.NormalMapIndex = Resolve(textureManager, _textureSet.NormalMap);
 
             ctx.PushConstants(in constants, ModelPushConstants.PerMeshOffset);

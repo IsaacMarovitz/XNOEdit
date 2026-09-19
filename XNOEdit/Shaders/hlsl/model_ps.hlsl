@@ -17,7 +17,7 @@ float4 shaderMain(in Interpolators input) : SV_Target
     float4 normalMap  = SlSample2D(g_PushConstants.NormalMapIndex, samplerIndex, input.UV0);
     float4 lightmap   = SlSample2D(g_PushConstants.LightMapIndex, samplerIndex, input.UV1);
 
-    float4 textureColor = g_PushConstants.Blend == 1.0
+    float4 textureColor = (g_PushConstants.Blend == 1.0 && g_PushConstants.BlendMapIndex != SL_NULL_TEXTURE_2D)
         ? lerp(blendColor, mainColor, input.Color.a)
         : mainColor;
 

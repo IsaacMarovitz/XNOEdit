@@ -267,6 +267,10 @@ namespace Solaris.Graph
             commandList->SetGraphicsDescriptorSet(tables.SamplerSet, SlGlobalLayout.SamplerSet);
             commandList->SetGraphicsDescriptorSet(Ring.DescriptorSet, SlGlobalLayout.ConstantSet);
 
+            var zeroes = stackalloc byte[(int)SlGlobalLayout.PushConstantSize];
+            new Span<byte>(zeroes, (int)SlGlobalLayout.PushConstantSize).Clear();
+            commandList->SetGraphicsPushConstants(0, zeroes, 0, SlGlobalLayout.PushConstantSize);
+
             var framebuffer = AcquireFramebuffer(pass, out var width, out var height);
 
             if (framebuffer != null)

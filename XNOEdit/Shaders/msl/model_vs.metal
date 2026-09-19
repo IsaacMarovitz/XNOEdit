@@ -27,7 +27,7 @@ ModelInterpolators shaderMain(ModelVertexStageIn input [[stage_in]],
 
     output.UV0 = input.uv0;
     output.UV1 = input.uv1;
-    output.Color = mix(float4(1.0), input.color, vertColorStrength);
+    output.Color = float4(mix(float3(1.0), input.color.rgb, vertColorStrength), input.color.a);
     output.Position = projection * view * worldPos;
 
     return output;

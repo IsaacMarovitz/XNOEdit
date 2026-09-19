@@ -102,7 +102,7 @@ namespace XNOEdit.Panels
             ViewportSize = new Vector2(width, height);
         }
 
-        public void Render(Matrix4x4 view, Matrix4x4 projection, bool renderGuizmos)
+        public void Render(Matrix4x4 view, bool renderGuizmos)
         {
             var windowClass = new ImGuiWindowClass
             {
