@@ -35,6 +35,8 @@ namespace Solaris.Graph
         ColorTarget,
         DepthTarget,
         ShaderRead,
+        ResolveSource,
+        ResolveDest,
         CopySource,
         CopyDest,
     }
@@ -46,13 +48,15 @@ namespace Solaris.Graph
             SlAccess.ColorTarget => RenderTextureLayout.ColorWrite,
             SlAccess.DepthTarget => RenderTextureLayout.DepthWrite,
             SlAccess.ShaderRead => RenderTextureLayout.ShaderRead,
+            SlAccess.ResolveSource => RenderTextureLayout.ResolveSource,
+            SlAccess.ResolveDest => RenderTextureLayout.ResolveDest,
             SlAccess.CopySource => RenderTextureLayout.CopySource,
             SlAccess.CopyDest => RenderTextureLayout.CopyDest,
             _ => RenderTextureLayout.General,
         };
 
         public static bool IsWrite(this SlAccess access) =>
-            access is SlAccess.ColorTarget or SlAccess.DepthTarget or SlAccess.CopyDest;
+            access is SlAccess.ColorTarget or SlAccess.DepthTarget or SlAccess.CopyDest or SlAccess.ResolveDest;
     }
 
     internal sealed class SlResourceEntry
@@ -115,5 +119,7 @@ namespace Solaris.Graph
         public List<SlPassAccess> Accesses { get; } = [];
         public Action<SlPassContext>? Body { get; set; }
         public List<int> Dependencies { get; } = [];
+        public SlTextureHandle? ResolveSource { get; set; }
+        public SlTextureHandle? ResolveTarget { get; set; }
     }
 }

@@ -98,7 +98,7 @@ namespace XNOEdit
 
             var imguiController = new ImGuiController(_device, _uploader, _window);
             UIManager = new UIManager();
-            UIManager.OnLoad(imguiController, _device);
+            UIManager.OnLoad(imguiController, _device, _window);
             UIManager.EnvironmentPanel?.InitSunAngles(_settings);
             UIManager.ResetCameraAction += ResetCamera;
             UIManager.ObjectsPanel?.LoadObject += QueueObjectLoad;
@@ -547,11 +547,18 @@ namespace XNOEdit
 
             var viewportColor = frame.ImportTexture(UIManager.ViewportPanel.ColorTarget);
             var viewportDepth = frame.ImportTexture(UIManager.ViewportPanel.DepthTarget);
+            var viewportResolve = frame.ImportTexture(UIManager.ViewportPanel.ResolveTarget);
 
-            frame.AddPass("Scene")
+            var scene = frame.AddPass("Scene")
                 .Color(viewportColor, SlLoadOp.Clear, SlClearValue.Color(0.1f, 0.1f, 0.1f))
-                .Depth(viewportDepth)
-                .Execute(ctx =>
+                .Depth(viewportDepth);
+
+            if (UIManager.ViewportPanel.IsMultisampled)
+            {
+                scene.ResolveTo(viewportColor, viewportResolve);
+            }
+
+            scene.Execute(ctx =>
                 {
                     _skybox?.Draw(ctx, view, projection,
                         new SkyboxParameters
@@ -587,7 +594,7 @@ namespace XNOEdit
                 });
 
             frame.AddPass("UI")
-                .Reads(viewportColor)
+                .Reads(viewportResolve)
                 .Color(frame.SwapChainTarget, SlLoadOp.Clear, SlClearValue.Color(0.15f, 0.15f, 0.15f))
                 .Execute(ctx => UIManager.Controller?.Render(ctx));
         }

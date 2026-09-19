@@ -43,14 +43,14 @@ namespace XNOEdit.Managers
 
         private ImFontPtr _faFont;
 
-        public unsafe void OnLoad(ImGuiController controller, SlDevice device)
+        public unsafe void OnLoad(ImGuiController controller, SlDevice device, nint window)
         {
             Controller = controller;
             _alertPanel = new AlertPanel();
             ObjectsPanel = new ObjectsPanel();
             StagesPanel = new StagesPanel(this);
             MissionsPanel = new MissionsPanel();
-            ViewportPanel = new ViewportPanel(device);
+            ViewportPanel = new ViewportPanel(device, window);
             EnvironmentPanel = new EnvironmentPanel(this);
 
             var io = ImGui.GetIO();

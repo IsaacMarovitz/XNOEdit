@@ -283,6 +283,31 @@ namespace Solaris.Graph
 
             var context = new SlPassContext(this, commandList, width, height, BuildSignature(pass));
             pass.Body(context);
+            EmitResolve(commandList, pass);
+        }
+
+        private void EmitResolve(RenderCommandList* commandList, SlPassNode pass)
+        {
+            if (pass.ResolveSource is not { } sourceHandle || pass.ResolveTarget is not { } targetHandle)
+                return;
+
+            var source = Resolve(sourceHandle);
+            var target = Resolve(targetHandle);
+
+            if (source.Texture is not { } sourceTexture || target.Texture is not { } targetTexture)
+                return;
+
+            var barriers = stackalloc RenderTextureBarrier[2];
+
+            barriers[0] = new RenderTextureBarrier(sourceTexture.Handle, RenderTextureLayout.ResolveSource);
+            barriers[1] = new RenderTextureBarrier(targetTexture.Handle, RenderTextureLayout.ResolveDest);
+
+            commandList->Barriers(RenderBarrierStages.Graphics, new ReadOnlySpan<RenderTextureBarrier>(barriers, 2));
+
+            source.Layout = RenderTextureLayout.ResolveSource;
+            target.Layout = RenderTextureLayout.ResolveDest;
+
+            commandList->ResolveTexture(targetTexture.Handle, sourceTexture.Handle);
         }
 
         /// <summary>
@@ -498,6 +523,13 @@ namespace Solaris.Graph
         public SlPassBuilder Reads(SlTextureHandle texture)
         {
             _node.Accesses.Add(new SlPassAccess(texture, SlAccess.ShaderRead, SlLoadOp.Load, default));
+            return this;
+        }
+
+        public SlPassBuilder ResolveTo(SlTextureHandle source, SlTextureHandle target)
+        {
+            _node.ResolveSource = source;
+            _node.ResolveTarget = target;
             return this;
         }
 

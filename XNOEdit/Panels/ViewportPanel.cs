@@ -2,6 +2,7 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
 using Plume;
+using SDL3;
 using Solaris;
 
 namespace XNOEdit.Panels
@@ -16,40 +17,67 @@ namespace XNOEdit.Panels
 
         private SlTexture? _colorTexture;
         private SlTexture? _depthTexture;
-        private SlTextureIndex _colorIndex;
+        private SlTexture? _resolveTexture;
+        private SlTextureIndex _resolveIndex;
+
+        private uint _sampleCount = 4;
+        private float _renderScale = 1.0f;
 
         public SlTexture ColorTarget => _colorTexture!;
         public SlTexture DepthTarget => _depthTexture!;
+        public SlTexture ResolveTarget => _resolveTexture!;
+        public bool IsMultisampled => _sampleCount > 1;
 
         private const RenderFormat ColorTextureFormat = RenderFormat.B8G8R8A8Unorm;
         private const RenderFormat DepthTextureFormat = RenderFormat.D32Float;
 
-        public ViewportPanel(SlDevice device)
+        public ViewportPanel(SlDevice device, nint window)
         {
             _device = device;
+            _renderScale = SDL.GetWindowPixelDensity(window);
 
             CreateRenderTargets((uint)ViewportSize.X, (uint)ViewportSize.Y);
         }
 
         private void CreateRenderTargets(uint width, uint height)
         {
-            width = Math.Max(width, 1);
-            height = Math.Max(height, 1);
+            width = Math.Max((uint)(width * _renderScale), 1);
+            height = Math.Max((uint)(height * _renderScale), 1);
+
+            var supported = _device.GetSampleCountsSupported(ColorTextureFormat);
+            var samples = _sampleCount;
+
+            while (samples > 1 && (supported & samples) == 0)
+            {
+                samples /= 2;
+            }
 
             _colorTexture = _device.CreateTexture(
-                SlTextureDescriptor.ColorTarget(width, height, ColorTextureFormat), "ViewportColor");
+                SlTextureDescriptor.ColorTarget(width, height, ColorTextureFormat, samples), "ViewportColor");
 
             _depthTexture = _device.CreateTexture(
-                SlTextureDescriptor.DepthTarget(width, height, DepthTextureFormat), "ViewportDepth");
+                SlTextureDescriptor.DepthTarget(width, height, DepthTextureFormat, samples), "ViewportDepth");
 
-            _colorIndex = _device.Tables.Register(_colorTexture);
+            _resolveTexture = samples > 1
+                ? _device.CreateTexture(
+                    SlTextureDescriptor.ColorTarget(width, height, ColorTextureFormat), "ViewportResolve")
+                : _colorTexture;
+
+            _resolveIndex = _device.Tables.Register(_resolveTexture);
         }
 
         private void DestroyRenderTargets()
         {
+            if (_resolveTexture != null)
+            {
+                _device.Tables.Release(_resolveIndex);
+
+                if (!ReferenceEquals(_resolveTexture, _colorTexture))
+                    _device.Retire(_resolveTexture);
+            }
+
             if (_colorTexture != null)
             {
-                _device.Tables.Release(_colorIndex);
                 _device.Retire(_colorTexture);
             }
 
@@ -60,6 +88,7 @@ namespace XNOEdit.Panels
 
             _colorTexture = null;
             _depthTexture = null;
+            _resolveTexture = null;
         }
 
         public void Resize(uint width, uint height)
@@ -106,7 +135,7 @@ namespace XNOEdit.Panels
                 _pendingWidth = (uint)Math.Max(contentSize.X, 1);
                 _pendingHeight = (uint)Math.Max(contentSize.Y, 1);
 
-                ImGui.Image(new ImTextureRef(null, _colorIndex.Packed), ViewportSize);
+                ImGui.Image(new ImTextureRef(null, _resolveIndex.Packed), ViewportSize);
 
                 if (renderGuizmos)
                 {
