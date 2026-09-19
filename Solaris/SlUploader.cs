@@ -209,7 +209,6 @@ namespace Solaris
 
             if (_fence != null)
             {
-                _device.Queue->WaitForCommandFence(_fence);
                 _fence->Dispose();
                 _fence = null;
             }

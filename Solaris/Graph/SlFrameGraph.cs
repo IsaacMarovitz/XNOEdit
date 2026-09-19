@@ -18,8 +18,7 @@ namespace Solaris.Graph
         private readonly Dictionary<int, SlResourceEntry> _resources = [];
         private int _nextResourceId = 1;
         private int _frameSlot;
-        private bool _firstFrames = true;
-        private int _framesSubmitted;
+        private readonly bool[] _slotInFlight = new bool[SlDevice.FramesInFlight];
         private bool _disposed;
 
         public SlFrameGraph(SlDevice device, RenderWindow window, RenderFormat format, uint maxFrameLatency = 0)
@@ -64,10 +63,10 @@ namespace Solaris.Graph
             if (_swapChain.IsEmpty)
                 return null;
 
-            // Wait for the frame that last used this slot's command list and ring.
-            if (!_firstFrames)
+            if (_slotInFlight[_frameSlot])
             {
                 _device.Queue->WaitForCommandFence(_swapChain.Fence(_frameSlot));
+                _slotInFlight[_frameSlot] = false;
             }
 
             _device.Retirement.BeginFrame();
@@ -94,22 +93,21 @@ namespace Solaris.Graph
 
         internal void EndFrame(uint textureIndex)
         {
+            _slotInFlight[_frameSlot] = true;
             _swapChain.Present(textureIndex, _frameSlot);
 
             _frameSlot = (_frameSlot + 1) % SlDevice.FramesInFlight;
-            _framesSubmitted++;
-
-            if (_framesSubmitted >= SlDevice.FramesInFlight)
-            {
-                _firstFrames = false;
-            }
         }
 
         public void WaitForIdle()
         {
             for (var i = 0; i < SlDevice.FramesInFlight; i++)
             {
+                if (!_slotInFlight[i])
+                    continue;
+
                 _device.Queue->WaitForCommandFence(_swapChain.Fence(i));
+                _slotInFlight[i] = false;
             }
         }
 
