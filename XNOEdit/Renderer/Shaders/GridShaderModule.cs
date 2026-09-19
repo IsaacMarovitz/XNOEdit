@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Plume;
 using Solaris;
 
 namespace XNOEdit.Renderer.Shaders
@@ -15,45 +16,30 @@ namespace XNOEdit.Renderer.Shaders
         public float FadeEnd;
     }
 
-    public class GridShader : Shader<GridUniforms>
+    public class GridShader : ShaderModule
     {
-        public GridShader(
-            SlDevice device,
-            string shaderSource)
-            : base(
-                device,
-                shaderSource,
-                "Grid Shader",
-                pipelineVariants: new Dictionary<string, SlPipelineVariantDescriptor>
+        public GridShader(SlDevice device, ReadOnlySpan<byte> vertex, ReadOnlySpan<byte> pixel)
+            : base(device, vertex, pixel, "Grid Shader",
+                new Dictionary<string, SlPipelineVariant>
                 {
                     ["default"] = new()
                     {
-                        Topology = SlPrimitiveTopology.LineList,
-                        CullMode = SlCullMode.None,
-                        FrontFace = SlFrontFace.Clockwise,
+                        Topology = RenderPrimitiveTopology.LineList,
+                        CullMode = RenderCullMode.None,
+                        FrontFace = RenderFrontFace.Clockwise,
                         DepthWrite = true,
-                        DepthCompare = SlCompareFunction.Greater,
+                        DepthCompare = RenderComparisonFunction.Greater,
                         AlphaBlend = true
                     }
                 })
         {
         }
 
-        protected override SlVertexBufferLayout[] CreateVertexLayouts()
-        {
-            var vertexAttributes = new SlVertexAttribute[2];
-            vertexAttributes[0] = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 0,  ShaderLocation = 0 };  // Position
-            vertexAttributes[1] = new SlVertexAttribute { Format = SlVertexFormat.Float32x3, Offset = 12, ShaderLocation = 1 };  // Color
-
-            return
+        protected override SlVertexLayout CreateVertexLayout() => new(
+            new SlVertexBufferLayout(0, 24, SlVertexStepMode.Vertex,
             [
-                new SlVertexBufferLayout
-                {
-                    Stride = 24,
-                    StepMode = SlVertexStepMode.Vertex,
-                    Attributes = vertexAttributes
-                }
-            ];
-        }
+                new SlVertexAttribute("POSITION", 0, 0, RenderFormat.R32G32B32Float, 0),
+                new SlVertexAttribute("COLOR", 0, 1, RenderFormat.R32G32B32Float, 12),
+            ]));
     }
 }

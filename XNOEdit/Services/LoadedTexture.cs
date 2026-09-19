@@ -6,13 +6,12 @@ namespace XNOEdit.Services
     {
         public readonly string Name;
         public readonly SlTexture Texture;
-        public readonly SlTextureView View;
 
-        public LoadedTexture(string name, SlTexture texture, SlTextureView view)
+        public LoadedTexture(string name, SlTexture texture)
         {
             Name = name;
             Texture = texture;
-            View = view;
         }
     }
 }
+

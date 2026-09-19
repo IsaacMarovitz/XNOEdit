@@ -3,49 +3,49 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Hexa.NET.ImGui;
+using Plume;
 using SDL3;
-using Silk.NET.Core.Native;
 using Solaris;
-using Solaris.Builders;
+using Solaris.Graph;
 
 namespace XNOEdit.Renderer
 {
     public unsafe class ImGuiController : IDisposable
     {
         private readonly SlDevice _device;
-        private readonly SlQueue _queue;
+        private readonly SlUploader _uploader;
         private readonly IntPtr _window;
-        private readonly uint _framesInFlight;
 
-        private SlShaderModule _shaderModule;
-        private SlSampler _fontSampler;
+        private SlMaterial _material;
+        private SlSamplerIndex _fontSampler;
 
-        private SlBindGroupLayout _commonBindGroupLayout;
-        private SlBindGroupLayout _imageBindGroupLayout;
-        private SlRenderPipeline _renderPipeline;
-
-        private SlBindGroup _commonBindGroup;
-
-        private SlBuffer<Uniforms> _uniformsBuffer;
-
-        private WindowRenderBuffers _windowRenderBuffers;
-
-        private readonly Dictionary<nint, SlBindGroup> _textureBindGroups = [];
-        private readonly Dictionary<nint, (SlTextureView View, SlTexture Texture)> _gpuTextures = [];
+        private readonly Dictionary<nint, (SlTexture Texture, SlTextureIndex Index)> _gpuTextures = [];
 
         private SetClipboardTextDelegate _setClipboardText;
         private GetClipboardTextDelegate _getClipboardText;
         private IntPtr _clipboardText;
 
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct ImGuiTexturePush
+        {
+            public uint TextureIndex;
+            public uint SamplerIndex;
+        }
+
+        public static class ImGuiPushConstants
+        {
+            public const uint MvpOffset = 0;
+            public const uint TextureOffset = 64;
+        }
+
         public ImGuiController(
             SlDevice device,
-            IntPtr window,
-            uint framesInFlight)
+            SlUploader uploader,
+            IntPtr window)
         {
             _device = device;
+            _uploader = uploader;
             _window = window;
-            _framesInFlight = framesInFlight;
-            _queue = _device.GetQueue();
 
             Init();
         }
@@ -56,42 +56,9 @@ namespace XNOEdit.Renderer
             ImGui.NewFrame();
         }
 
-        public void Render(SlRenderPass encoder)
+        public void Render(SlPassContext ctx)
         {
-            ImGui.Render();
-            DrawImGui(encoder);
-        }
-
-        public void BindImGuiTextureView(SlTextureView view)
-        {
-            var id = (nint)view.GetHandle();
-
-            if (_textureBindGroups.TryGetValue(id, out var existing))
-            {
-                existing.Dispose();
-            }
-
-            SlBindGroupEntry imageEntry = new()
-            {
-                TextureView = view
-            };
-
-            SlBindGroupDescriptor imageDesc = new()
-            {
-                Layout = _imageBindGroupLayout,
-                Entries = [imageEntry]
-            };
-
-            var bindGroup = _device.CreateBindGroup(imageDesc);
-            _textureBindGroups[id] = bindGroup;
-        }
-
-        public void UnbindImGuiTextureView(IntPtr view)
-        {
-            if (_textureBindGroups.Remove(view, out var bindGroup))
-            {
-                bindGroup.Dispose();
-            }
+            DrawImGui(ctx);
         }
 
         private void Init()
@@ -115,181 +82,70 @@ namespace XNOEdit.Renderer
             platformIO.PlatformSetClipboardTextFn = (void*)Marshal.GetFunctionPointerForDelegate(_setClipboardText);
             platformIO.PlatformGetClipboardTextFn = (void*)Marshal.GetFunctionPointerForDelegate(_getClipboardText);
 
-            InitShaders();
             InitSampler();
-            InitBindGroupLayouts();
-            InitPipeline();
-            InitUniformBuffers();
-            InitBindGroups();
+            InitMaterial(ShaderLibrary.Get(_device, "imgui_vs"),
+                ShaderLibrary.Get(_device, "imgui_ps"));
 
             SetPerFrameImGuiData(1f / 60f);
-        }
-
-        private void InitShaders()
-        {
-            var source = EmbeddedResources.ReadAllText("XNOEdit/Shaders/ImGui.wgsl");
-
-            SlShaderModuleDescriptor descriptor = new()
-            {
-                Source = source,
-                Language = SlShaderLanguage.Wgsl,
-                Label = "ImGui Shader"
-            };
-
-            _shaderModule = _device.CreateShaderModule(descriptor);
         }
 
         private void InitSampler()
         {
             SlSamplerDescriptor samplerDescriptor = new()
             {
-                MinFilter = SlFilterMode.Linear,
-                MagFilter = SlFilterMode.Linear,
-                MipmapFilter = SlFilterMode.Linear,
-                AddressModeU = SlAddressMode.Repeat,
-                AddressModeV = SlAddressMode.Repeat,
-                AddressModeW = SlAddressMode.Repeat,
+                MinFilter = RenderFilter.Linear,
+                MagFilter = RenderFilter.Linear,
+                MipmapMode = RenderMipmapMode.Linear,
+                AddressU = RenderTextureAddressMode.Wrap,
+                AddressV = RenderTextureAddressMode.Wrap,
+                AddressW = RenderTextureAddressMode.Wrap,
                 MaxAnisotropy = 1,
             };
 
-            _fontSampler = _device.CreateSampler(samplerDescriptor);
+            _fontSampler = _device.GetSampler(samplerDescriptor);
         }
 
-        private void InitBindGroupLayouts()
+        private void InitMaterial(ReadOnlySpan<byte> vertex, ReadOnlySpan<byte> pixel)
         {
-            var commonBgLayoutEntries = new SlBindGroupLayoutEntry[2];
+            _fontSampler = _device.GetSampler(SlSamplerDescriptor.LinearWrap with { MaxAnisotropy = 1 });
 
-            commonBgLayoutEntries[0] = new SlBindGroupLayoutEntry
-            {
-                Binding = 0,
-                Visibility = SlShaderStage.Vertex | SlShaderStage.Fragment,
-                Type = SlBindingType.Buffer,
-                BufferType = SlBufferBindingType.Uniform
-            };
+            var vertexShader = SlShader.Create(_device, vertex, "shaderMain");
+            var pixelShader = SlShader.Create(_device, pixel, "shaderMain");
 
-            commonBgLayoutEntries[1] = new SlBindGroupLayoutEntry
-            {
-                Binding = 1,
-                Visibility = SlShaderStage.Fragment,
-                Type = SlBindingType.Sampler,
-                SamplerType = SlSamplerBindingType.Filtering
-            };
+            var layout = new SlVertexLayout(
+                new SlVertexBufferLayout(0, (uint)sizeof(ImDrawVert), SlVertexStepMode.Vertex,
+                [
+                    new SlVertexAttribute("POSITION", 0, 0, RenderFormat.R32G32Float, 0),
+                    new SlVertexAttribute("TEXCOORD", 0, 1, RenderFormat.R32G32Float, 8),
+                    new SlVertexAttribute("COLOR", 0, 2, RenderFormat.R8G8B8A8Unorm, 16),
+                ]));
 
-            var imageBgLayoutEntry = new SlBindGroupLayoutEntry
-            {
-                Binding = 0,
-                Visibility = SlShaderStage.Fragment,
-                Type = SlBindingType.Texture,
-                TextureSampleType = SlTextureSampleType.Float,
-                TextureDimension = SlTextureViewDimension.Dimension2D
-            };
-
-            SlBindGroupLayoutDescriptor commonBgLayoutDesc = new()
-            {
-                Entries = commonBgLayoutEntries,
-            };
-
-            SlBindGroupLayoutDescriptor imageBgLayoutDesc = new()
-            {
-                Entries = [imageBgLayoutEntry],
-            };
-
-            _commonBindGroupLayout = _device.CreateBindGroupLayout(commonBgLayoutDesc);
-            _imageBindGroupLayout = _device.CreateBindGroupLayout(imageBgLayoutDesc);
-        }
-
-        private void InitPipeline()
-        {
-            _renderPipeline?.Dispose();
-
-            var vertexAttrib = new SlVertexAttribute[3];
-
-            vertexAttrib[0] = new SlVertexAttribute
-            {
-                Format = SlVertexFormat.Float32x2,
-                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Pos)),
-                ShaderLocation = 0
-            };
-
-            vertexAttrib[1] = new SlVertexAttribute
-            {
-                Format = SlVertexFormat.Float32x2,
-                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Uv)),
-                ShaderLocation = 1
-            };
-
-            vertexAttrib[2] = new SlVertexAttribute
-            {
-                Format = SlVertexFormat.Unorm8x4,
-                Offset = (ulong)Marshal.OffsetOf<ImDrawVert>(nameof(ImDrawVert.Col)),
-                ShaderLocation = 2
-            };
-
-            var vbLayout = new SlVertexBufferLayout
-            {
-                Stride = (ulong)sizeof(ImDrawVert),
-                StepMode = SlVertexStepMode.Vertex,
-                Attributes = vertexAttrib
-            };
-
-            var pipelineBuilder = new RenderPipelineBuilder(_device)
-                .WithBindGroupLayout(_commonBindGroupLayout)
-                .WithBindGroupLayout(_imageBindGroupLayout)
-                .WithCustomBlend(new SlBlendState
+            _material = new SlMaterial(_device, vertexShader, pixelShader, layout,
+                new Dictionary<string, SlPipelineVariant>
                 {
-                    Color = new SlBlendComponent
+                    ["default"] = new()
                     {
-                        Operation = SlBlendOperation.Add, SrcFactor = SlBlendFactor.SrcAlpha,
-                        DstFactor = SlBlendFactor.OneMinusSrcAlpha
-                    },
-                    Alpha = new SlBlendComponent
-                    {
-                        Operation = SlBlendOperation.Add, SrcFactor = SlBlendFactor.One,
-                        DstFactor = SlBlendFactor.OneMinusSrcAlpha
+                        Topology = RenderPrimitiveTopology.TriangleList,
+                        CullMode = RenderCullMode.None,
+                        FrontFace = RenderFrontFace.Clockwise,
+                        DepthWrite = false,
+                        DepthTest = false,
+                        Blend = SlBlendState.AlphaBlend
                     }
-                })
-                .WithTopology(SlPrimitiveTopology.TriangleList)
-                .WithCulling(SlCullMode.None)
-                .WithVertexLayout(vbLayout)
-                .WithShader(_shaderModule);
-
-            _renderPipeline = pipelineBuilder;
+                }, "ImGui Shader");
         }
 
-        private void InitUniformBuffers()
+        public void PrepareFrame()
         {
-            _uniformsBuffer = _device.CreateUniform<Uniforms>();
-        }
+            var drawData = ImGui.GetDrawData();
 
-        private void InitBindGroups()
-        {
-            var bindGroupEntries = new SlBindGroupEntry[2];
-
-            bindGroupEntries[0] = new SlBindGroupEntry
+            for (var i = 0; i < drawData.Textures.Size; i++)
             {
-                Binding = 0,
-                Buffer = new SlBufferBinding
-                {
-                    Handle = _uniformsBuffer.GetHandle(),
-                    Offset = 0,
-                    Size = (ulong)Align(sizeof(Uniforms), 16),
-                    Source = _uniformsBuffer
-                },
-            };
+                var texture = drawData.Textures[i];
 
-            bindGroupEntries[1] = new SlBindGroupEntry
-            {
-                Binding = 1,
-                Sampler = _fontSampler
-            };
-
-            SlBindGroupDescriptor bgCommonDesc = new()
-            {
-                Layout = _commonBindGroupLayout,
-                Entries = bindGroupEntries
-            };
-
-            _commonBindGroup = _device.CreateBindGroup(bgCommonDesc);
+                if (texture.Status != ImTextureStatus.Ok)
+                    ProcessTextureRequest(texture);
+            }
         }
 
         private void ProcessTextureRequest(ImTextureDataPtr texture)
@@ -310,88 +166,71 @@ namespace XNOEdit.Renderer
 
         private void CreateTexture(ImTextureDataPtr tex)
         {
-            var width = tex.Width;
-            var height = tex.Height;
+            var width = (uint)tex.Width;
+            var height = (uint)tex.Height;
             var pixels = (byte*)tex.GetPixels();
 
-            SlTextureDescriptor textureDescriptor = new()
-            {
-                Dimension = SlTextureDimension.Dimension2D,
-                Size = new SlExtent3D
-                {
-                    Width = (uint)width,
-                    Height = (uint)height,
-                    DepthOrArrayLayers = 1,
-                },
-                SampleCount = 1,
-                Format = SlTextureFormat.Rgba8Unorm,
-                MipLevelCount = 1,
-                Usage = SlTextureUsage.CopyDst | SlTextureUsage.TextureBinding
-            };
+            var texture = _device.CreateTexture(
+                SlTextureDescriptor.Sampled2D(width, height, RenderFormat.R8G8B8A8Unorm), "ImGuiAtlas");
 
-            var texture = _device.CreateTexture(textureDescriptor);
+            _uploader.StageTexture(
+                texture,
+                new ReadOnlySpan<byte>(pixels, (int)(width * height * 4)),
+                width, height,
+                bytesPerRow: width * 4);
 
-            SlTextureViewDescriptor textureViewDescriptor = new()
-            {
-                Dimension = SlTextureViewDimension.Dimension2D,
-                Format = SlTextureFormat.Rgba8Unorm,
-                BaseMipLevel = 0,
-                MipLevelCount = 1,
-                BaseArrayLayer = 0,
-                ArrayLayerCount = 1
-            };
+            var index = _device.Tables.Register(texture);
 
-            var view = texture.CreateTextureView(textureViewDescriptor);
+            _gpuTextures[(nint)index.Packed] = (texture, index);
 
-            SlCopyTextureDescriptor imageCopyTexture = new()
-            {
-                Texture = texture,
-                MipLevel = 0
-            };
-
-            SlTextureDataLayout textureDataLayout = new()
-            {
-                Offset = 0,
-                BytesPerRow = (uint)(width * 4),
-                RowsPerImage = (uint)height,
-            };
-
-            SlExtent3D extent = new()
-            {
-                Height = (uint)height,
-                Width = (uint)width,
-                DepthOrArrayLayers = 1,
-            };
-
-            _queue.WriteTexture(imageCopyTexture, pixels, (nuint)(width * height * 4), textureDataLayout, extent);
-
-            BindImGuiTextureView(view);
-
-            _gpuTextures[(IntPtr)view.GetHandle()] = (view, texture);
-
-            tex.SetTexID(view.GetHandle());
+            tex.SetTexID(index.Packed);
             tex.SetStatus(ImTextureStatus.Ok);
         }
 
         private void UpdateTexture(ImTextureDataPtr tex)
         {
-            DestroyTexture(tex);
-            CreateTexture(tex);
+            var id = (nint)tex.TexID;
+
+            if (id == 0 || !_gpuTextures.TryGetValue(id, out var entry))
+            {
+                CreateTexture(tex);
+                return;
+            }
+
+            var rect = tex.UpdateRect;
+
+            if (rect.W <= 0 || rect.H <= 0)
+            {
+                tex.SetStatus(ImTextureStatus.Ok);
+                return;
+            }
+
+            var pitch = (uint)(tex.Width * tex.BytesPerPixel);
+            var pixels = (byte*)tex.GetPixels();
+            var origin = pixels + rect.Y * pitch + rect.X * tex.BytesPerPixel;
+            var length = (rect.H - 1) * (int)pitch + rect.W * tex.BytesPerPixel;
+
+            _uploader.StageTexture(
+                entry.Texture,
+                new ReadOnlySpan<byte>(origin, length),
+                rect.W,
+                rect.H,
+                bytesPerRow: (uint)(rect.W * tex.BytesPerPixel),
+                sourceRowPitch: pitch,
+                destinationX: rect.X,
+                destinationY: rect.Y);
+
+            tex.SetStatus(ImTextureStatus.Ok);
         }
 
         private void DestroyTexture(ImTextureDataPtr tex)
         {
             var id = (nint)tex.TexID;
 
-            if (id != 0)
+            if (id != 0 && _gpuTextures.Remove(id, out var entry))
             {
-                UnbindImGuiTextureView(id);
-
-                if (_gpuTextures.Remove(id, out var entry))
-                {
-                    entry.View.Dispose();
-                    entry.Texture.Dispose();
-                }
+                _device.Tables.Release(entry.Index);
+                _device.Retire(entry.Texture);
             }
 
             tex.SetTexID(null);
@@ -609,116 +448,59 @@ namespace XNOEdit.Renderer
             io.DeltaTime = deltaSeconds;
         }
 
-        private void DrawImGui(SlRenderPass encoder)
+        private void DrawImGui(SlPassContext ctx)
         {
             var drawData = ImGui.GetDrawData();
             drawData.ScaleClipRects(ImGui.GetIO().DisplayFramebufferScale);
 
             var framebufferWidth = (int)(drawData.DisplaySize.X * drawData.FramebufferScale.X);
             var framebufferHeight = (int)(drawData.DisplaySize.Y * drawData.FramebufferScale.Y);
-            if (framebufferWidth <= 0 || framebufferHeight <= 0)
-            {
+
+            if (framebufferWidth <= 0 || framebufferHeight <= 0 || drawData.TotalVtxCount == 0)
                 return;
-            }
 
-            for (var i = 0; i < drawData.Textures.Size; i++)
-            {
-                var texture = drawData.Textures[i];
+            var vertices = ctx.Ring.Allocate((ulong)(drawData.TotalVtxCount * sizeof(ImDrawVert)));
+            var indices = ctx.Ring.Allocate((ulong)(drawData.TotalIdxCount * sizeof(ushort)));
 
-                if (texture.Status != ImTextureStatus.Ok)
-                    ProcessTextureRequest(texture);
-            }
+            var vtxDst = (ImDrawVert*)Unsafe.AsPointer(ref vertices.Data[0]);
+            var idxDst = (ushort*)Unsafe.AsPointer(ref indices.Data[0]);
 
-            if (_windowRenderBuffers.FrameRenderBuffers == null || _windowRenderBuffers.FrameRenderBuffers.Length == 0)
-            {
-                _windowRenderBuffers.Index = 0;
-                _windowRenderBuffers.Count = _framesInFlight;
-                _windowRenderBuffers.FrameRenderBuffers = new FrameRenderBuffer[_windowRenderBuffers.Count];
-            }
-
-            _windowRenderBuffers.Index = (_windowRenderBuffers.Index + 1) % _windowRenderBuffers.Count;
-            ref var frameRenderBuffer = ref _windowRenderBuffers.FrameRenderBuffers[_windowRenderBuffers.Index];
-
-            if (drawData.TotalVtxCount > 0)
-            {
-                var vertSize = (ulong)Align(drawData.TotalVtxCount * sizeof(ImDrawVert), 4);
-                var indexSize = (ulong)Align(drawData.TotalIdxCount * sizeof(ushort), 4);
-                CreateOrUpdateBuffers(ref frameRenderBuffer, vertSize, indexSize);
-
-                if (frameRenderBuffer is {
-                        VertexBufferMemory: not null,
-                        IndexBufferMemory: not null,
-                        VertexBufferGpu: not null,
-                        IndexBufferGpu: not null
-                    })
-                {
-                    var vtxDst = frameRenderBuffer.VertexBufferMemory.AsPtr<ImDrawVert>();
-                    var idxDst = frameRenderBuffer.IndexBufferMemory.AsPtr<ushort>();
-                    for (var n = 0; n < drawData.CmdListsCount; n++)
-                    {
-                        var cmdList = drawData.CmdLists[n];
-                        Unsafe.CopyBlock(vtxDst, cmdList.VtxBuffer.Data, (uint)cmdList.VtxBuffer.Size * (uint)sizeof(ImDrawVert));
-                        Unsafe.CopyBlock(idxDst, cmdList.IdxBuffer.Data, (uint)cmdList.IdxBuffer.Size * sizeof(ushort));
-                        vtxDst += cmdList.VtxBuffer.Size;
-                        idxDst += cmdList.IdxBuffer.Size;
-                    }
-
-                    frameRenderBuffer.VertexBufferGpu.UpdateData(_queue, frameRenderBuffer.VertexBufferMemory);
-                    frameRenderBuffer.IndexBufferGpu.UpdateData(_queue, frameRenderBuffer.IndexBufferMemory);
-                }
-            }
-
-            var io = ImGui.GetIO();
-            Uniforms uniforms = new()
-            {
-                Mvp = Matrix4x4.CreateOrthographicOffCenter(
-                    0f,
-                    io.DisplaySize.X,
-                    io.DisplaySize.Y,
-                    0.0f,
-                    -1.0f,
-                    1.0f
-                )
-            };
-
-            _uniformsBuffer.UpdateData(_queue, in uniforms);
-            encoder.SetPipeline(_renderPipeline);
-
-            if (drawData.TotalVtxCount > 0)
-            {
-                if (frameRenderBuffer is {
-                        VertexBufferGpu: not null,
-                        IndexBufferGpu: not null
-                    })
-                {
-                    encoder.SetVertexBuffer(0, frameRenderBuffer.VertexBufferGpu);
-                    encoder.SetIndexBuffer(frameRenderBuffer.IndexBufferGpu, SlIndexFormat.Uint16);
-                    encoder.SetBindGroup(0, _commonBindGroup);
-                }
-            }
-
-            encoder.SetViewport(0, 0, drawData.FramebufferScale.X * drawData.DisplaySize.X, drawData.FramebufferScale.Y * drawData.DisplaySize.Y, 0, 1);
-
-            if (_textureBindGroups.Count > 0)
-            {
-                encoder.SetBindGroup(1, _textureBindGroups.Values.First());
-            }
-
-            var vtxOffset = 0;
-            var idxOffset = 0;
             for (var n = 0; n < drawData.CmdListsCount; n++)
             {
                 var cmdList = drawData.CmdLists[n];
+
+                Unsafe.CopyBlock(vtxDst, cmdList.VtxBuffer.Data, (uint)cmdList.VtxBuffer.Size * (uint)sizeof(ImDrawVert));
+                Unsafe.CopyBlock(idxDst, cmdList.IdxBuffer.Data, (uint)cmdList.IdxBuffer.Size * sizeof(ushort));
+
+                vtxDst += cmdList.VtxBuffer.Size;
+                idxDst += cmdList.IdxBuffer.Size;
+            }
+
+            var io = ImGui.GetIO();
+            var mvp = Matrix4x4.CreateOrthographicOffCenter(
+                0f, io.DisplaySize.X, io.DisplaySize.Y, 0.0f, -1.0f, 1.0f);
+
+            ctx.SetPipeline(_material.Pipeline(ctx.Signature));
+            ctx.PushConstants(in mvp);
+            ctx.SetVertexBuffer(0, vertices.View, (uint)sizeof(ImDrawVert));
+            ctx.SetIndexBuffer(indices.View);
+            ctx.SetViewport(0, 0, framebufferWidth, framebufferHeight);
+
+            SDL.GetWindowSizeInPixels(_window, out var windowWidth, out var windowHeight);
+
+            var vtxOffset = 0;
+            var idxOffset = 0;
+
+            for (var n = 0; n < drawData.CmdListsCount; n++)
+            {
+                var cmdList = drawData.CmdLists[n];
+
                 for (var i = 0; i < cmdList.CmdBuffer.Size; i++)
                 {
                     var cmd = cmdList.CmdBuffer[i];
-                    if (cmd.UserCallback == null)
-                    {
-                        if (_textureBindGroups.TryGetValue(cmd.GetTexID(), out var value))
-                        {
-                            encoder.SetBindGroup(1, value);
-                        }
-                    }
+
+                    if (cmd.UserCallback != null)
+                        continue;
 
                     Vector2 clipMin = new(cmd.ClipRect.X, cmd.ClipRect.Y);
                     Vector2 clipMax = new(cmd.ClipRect.Z, cmd.ClipRect.W);
@@ -726,12 +508,22 @@ namespace XNOEdit.Renderer
                     if (clipMax.X <= clipMin.X || clipMax.Y <= clipMin.Y)
                         continue;
 
-                    SDL.GetWindowSizeInPixels(_window, out var width, out var height);
+                    var texturePush = new ImGuiTexturePush
+                    {
+                        TextureIndex = (uint)cmd.GetTexID(),
+                        SamplerIndex = _fontSampler.Slot
+                    };
+                    ctx.PushConstants(in texturePush, ImGuiPushConstants.TextureOffset);
 
-                    encoder.SetScissorRect((uint)clipMin.X, (uint)clipMin.Y,
-                        (uint)Math.Clamp(clipMax.X - clipMin.X, 0, width),
-                        (uint)Math.Clamp(clipMax.Y - clipMin.Y, 0, height));
-                    encoder.DrawIndexed(cmd.ElemCount, 1, (uint)(idxOffset + cmd.IdxOffset), (int)(vtxOffset + cmd.VtxOffset));
+                    ctx.SetScissor(
+                        (int)clipMin.X,
+                        (int)clipMin.Y,
+                        (int)Math.Clamp(clipMax.X, 0, windowWidth),
+                        (int)Math.Clamp(clipMax.Y, 0, windowHeight));
+
+                    ctx.DrawIndexed(cmd.ElemCount, 1,
+                        (uint)(idxOffset + cmd.IdxOffset),
+                        (int)(vtxOffset + cmd.VtxOffset));
                 }
 
                 vtxOffset += cmdList.VtxBuffer.Size;
@@ -739,97 +531,16 @@ namespace XNOEdit.Renderer
             }
         }
 
-        private void CreateOrUpdateBuffers(ref FrameRenderBuffer frameRenderBuffer, ulong vertSize, ulong indexSize)
-        {
-            if (frameRenderBuffer.VertexBufferGpu == null || frameRenderBuffer.VertexBufferGpu.Size < vertSize)
-            {
-                frameRenderBuffer.VertexBufferMemory?.Dispose();
-                frameRenderBuffer.VertexBufferGpu?.Dispose();
-
-                frameRenderBuffer.VertexBufferGpu = _device.CreateBuffer<byte>(new SlBufferDescriptor
-                {
-                    Size = vertSize,
-                    Usage = SlBufferUsage.Vertex | SlBufferUsage.CopyDst
-                });
-                frameRenderBuffer.VertexBufferMemory = GlobalMemory.Allocate((int)vertSize);
-            }
-
-            if (frameRenderBuffer.IndexBufferGpu == null || frameRenderBuffer.IndexBufferGpu.Size < indexSize)
-            {
-                frameRenderBuffer.IndexBufferMemory?.Dispose();
-                frameRenderBuffer.IndexBufferGpu?.Dispose();
-
-                frameRenderBuffer.IndexBufferGpu = _device.CreateBuffer<byte>(new SlBufferDescriptor
-                {
-                    Size = indexSize,
-                    Usage = SlBufferUsage.Index | SlBufferUsage.CopyDst
-                });
-                frameRenderBuffer.IndexBufferMemory = GlobalMemory.Allocate((int)indexSize);
-            }
-        }
-
         public void Dispose()
         {
-            if (_windowRenderBuffers.FrameRenderBuffers != null)
+            foreach (var (texture, index) in _gpuTextures.Values)
             {
-                foreach (var renderBuffer in _windowRenderBuffers.FrameRenderBuffers)
-                {
-                    renderBuffer.VertexBufferGpu?.Dispose();
-                    renderBuffer.IndexBufferGpu?.Dispose();
-                    renderBuffer.IndexBufferMemory?.Dispose();
-                    renderBuffer.VertexBufferMemory?.Dispose();
-                }
+                _device.Tables.Release(index);
+                _device.Retire(texture);
             }
 
-            foreach (var bg in _textureBindGroups.Values)
-            {
-                bg.Dispose();
-            }
-            _textureBindGroups.Clear();
-
-            foreach (var entry in _gpuTextures.Values)
-            {
-                entry.View.Dispose();
-                entry.Texture.Dispose();
-            }
             _gpuTextures.Clear();
-
-            _commonBindGroup.Dispose();
-            _uniformsBuffer.Dispose();
-            _renderPipeline.Dispose();
-            _commonBindGroupLayout.Dispose();
-            _imageBindGroupLayout.Dispose();
-
-            _fontSampler?.Dispose();
-
-            _shaderModule.Dispose();
-
-            _queue?.Dispose();
+            _material.Dispose();
         }
-
-        private static int Align(int size, int align)
-        {
-            return (size + (align - 1)) & ~(align - 1);
-        }
-
-        private struct Uniforms
-        {
-            public Matrix4x4 Mvp;
-        }
-
-        private struct FrameRenderBuffer
-        {
-            public SlBuffer<byte>? VertexBufferGpu;
-            public SlBuffer<byte>? IndexBufferGpu;
-            public GlobalMemory? VertexBufferMemory;
-            public GlobalMemory? IndexBufferMemory;
-        };
-
-        private struct WindowRenderBuffers
-        {
-            public uint Index;
-            public uint Count;
-            public FrameRenderBuffer[]? FrameRenderBuffers;
-        };
     }
 }

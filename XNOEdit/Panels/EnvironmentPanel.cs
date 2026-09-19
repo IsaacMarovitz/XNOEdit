@@ -27,7 +27,7 @@ namespace XNOEdit.Panels
                 _sunAzimuth += 360.0f;
         }
 
-        public void Render(ref RenderSettings settings)
+        public void Render(RenderSettings settings)
         {
             ImGui.Begin(Name);
             ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);

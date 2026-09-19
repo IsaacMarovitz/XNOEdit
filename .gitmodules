@@ -2,3 +2,6 @@
 	path = Marathon
 	url = https://www.github.com/hyperbx/Marathon
 	branch = v2.0.0
+[submodule "PlumeSharp"]
+	path = PlumeSharp
+	url = https://IsaacMarovitz@github.com/IsaacMarovitz/PlumeSharp

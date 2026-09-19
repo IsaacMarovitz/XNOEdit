@@ -1,0 +1,17 @@
+#pragma once
+
+#include "solaris_common.metali"
+
+struct SkyboxPushConstants
+{
+    float4x4 InverseViewProjection;
+    float4 CameraPosition;
+    float4 SunDirection;
+    float4 SunColor;
+};
+
+struct SkyboxInterpolators
+{
+    float4 Position [[position]];
+    float3 ViewDir;
+};

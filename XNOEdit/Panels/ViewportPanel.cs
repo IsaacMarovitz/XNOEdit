@@ -1,8 +1,8 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
 using Hexa.NET.ImGuizmo;
+using Plume;
 using Solaris;
-using XNOEdit.Renderer;
 
 namespace XNOEdit.Panels
 {
@@ -13,97 +13,53 @@ namespace XNOEdit.Panels
         public bool IsHovered { get; private set; }
 
         private readonly SlDevice _device;
-        private readonly ImGuiController _imguiController;
 
         private SlTexture? _colorTexture;
-        private SlTextureView? _colorTextureView;
         private SlTexture? _depthTexture;
-        private SlTextureView? _depthTextureView;
+        private SlTextureIndex _colorIndex;
 
-        private const SlTextureFormat ColorTextureFormat = SlTextureFormat.Bgra8Unorm;
-        private const SlTextureFormat DepthTextureFormat = SlTextureFormat.Depth32float;
+        public SlTexture ColorTarget => _colorTexture!;
+        public SlTexture DepthTarget => _depthTexture!;
 
-        public ViewportPanel(SlDevice device, ImGuiController imguiController)
+        private const RenderFormat ColorTextureFormat = RenderFormat.B8G8R8A8Unorm;
+        private const RenderFormat DepthTextureFormat = RenderFormat.D32Float;
+
+        public ViewportPanel(SlDevice device)
         {
             _device = device;
-            _imguiController = imguiController;
 
             CreateRenderTargets((uint)ViewportSize.X, (uint)ViewportSize.Y);
         }
 
         private void CreateRenderTargets(uint width, uint height)
         {
-            // Ensure minimum size
             width = Math.Max(width, 1);
             height = Math.Max(height, 1);
 
-            // Create color texture
-            var colorTextureDesc = new SlTextureDescriptor
-            {
-                Size = new SlExtent3D { Width = width, Height = height, DepthOrArrayLayers = 1 },
-                MipLevelCount = 1,
-                SampleCount = 1,
-                Dimension = SlTextureDimension.Dimension2D,
-                Format = ColorTextureFormat,
-                Usage = SlTextureUsage.RenderAttachment | SlTextureUsage.TextureBinding
-            };
+            _colorTexture = _device.CreateTexture(
+                SlTextureDescriptor.ColorTarget(width, height, ColorTextureFormat), "ViewportColor");
 
-            _colorTexture = _device.CreateTexture(colorTextureDesc);
+            _depthTexture = _device.CreateTexture(
+                SlTextureDescriptor.DepthTarget(width, height, DepthTextureFormat), "ViewportDepth");
 
-            var colorViewDesc = new SlTextureViewDescriptor
-            {
-                Format = ColorTextureFormat,
-                Dimension = SlTextureViewDimension.Dimension2D,
-                BaseMipLevel = 0,
-                MipLevelCount = 1,
-                BaseArrayLayer = 0,
-                ArrayLayerCount = 1
-            };
-
-            _colorTextureView = _colorTexture.CreateTextureView(colorViewDesc);
-
-            var depthTextureDesc = new SlTextureDescriptor
-            {
-                Size = new SlExtent3D { Width = width, Height = height, DepthOrArrayLayers = 1 },
-                MipLevelCount = 1,
-                SampleCount = 1,
-                Dimension = SlTextureDimension.Dimension2D,
-                Format = DepthTextureFormat,
-                Usage = SlTextureUsage.RenderAttachment
-            };
-
-            _depthTexture = _device.CreateTexture(depthTextureDesc);
-
-            var depthViewDesc = new SlTextureViewDescriptor
-            {
-                Format = DepthTextureFormat,
-                Dimension = SlTextureViewDimension.Dimension2D,
-                BaseMipLevel = 0,
-                MipLevelCount = 1,
-                BaseArrayLayer = 0,
-                ArrayLayerCount = 1
-            };
-
-            _depthTextureView = _depthTexture.CreateTextureView(depthViewDesc);
-            _imguiController.BindImGuiTextureView(_colorTextureView);
+            _colorIndex = _device.Tables.Register(_colorTexture);
         }
 
         private void DestroyRenderTargets()
         {
-            if (_colorTextureView != null)
+            if (_colorTexture != null)
             {
-                _imguiController.UnbindImGuiTextureView((IntPtr)_colorTextureView.GetHandle());
-                _colorTextureView.Dispose();
+                _device.Tables.Release(_colorIndex);
+                _device.Retire(_colorTexture);
             }
 
-            _colorTexture?.Dispose();
-            _depthTextureView?.Dispose();
-            _depthTexture?.Dispose();
+            if (_depthTexture != null)
+            {
+                _device.Retire(_depthTexture);
+            }
 
             _colorTexture = null;
-            _colorTextureView = null;
             _depthTexture = null;
-            _depthTextureView = null;
         }
 
         public void Resize(uint width, uint height)
@@ -115,33 +71,6 @@ namespace XNOEdit.Panels
             CreateRenderTargets(width, height);
 
             ViewportSize = new Vector2(width, height);
-        }
-
-        public SlRenderPass BeginRenderPass(SlCommandEncoder encoder)
-        {
-            var colorAttachment = new SlColorAttachment
-            {
-                View = _colorTextureView,
-                LoadOp = SlLoadOp.Clear,
-                StoreOp = SlStoreOp.Store,
-                ClearValue = new SlColor { R = 0.1, G = 0.1, B = 0.1, A = 1.0 }
-            };
-
-            var depthAttachment = new SlDepthStencilAttachment
-            {
-                View = _depthTextureView,
-                DepthLoadOp = SlLoadOp.Clear,
-                DepthStoreOp = SlStoreOp.Store,
-                DepthClearValue = 0.0f // Reverse-Z
-            };
-
-            var renderPassDesc = new SlRenderPassDescriptor
-            {
-                ColorAttachments = [colorAttachment],
-                DepthStencilAttachment = depthAttachment
-            };
-
-            return encoder.BeginRenderPass(renderPassDesc);
         }
 
         public void Render(Matrix4x4 view, Matrix4x4 projection, bool renderGuizmos)
@@ -177,7 +106,7 @@ namespace XNOEdit.Panels
                 _pendingWidth = (uint)Math.Max(contentSize.X, 1);
                 _pendingHeight = (uint)Math.Max(contentSize.Y, 1);
 
-                ImGui.Image(new ImTextureRef(null, _colorTextureView.GetHandle()), ViewportSize);
+                ImGui.Image(new ImTextureRef(null, _colorIndex.Packed), ViewportSize);
 
                 if (renderGuizmos)
                 {

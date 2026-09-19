@@ -1,14 +1,13 @@
 using Solaris;
-using XNOEdit.Renderer;
 
 namespace XNOEdit.Managers
 {
-    public class TextureManager(ImGuiController imguiController) : IDisposable
+    public class TextureManager(SlDevice device) : IDisposable
     {
         private readonly Dictionary<string, ManagedTexture> _textures = new();
         private bool _disposed;
 
-        public void Add(string name, SlTexture texture, SlTextureView view)
+        public unsafe void Add(string name, SlTexture texture)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(TextureManager));
@@ -18,61 +17,34 @@ namespace XNOEdit.Managers
                 return;
             }
 
-            // Create ImGui bind group for this texture
-            imguiController.BindImGuiTextureView(view);
-
             _textures[name] = new ManagedTexture
             {
                 Texture = texture,
-                View = view
+                Index = device.Tables.Register(texture)
             };
         }
 
-        public void AddRange(IEnumerable<(string Name, SlTexture Texture, SlTextureView View)> textures)
+        public void AddRange(IEnumerable<(string Name, SlTexture Texture)> textures)
         {
-            foreach (var (name, texture, view) in textures)
+            foreach (var (name, texture) in textures)
             {
-                Add(name, texture, view);
+                Add(name, texture);
             }
         }
 
-        public bool Remove(string name)
-        {
-            if (_textures.TryGetValue(name, out var texture))
-            {
-                ReleaseTexture(texture);
-                _textures.Remove(name);
-                return true;
-            }
-
-            return false;
-        }
-
-        public SlTextureView? GetView(string? name)
+        /// <summary>
+        /// Returns the bindless index, or the null-texture index when unknown. Callers
+        /// put this straight into a push constant — there is no failure path to handle.
+        /// </summary>
+        public SlTextureIndex GetIndex(string? name)
         {
             if (name != null && _textures.TryGetValue(name, out var texture))
-                return texture.View;
-            return null;
+                return texture.Index;
+
+            return SlTextureIndex.NullTexture2D;
         }
 
-        public bool TryGetView(string name, out SlTextureView? view)
-        {
-            if (_textures.TryGetValue(name, out var texture))
-            {
-                view = texture.View;
-                return true;
-            }
-
-            view = null;
-            return false;
-        }
-
-        public unsafe nint GetImGuiId(string name)
-        {
-            if (_textures.TryGetValue(name, out var texture))
-                return (nint)texture.View.GetHandle();
-            return 0;
-        }
+        public ulong GetImGuiTextureId(string? name) => GetIndex(name).Packed;
 
         public bool Contains(string name) => _textures.ContainsKey(name);
 
@@ -89,14 +61,10 @@ namespace XNOEdit.Managers
             _textures.Clear();
         }
 
-        private unsafe void ReleaseTexture(ManagedTexture texture)
+        private void ReleaseTexture(ManagedTexture texture)
         {
-            // Unbind from ImGui first
-            imguiController.UnbindImGuiTextureView((IntPtr)texture.View.GetHandle());
-
-            // Release resources
-            texture.View?.Dispose();
-            texture.Texture?.Dispose();
+            device.Tables.Release(texture.Index);
+            device.Retire(texture.Texture);
         }
 
         public void Dispose()
@@ -110,15 +78,7 @@ namespace XNOEdit.Managers
         private struct ManagedTexture
         {
             public SlTexture Texture;
-            public SlTextureView View;
-        }
-    }
-
-    public static unsafe class TextureManagerExtensions
-    {
-        public static SlTextureView? ResolveTexture(this TextureManager manager, string? name)
-        {
-            return manager.GetView(name);
+            public SlTextureIndex Index;
         }
     }
 }

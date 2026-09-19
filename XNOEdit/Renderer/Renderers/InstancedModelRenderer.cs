@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Solaris;
+using Solaris.Graph;
 using XNOEdit.Managers;
 using XNOEdit.Renderer.Shaders;
 
@@ -42,12 +43,12 @@ namespace XNOEdit.Renderer.Renderers
         public TextureManager TextureManager;
     }
 
-    public unsafe class InstancedModelRenderer : Renderer<InstancedModelParameters>
+    public class InstancedModelRenderer : Renderer<InstancedModelParameters>
     {
         private readonly SlDevice _device;
         private readonly Model _model;
 
-        private SlBuffer<InstanceData>? _instanceBuffer;
+        private SlBuffer? _instanceBuffer;
         private InstanceData[] _instances = [];
 
         public int InstanceCount => _instances.Length;
@@ -55,23 +56,26 @@ namespace XNOEdit.Renderer.Renderers
         public InstancedModelRenderer(
             SlDevice device,
             ObjectChunk objectChunk,
-            TextureListChunk? textureListChunk,
-            EffectListChunk? effectListChunk,
-            ArcFile? shaderArchive)
+            TextureListChunk textureListChunk,
+            EffectListChunk effectListChunk,
+            ArcFile shaderArchive)
             : base(CreateShader(device))
         {
             _device = device;
-            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive, (InstancedModelShader)Shader);
+            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive);
         }
 
         private static InstancedModelShader CreateShader(SlDevice device)
         {
-            return new InstancedModelShader(device, EmbeddedResources.ReadAllText("XNOEdit/Shaders/InstancedModel.wgsl"));
+            return new InstancedModelShader(device, ShaderLibrary.Get(device, "instanced_model_vs"),
+                ShaderLibrary.Get(device, "model_ps"));
         }
 
         public void SetInstances(InstanceData[] instances)
         {
-            _instanceBuffer?.Dispose();
+            if (_instanceBuffer != null)
+                _device.Retire(_instanceBuffer);
+
             _instances = instances;
 
             if (instances.Length == 0)
@@ -80,12 +84,11 @@ namespace XNOEdit.Renderer.Renderers
                 return;
             }
 
-            _instanceBuffer = _device.CreateBuffer(instances, SlBufferUsage.Vertex | SlBufferUsage.CopyDst);
+            _instanceBuffer = _device.CreateBuffer(instances, SlBufferUsage.Vertex);
         }
 
         public override void Draw(
-            SlQueue queue,
-            SlRenderPass passEncoder,
+            SlPassContext ctx,
             Matrix4x4 view,
             Matrix4x4 projection,
             InstancedModelParameters parameters)
@@ -93,11 +96,7 @@ namespace XNOEdit.Renderer.Renderers
             if (_instances.Length == 0 || _instanceBuffer == null)
                 return;
 
-            base.Draw(queue, passEncoder, view, projection, parameters);
-
-            var shader = (InstancedModelShader)Shader;
-
-            var perFrameUniforms = new PerFrameUniforms
+            var perFrame = new PerFrameUniforms
             {
                 Model = Matrix4x4.Identity,
                 View = view,
@@ -109,18 +108,21 @@ namespace XNOEdit.Renderer.Renderers
                 Lightmap = parameters.Lightmap ? 1.0f : 0.0f,
             };
 
-            shader.UpdatePerFrameUniforms(queue, in perFrameUniforms);
+            var perFrameOffset = ctx.UploadConstants(in perFrame);
+            ctx.PushConstants(in perFrameOffset);
 
-            var pipeline = shader.GetPipeline(parameters.CullBackfaces, parameters.Wireframe);
-            passEncoder.SetPipeline(pipeline);
-            passEncoder.SetVertexBuffer(1, _instanceBuffer);
+            var variant = parameters.CullBackfaces ? "culled" : "default";
+            ctx.SetPipeline(Material.Pipeline(variant, ctx.Signature));
+            ctx.SetVertexBuffer(1, _instanceBuffer.View, InstancedModelShader.InstanceStride);
 
-            _model.Draw(passEncoder, parameters.Wireframe, parameters.TextureManager, shader, _instances.Length);
+            _model.Draw(ctx, parameters.TextureManager, _instances.Length);
         }
 
         public override void Dispose()
         {
-            _instanceBuffer?.Dispose();
+            if (_instanceBuffer != null)
+                _device.Retire(_instanceBuffer);
+
             _model.Dispose();
             base.Dispose();
         }

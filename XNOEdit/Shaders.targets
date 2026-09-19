@@ -1,0 +1,76 @@
+<Project>
+
+    <PropertyGroup>
+        <ShaderSourceDir>$(MSBuildThisFileDirectory)Shaders</ShaderSourceDir>
+        <ShaderOutputDir>$(MSBuildThisFileDirectory)obj/shaders</ShaderOutputDir>
+        <DxcTool Condition="'$(DxcTool)' == ''">dxc</DxcTool>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Shader Include="grid_vs"             Profile="vs_6_0" InvertY="-fvk-invert-y" />
+        <Shader Include="grid_ps"             Profile="ps_6_0" />
+        <Shader Include="model_vs"            Profile="vs_6_0" InvertY="-fvk-invert-y" />
+        <Shader Include="model_ps"            Profile="ps_6_0" />
+        <Shader Include="instanced_model_vs"  Profile="vs_6_0" InvertY="-fvk-invert-y" />
+        <Shader Include="skybox_vs"           Profile="vs_6_0" InvertY="-fvk-invert-y" />
+        <Shader Include="skybox_ps"           Profile="ps_6_0" />
+        <Shader Include="imgui_vs"            Profile="vs_6_0" InvertY="-fvk-invert-y" />
+        <Shader Include="imgui_ps"            Profile="ps_6_0" />
+    </ItemGroup>
+
+    <Target Name="CompileShadersMetal"
+            Condition="'$([System.OperatingSystem]::IsMacOS())' == 'true'"
+            Inputs="@(Shader->'$(ShaderSourceDir)/msl/%(Identity).metal')"
+            Outputs="@(Shader->'$(ShaderOutputDir)/%(Identity).metallib')">
+
+        <MakeDir Directories="$(ShaderOutputDir)" />
+
+        <Exec Command="xcrun -sdk macosx metal -o &quot;$(ShaderOutputDir)/%(Shader.Identity).metallib&quot; &quot;$(ShaderSourceDir)/msl/%(Shader.Identity).metal&quot; -D__air__ -DXNOEDIT -frecord-sources -gline-tables-only" />
+    </Target>
+
+    <Target Name="CompileShadersSpirv"
+            Inputs="@(Shader->'$(ShaderSourceDir)/hlsl/%(Identity).hlsl')"
+            Outputs="@(Shader->'$(ShaderOutputDir)/%(Identity).spv')">
+
+        <MakeDir Directories="$(ShaderOutputDir)" />
+
+        <Exec Command="$(DxcTool) -T %(Shader.Profile) -HV 2021 -all-resources-bound -spirv %(Shader.InvertY) -DXNOEDIT -E shaderMain -Fo &quot;$(ShaderOutputDir)/%(Shader.Identity).spv&quot; &quot;$(ShaderSourceDir)/hlsl/%(Shader.Identity).hlsl&quot;" />
+    </Target>
+
+    <Target Name="CompileShadersDxil"
+            Condition="'$([System.OperatingSystem]::IsWindows())' == 'true'"
+            Inputs="@(Shader->'$(ShaderSourceDir)/hlsl/%(Identity).hlsl')"
+            Outputs="@(Shader->'$(ShaderOutputDir)/%(Identity).dxil')">
+
+        <MakeDir Directories="$(ShaderOutputDir)" />
+
+        <Exec Command="$(DxcTool) -T %(Shader.Profile) -HV 2021 -all-resources-bound -Wno-ignored-attributes -DXNOEDIT -E shaderMain -Fo &quot;$(ShaderOutputDir)/%(Shader.Identity).dxil&quot; &quot;$(ShaderSourceDir)/hlsl/%(Shader.Identity).hlsl&quot;" />
+    </Target>
+
+    <Target Name="EmbedShaders"
+            DependsOnTargets="CompileShadersMetal;CompileShadersSpirv;CompileShadersDxil"
+            BeforeTargets="AssignTargetPaths"
+            Condition="'$(ShadersEmbedded)' != 'true'">
+
+        <PropertyGroup>
+            <ShadersEmbedded>true</ShadersEmbedded>
+        </PropertyGroup>
+
+        <ItemGroup>
+            <ShaderArtifact Include="@(Shader->'$(ShaderOutputDir)/%(Identity).metallib')"
+                            Condition="'$([System.OperatingSystem]::IsMacOS())' == 'true'" />
+            <ShaderArtifact Include="@(Shader->'$(ShaderOutputDir)/%(Identity).spv')" />
+            <ShaderArtifact Include="@(Shader->'$(ShaderOutputDir)/%(Identity).dxil')"
+                            Condition="'$([System.OperatingSystem]::IsWindows())' == 'true'" />
+        </ItemGroup>
+
+        <ItemGroup>
+            <EmbeddedResource Include="@(ShaderArtifact)">
+                <LogicalName>XNOEdit.Shaders.%(ShaderArtifact.Filename)%(ShaderArtifact.Extension)</LogicalName>
+                <Link>Shaders/%(ShaderArtifact.Filename)%(ShaderArtifact.Extension)</Link>
+                <WithCulture>false</WithCulture>
+            </EmbeddedResource>
+        </ItemGroup>
+    </Target>
+
+</Project>

@@ -5,6 +5,7 @@ using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
 using Pfim;
+using Plume;
 using Solaris;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
@@ -81,12 +82,12 @@ namespace XNOEdit.Services
     public class FileLoaderService
     {
         private readonly SlDevice _device;
-        private readonly SlQueue _queue;
+        private readonly SlUploader _uploader;
 
-        public FileLoaderService(SlDevice device, SlQueue queue)
+        public FileLoaderService(SlDevice device, SlUploader uploader)
         {
             _device = device;
-            _queue = queue;
+            _uploader = uploader;
         }
 
         public async Task<ObjectLoadResult?> ReadXnoAsync(
@@ -376,15 +377,15 @@ namespace XNOEdit.Services
                 if (skipNames != null && skipNames.Contains(textureFile.Name))
                     continue;
 
-                var pointers = LoadTexture(textureFile);
-                if (pointers.texture != null)
-                    result.Add(new LoadedTexture(textureFile.Name, pointers.texture, pointers.textureView));
+                var texture = LoadTexture(textureFile);
+                if (texture != null)
+                    result.Add(new LoadedTexture(textureFile.Name, texture));
             }
 
             return result;
         }
 
-        private (SlTexture? texture, SlTextureView? textureView) LoadTexture(IFile file)
+        private SlTexture? LoadTexture(IFile file)
         {
             try
             {
@@ -398,24 +399,12 @@ namespace XNOEdit.Services
                 Logger.Debug?.PrintMsg(LogClass.Application,
                     $"  Loading {file.Name}: {image.Width}x{image.Height}, {mipLevelCount} mip levels, format: {image.Format}");
 
-                var textureDesc = new SlTextureDescriptor
-                {
-                    Size = new SlExtent3D
-                    {
-                        Width = (uint)image.Width,
-                        Height = (uint)image.Height,
-                        DepthOrArrayLayers = 1
-                    },
-                    MipLevelCount = mipLevelCount,
-                    SampleCount = 1,
-                    Dimension = SlTextureDimension.Dimension2D,
-                    Format = SlTextureFormat.Bgra8Unorm,
-                    Usage = SlTextureUsage.TextureBinding | SlTextureUsage.CopyDst
-                };
+                var texture = _device.CreateTexture(
+                    SlTextureDescriptor.Sampled2D(
+                        (uint)image.Width, (uint)image.Height, RenderFormat.B8G8R8A8Unorm, mipLevelCount),
+                    file.Name);
 
-                var wgpuTexture = _device.CreateTexture(textureDesc);
-
-                UploadMipLevel(wgpuTexture, image.Data, 0, image.Data.Length,
+                UploadMipLevel(texture, image.Data, 0, image.Data.Length,
                     image.Width, image.Height, image.Stride, 0, image.Format);
 
                 if (image.MipMaps is { Length: > 0 })
@@ -423,27 +412,17 @@ namespace XNOEdit.Services
                     for (var i = 0; i < image.MipMaps.Length; i++)
                     {
                         var mipMap = image.MipMaps[i];
-                        UploadMipLevel(wgpuTexture, image.Data, mipMap.DataOffset, mipMap.DataLen,
+                        UploadMipLevel(texture, image.Data, mipMap.DataOffset, mipMap.DataLen,
                             mipMap.Width, mipMap.Height, mipMap.Stride, (uint)(i + 1), image.Format);
                     }
                 }
 
-                var viewDesc = new SlTextureViewDescriptor
-                {
-                    Format = SlTextureFormat.Bgra8Unorm,
-                    Dimension = SlTextureViewDimension.Dimension2D,
-                    BaseMipLevel = 0,
-                    MipLevelCount = mipLevelCount,
-                    BaseArrayLayer = 0,
-                    ArrayLayerCount = 1
-                };
-
-                return (wgpuTexture, wgpuTexture.CreateTextureView(viewDesc));
+                return texture;
             }
             catch (Exception ex)
             {
                 Logger.Error?.PrintMsg(LogClass.Application, $"Failed to load texture {file.Name}: {ex.Message}");
-                return (null, null);
+                return null;
             }
         }
 
@@ -455,28 +434,13 @@ namespace XNOEdit.Services
 
             var imageData = ConvertToRgba(mipData, width, height, stride, format);
 
-            var imageCopyTexture = new SlCopyTextureDescriptor
-            {
-                Texture = texture,
-                MipLevel = mipLevel,
-                Origin = new SlOrigin3D { X = 0, Y = 0, Z = 0 }
-            };
-
-            var textureDataLayout = new SlTextureDataLayout
-            {
-                Offset = 0,
-                BytesPerRow = (uint)(width * 4),
-                RowsPerImage = (uint)height
-            };
-
-            var writeSize = new SlExtent3D
-            {
-                Width = (uint)width,
-                Height = (uint)height,
-                DepthOrArrayLayers = 1
-            };
-
-            _queue.WriteTexture(imageCopyTexture, imageData, textureDataLayout, writeSize);
+            _uploader.StageTexture(
+                texture,
+                imageData,
+                (uint)width,
+                (uint)height,
+                bytesPerRow: (uint)(width * 4),
+                mipLevel: mipLevel);
         }
 
         private static byte[] ConvertToRgba(byte[] data, int width, int height, int stride, ImageFormat format)

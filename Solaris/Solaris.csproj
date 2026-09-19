@@ -10,12 +10,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="SDL3-CS" Version="3.3.2.1" />
-        <PackageReference Include="SDL3-CS.Native" Version="3.3.2" />
+        <PackageReference Include="SDL3-CS" Version="3.4.16.1" />
+        <PackageReference Include="SDL3-CS.Native" Version="3.4.2" />
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\PlumeSharp\PlumeSharp\PlumeSharp.csproj" />
         <ProjectReference Include="..\XNOEdit.Logging\XNOEdit.Logging.csproj" />
     </ItemGroup>
-
+    
 </Project>
