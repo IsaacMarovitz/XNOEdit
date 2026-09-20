@@ -80,7 +80,7 @@ namespace XNOEdit.Renderer.Renderers
 
             var offset = ctx.UploadConstants(in uniforms);
 
-            ctx.SetPipeline(Material.Pipeline(ctx.Signature));
+            ctx.SetPipeline(ShaderModule.Pipeline(ctx.Signature));
             ctx.PushConstants(in offset);
             ctx.SetVertexBuffer(0, _vertexBuffer.View, stride: 24);
             ctx.Draw((uint)_lineCount);

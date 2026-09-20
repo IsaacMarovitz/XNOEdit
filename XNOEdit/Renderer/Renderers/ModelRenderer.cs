@@ -1,10 +1,10 @@
 using System.Numerics;
-using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Solaris;
 using Solaris.Graph;
+using XNOEdit.Guest;
+using XNOEdit.Logging;
 using XNOEdit.Managers;
-using XNOEdit.Renderer.Shaders;
 
 namespace XNOEdit.Renderer.Renderers
 {
@@ -13,33 +13,44 @@ namespace XNOEdit.Renderer.Renderers
         public Vector3 SunDirection;
         public Vector3 SunColor;
         public Vector3 Position;
-        public float VertColorStrength;
-        public bool Wireframe;
         public bool CullBackfaces;
-        public bool Lightmap;
+        public GuestDrawPhase GuestPhase;
+        public GuestDrawContext GuestDraw;
         public TextureManager TextureManager;
+
+        public readonly GuestSceneState ToSceneState(Matrix4x4 view, Matrix4x4 projection) => new()
+        {
+            View = view,
+            Projection = projection,
+            CameraPosition = Position,
+            SunDirection = SunDirection,
+            SunColor = SunColor,
+            Ambient = SunColor * 0.3f,
+            CullBackfaces = CullBackfaces,
+        };
     }
 
-    public class ModelRenderer : Renderer<ModelParameters>
+    public class ModelRenderer : IDisposable
     {
         private readonly Model _model;
+        private readonly GuestDrawContext _guestDraw = new();
+        private bool _reportedGuestFallback;
+
+        private Matrix4x4[] _instances = [Matrix4x4.Identity];
 
         public ModelRenderer(
             SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
-            ArcFile shaderArchive)
-            : base(CreateShader(device))
+            GuestMaterialCache? guestMaterial)
         {
-            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, shaderArchive);
+            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, guestMaterial);
         }
 
-        public static ModelShader CreateShader(SlDevice device)
-        {
-            return new ModelShader(device, ShaderLibrary.Get(device, "model_vs"),
-                ShaderLibrary.Get(device, "model_ps"));
-        }
+        public int InstanceCount => _instances.Length;
+
+        public void SetInstances(Matrix4x4[] instances) => _instances = instances;
 
         public bool GetVisible() => _model.GetAnyMeshVisible();
         public void SetVisible(bool visible) => _model.SetAllVisible(visible);
@@ -51,42 +62,37 @@ namespace XNOEdit.Renderer.Renderers
             _model.SetVisible(subobject, meshSet, visibility);
         }
 
-        public override void Draw(
+        public void Draw(
             SlPassContext ctx,
             Matrix4x4 view,
             Matrix4x4 projection,
             ModelParameters modelParameters)
         {
-            var perFrame = new PerFrameUniforms
+            if (_instances.Length == 0)
+                return;
+
+            var scene = modelParameters.ToSceneState(view, projection);
+
+            var skipped = _model.DrawGuest(
+                ctx, modelParameters.GuestDraw, modelParameters.TextureManager,
+                in scene, _instances, modelParameters.GuestPhase);
+
+            if (skipped > 0 && !_reportedGuestFallback && modelParameters.GuestPhase == GuestDrawPhase.Opaque)
             {
-                Model = Matrix4x4.Identity,
-                View = view,
-                Projection = projection,
-                SunDirection = modelParameters.SunDirection.AsVector4(),
-                SunColor = modelParameters.SunColor.AsVector4(),
-                CameraPosition = modelParameters.Position,
-                VertColorStrength = modelParameters.VertColorStrength,
-                Lightmap = modelParameters.Lightmap ? 1.0f : 0.0f,
-            };
-
-            var push = new ModelPerFramePush
-            {
-                PerFrameOffset = ctx.UploadConstants(in perFrame),
-                SamplerIndex = ((ModelShader)ShaderModule).Sampler.Slot
-            };
-            ctx.PushConstants(in push);
-
-            var variant = modelParameters.CullBackfaces ? "culled" : "default";
-            ctx.SetPipeline(Material.Pipeline(variant, ctx.Signature));
-
-            _model.Draw(ctx, modelParameters.TextureManager);
+                _reportedGuestFallback = true;
+                Logger.Warning?.PrintMsg(LogClass.Application,
+                    $"{skipped} mesh(es) have no recompiled shader and were not drawn");
+            }
         }
 
-        public override void Dispose()
+        public void CollectTransparent(List<GuestTransparentDraw> sink, Matrix4x4 view)
+        {
+            _model.CollectTransparent(sink, view, _instances);
+        }
+
+        public void Dispose()
         {
             _model.Dispose();
-
-            base.Dispose();
         }
     }
 }

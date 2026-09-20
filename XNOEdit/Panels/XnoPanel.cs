@@ -48,7 +48,7 @@ namespace XNOEdit.Panels
             ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
 
             ImGui.Text("File Name:");
-            ImGui.Text(_xno.Name);
+            ImGui.Text($"{_xno.Name}");
 
             if (ImGui.BeginTabBar("Tab Bar", ImGuiTabBarFlags.AutoSelectNewTabs))
             {
@@ -278,6 +278,7 @@ namespace XNOEdit.Panels
             if (ImGui.BeginTabItem("Effect List"))
             {
                 var uniqueEffects = effectListChunk.Effects
+                    .Where(x => !string.IsNullOrEmpty(x.Name))
                     .GroupBy(x => x.Name)
                     .Select(g => g.FirstOrDefault());
 

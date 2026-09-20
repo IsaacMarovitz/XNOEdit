@@ -1,5 +1,6 @@
 using Marathon.Formats.Archive;
 using Marathon.IO.Types.FileSystem;
+using XNOEdit.Guest;
 using XNOEdit.ModelResolver;
 
 namespace XNOEdit.Services
@@ -16,7 +17,7 @@ namespace XNOEdit.Services
         public abstract LoadStepType Type { get; }
         public abstract Task ExecuteAsync(
             FileLoaderService loader,
-            ArcFile? shaderArchive,
+            GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress> progress,
             CancellationToken token);
     }
@@ -34,11 +35,11 @@ namespace XNOEdit.Services
 
         public override async Task ExecuteAsync(
             FileLoaderService loader,
-            ArcFile? shaderArchive,
+            GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress> progress,
             CancellationToken token)
         {
-            Result = await loader.ReadXnoAsync(File, shaderArchive, progress, token);
+            Result = await loader.ReadXnoAsync(File, guestMaterials, progress, token);
         }
     }
 
@@ -55,11 +56,11 @@ namespace XNOEdit.Services
 
         public override async Task ExecuteAsync(
             FileLoaderService loader,
-            ArcFile? shaderArchive,
+            GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress> progress,
             CancellationToken token)
         {
-            Result = await loader.ReadArcAsync(ArcFile, shaderArchive, progress, token);
+            Result = await loader.ReadArcAsync(ArcFile, guestMaterials, progress, token);
         }
     }
 
@@ -78,11 +79,11 @@ namespace XNOEdit.Services
 
         public override async Task ExecuteAsync(
             FileLoaderService loader,
-            ArcFile? shaderArchive,
+            GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress> progress,
             CancellationToken token)
         {
-            Result = await loader.ReadMissionAsync(File, ResolverContext, shaderArchive, progress, token);
+            Result = await loader.ReadMissionAsync(File, ResolverContext, guestMaterials, progress, token);
         }
     }
 
@@ -90,7 +91,7 @@ namespace XNOEdit.Services
     {
         private readonly List<LoadStep> _steps = [];
         private readonly FileLoaderService _loader;
-        private readonly ArcFile? _shaderArchive;
+        private GuestMaterialCache? _guestMaterials;
 
         private CancellationTokenSource? _cts;
         private Task? _runningTask;
@@ -103,10 +104,10 @@ namespace XNOEdit.Services
 
         public bool IsRunning => _runningTask is { IsCompleted: false };
 
-        public LoadChain(FileLoaderService loader, ArcFile? shaderArchive)
+        public LoadChain(FileLoaderService loader, GuestMaterialCache? guestMaterials)
         {
             _loader = loader;
-            _shaderArchive = shaderArchive;
+            _guestMaterials = guestMaterials;
         }
 
         public LoadChain Add(LoadStep step)
@@ -158,7 +159,7 @@ namespace XNOEdit.Services
                     token.ThrowIfCancellationRequested();
 
                     var step = _steps[_currentStepIndex];
-                    await step.ExecuteAsync(_loader, _shaderArchive, progress, token);
+                    await step.ExecuteAsync(_loader, _guestMaterials, progress, token);
 
                     StepCompleted?.Invoke(step);
                 }

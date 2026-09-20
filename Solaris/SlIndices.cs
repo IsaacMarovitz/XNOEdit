@@ -16,8 +16,9 @@ namespace Solaris
 
         /// <summary>A 1x1 texture that samples opaque white, for "no texture" material slots.</summary>
         public static readonly SlTextureIndex WhiteTexture2D = new(3);
+        public static readonly SlTextureIndex WhiteTexture2DArray = new(4);
 
-        internal const uint ReservedCount = 4;
+        internal const uint ReservedCount = 5;
 
         private readonly uint _value;
 

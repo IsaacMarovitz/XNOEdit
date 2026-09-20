@@ -60,7 +60,7 @@ namespace XNOEdit.Renderer.Renderers
                 SunColor = skyboxParameters.SunColor.AsVector4()
             };
 
-            ctx.SetPipeline(Material.Pipeline(ctx.Signature));
+            ctx.SetPipeline(ShaderModule.Pipeline(ctx.Signature));
             ctx.PushConstants(in constants);
             ctx.SetVertexBuffer(0, _vertexBuffer.View, SkyboxShader.VertexStride);
             ctx.Draw(4);

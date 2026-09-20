@@ -231,6 +231,9 @@ namespace Solaris
             if ((usage & SlBufferUsage.Structured) != 0)
                 flags |= RenderBufferFlags.Storage;
 
+            if ((usage & SlBufferUsage.DeviceAddressable) != 0)
+                flags |= RenderBufferFlags.DeviceAddressable;
+
             return flags;
         }
 

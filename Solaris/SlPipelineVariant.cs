@@ -29,6 +29,7 @@ namespace Solaris
 
         /// <summary>Per-channel colour write mask. Defaults to all channels.</summary>
         public RenderColorWriteEnable? ColorWriteMask { get; init; }
+        public uint SpecConstants { get; init; }
 
         public SlPipelineVariant() { }
 

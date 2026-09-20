@@ -317,10 +317,7 @@ namespace XNOEdit.Managers
 
                     ImGui.MenuItem("Guizmos", "", ref _guizmos);
                     ImGui.MenuItem("Show Grid", "G", ref settings.ShowGrid);
-                    ImGui.MenuItem("Vertex Colors", "V", ref settings.VertexColors);
                     ImGui.MenuItem("Backface Culling", "C", ref settings.BackfaceCulling);
-                    ImGui.MenuItem("Wireframe", "F", ref settings.WireframeMode);
-                    ImGui.MenuItem("Lightmap", "", ref settings.Lightmap);
 
                     ImGui.Separator();
 

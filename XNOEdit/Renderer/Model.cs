@@ -1,40 +1,34 @@
 using System.Numerics;
-using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Types;
 using Solaris;
 using Solaris.Graph;
+using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
-using XNOEdit.Renderer.Shaders;
 
 namespace XNOEdit.Renderer
 {
-    public struct TextureSet
-    {
-        public string? MainTexture;
-        public string? BlendMap;
-        public string? NormalMap;
-        public string? LightMap;
-        public bool Specular;
-    }
-
     public class Model : IDisposable
     {
         private readonly SlDevice _device;
         private readonly List<ModelMesh> _meshes = [];
+        private readonly List<ModelMesh> _sky = [];
+        private readonly List<ModelMesh> _opaque = [];
+        private readonly List<ModelMesh> _punchThrough = [];
+        private readonly List<ModelMesh> _transparent = [];
         private readonly Dictionary<int, SlBuffer> _sharedVertexBuffers = new();
-        private readonly ArcFile _shaderArchive;
+        private readonly GuestMaterialCache? _guestMaterials;
 
         public Model(
             SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
-            ArcFile shaderArchive)
+            GuestMaterialCache? guestMaterial)
         {
             _device = device;
-            _shaderArchive = shaderArchive;
+            _guestMaterials = guestMaterial;
 
             LoadModel(objectChunk, textureListChunk, effectListChunk);
         }
@@ -105,6 +99,18 @@ namespace XNOEdit.Renderer
                     vertices.Add(normal.Y);
                     vertices.Add(normal.Z);
 
+                    // Tangent
+                    var tangent = vertex.Tangent ?? Vector3.Zero;
+                    vertices.Add(tangent.X);
+                    vertices.Add(tangent.Y);
+                    vertices.Add(tangent.Z);
+
+                    // Binormal
+                    var binormal = vertex.Binormal ?? Vector3.Zero;
+                    vertices.Add(binormal.X);
+                    vertices.Add(binormal.Y);
+                    vertices.Add(binormal.Z);
+
                     // Color (BGRA)
                     if (vertex.VertexColourA != null)
                     {
@@ -122,32 +128,16 @@ namespace XNOEdit.Renderer
                     }
 
                     // UV
-                    if (vertex.TextureCoordinates != null)
+                    var coordinates = vertex.TextureCoordinates;
+
+                    for (var uv = 0; uv < 4; uv++)
                     {
-                        if (vertex.TextureCoordinates.Count >= 2)
-                        {
-                            vertices.Add(vertex.TextureCoordinates[0].X);
-                            vertices.Add(vertex.TextureCoordinates[0].Y);
+                        var coordinate = coordinates != null && uv < coordinates.Count
+                            ? coordinates[uv]
+                            : Vector2.Zero;
 
-                            vertices.Add(vertex.TextureCoordinates[1].X);
-                            vertices.Add(vertex.TextureCoordinates[1].Y);
-                        }
-                        else if (vertex.TextureCoordinates.Count >= 1)
-                        {
-                            vertices.Add(vertex.TextureCoordinates[0].X);
-                            vertices.Add(vertex.TextureCoordinates[0].Y);
-
-                            vertices.Add(1.0f);
-                            vertices.Add(1.0f);
-                        }
-                    }
-                    else
-                    {
-                        vertices.Add(1.0f);
-                        vertices.Add(1.0f);
-
-                        vertices.Add(1.0f);
-                        vertices.Add(1.0f);
+                        vertices.Add(coordinate.X);
+                        vertices.Add(coordinate.Y);
                     }
                 }
 
@@ -168,7 +158,6 @@ namespace XNOEdit.Renderer
                         var vertexListIndex = meshSet.VertexListIndex;
                         var primitiveList = meshSet.GetPrimitiveList(objectChunk);
                         var material = meshSet.GetMaterial(objectChunk);
-                        var textureSet = new TextureSet();
                         string effectName = null;
                         string techniqueName = null;
 
@@ -185,31 +174,39 @@ namespace XNOEdit.Renderer
                             }
                         }
 
-                        if (textureListChunk != null)
-                        {
-                            var textures = material.TextureMap.Descriptions
-                                .Where(d => d.Index >= 0 && d.Index < textureListChunk.Textures.Count)
-                                .Select(d => textureListChunk.Textures[d.Index])
-                                .Distinct()
-                                .ToList();
-
-                            textureSet = IntuitTextures(textures);
-                        }
-
                         if (primitiveList == null || !_sharedVertexBuffers.TryGetValue(vertexListIndex, out var buffer))
                         {
                             continue;
                         }
 
-                        if (effectName != null)
+                        var guestMaterial = _guestMaterials?.Resolve(effectName, techniqueName);
+
+                        if ((subObject.Type & 0xFF) == 0x02)
                         {
-                            var shaderFile = _shaderArchive.GetFile($"xenon/shader/std/{effectName}o");
-                            // var shaderData = shaderFile.Decompress
-                            // var containers = ShaderArchive.ExtractShaderContainers(shaderData);
+                            Logger.Debug?.PrintMsg(LogClass.Application,
+                                $"  transparent blend src=0x{(uint)material.Logic.SourceBlend:X} " +
+                                $"dst=0x{(uint)material.Logic.DestinationBlend:X} op=0x{(uint)material.Logic.BlendOperation:X}");
                         }
 
-                        var mesh = new ModelMesh(_device, buffer, primitiveList, textureSet, material, i, j);
+                        var mesh = new ModelMesh(
+                            _device, buffer, primitiveList, textureListChunk, material, guestMaterial,
+                            (GuestDrawBucket)(subObject.Type & 0xFF), subObject.MeshSets[j].Centre, i, j);
+
                         _meshes.Add(mesh);
+
+                        if (mesh.GuestMaterial is { IsSky: true })
+                        {
+                            _sky.Add(mesh);
+                        }
+                        else
+                        {
+                            switch (mesh.Bucket)
+                            {
+                                case GuestDrawBucket.Transparent: _transparent.Add(mesh); break;
+                                case GuestDrawBucket.PunchThrough: _punchThrough.Add(mesh); break;
+                                default: _opaque.Add(mesh); break;
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -221,102 +218,53 @@ namespace XNOEdit.Renderer
             Logger.Debug?.PrintMsg(LogClass.Application, $"Loaded {_sharedVertexBuffers.Count} vertex buffers, {_meshes.Count} meshes");
         }
 
-        private static TextureSet IntuitTextures(List<TextureFile> textures)
+        public int DrawGuest(
+            SlPassContext ctx, GuestDrawContext guest, TextureManager textureManager,
+            in GuestSceneState scene, ReadOnlySpan<Matrix4x4> instances, GuestDrawPhase phase)
         {
-            // Adapted from Beatz
-            int FindDiffuseIndex(string lowerName, out string mainTag)
+            var meshes = phase switch
             {
-                string[] diffuseTags = ["_dfxx", "_dfsp", "_dfpt", "_df"]; // Order matters, longer first
-                foreach (var tag in diffuseTags)
-                {
-                    var idx = lowerName.IndexOf(tag);
-                    if (idx >= 0)
-                    {
-                        mainTag = tag;
-                        return idx;
-                    }
-                }
-
-                mainTag = null;
-                return -1;
-            }
-
-            var diffuseTextures = textures.Where(t =>
-            {
-                var lower = t.Name.ToLowerInvariant();
-                return FindDiffuseIndex(lower, out _) >= 0;
-            }).ToList();
-
-            var mainTextureName = diffuseTextures.FirstOrDefault()?.Name;
-            var blendMapName = diffuseTextures.Count > 1 ? diffuseTextures.Last().Name : null;
-
-            var normalMapName = textures.FirstOrDefault(t =>
-            {
-                var lower = t.Name.ToLowerInvariant();
-                return lower.Contains("_ntxx") || lower.Contains("_nw") || lower.Contains("_nt");
-            })?.Name;
-
-            var lightMapName = textures.FirstOrDefault(t =>
-            {
-                var lower = t.Name.ToLowerInvariant();
-                return lower.Contains("_lm") || lower.Contains("_zlm");
-            })?.Name;
-
-            // Fallback main tex if no diffuse found
-            if (mainTextureName == null)
-            {
-                mainTextureName = textures.FirstOrDefault(t =>
-                    !t.Name.ToLowerInvariant().Contains("_lm") &&
-                    !t.Name.ToLowerInvariant().Contains("_zlm") &&
-                    !t.Name.ToLowerInvariant().Contains("_ntxx") &&
-                    !t.Name.ToLowerInvariant().Contains("_nw") &&
-                    !t.Name.ToLowerInvariant().Contains("_nt"))?.Name ?? textures.FirstOrDefault()?.Name;
-            }
-
-            var specular = false;
-
-            if (mainTextureName != null)
-            {
-                Logger.Debug?.PrintMsg(LogClass.Application, $"Main Texture: {mainTextureName}");
-
-                if (mainTextureName.Contains("_dfsp"))
-                {
-                    specular = true;
-                }
-            }
-
-            if (blendMapName != null)
-            {
-                Logger.Debug?.PrintMsg(LogClass.Application, $"Blend Map: {blendMapName}");
-
-                if (blendMapName.Contains("_dfsp"))
-                {
-                    specular = true;
-                }
-            }
-
-            if (normalMapName != null)
-                Logger.Debug?.PrintMsg(LogClass.Application, $"Normal Map: {normalMapName}");
-
-            if (lightMapName != null)
-                Logger.Debug?.PrintMsg(LogClass.Application, $"Light Map: {lightMapName}");
-
-            return new TextureSet
-            {
-                MainTexture = mainTextureName,
-                BlendMap = blendMapName,
-                NormalMap = normalMapName,
-                LightMap = lightMapName,
-                Specular = specular,
+                GuestDrawPhase.Sky => _sky,
+                GuestDrawPhase.PunchThrough => _punchThrough,
+                _ => _opaque,
             };
+
+            if (meshes.Count == 0)
+                return 0;
+
+            return DrawBucket(meshes, ctx, guest, textureManager, in scene, instances);
         }
 
-        public void Draw(SlPassContext ctx, TextureManager textureManager, int instanceCount = 1)
+        public void CollectTransparent(List<GuestTransparentDraw> sink, Matrix4x4 view, ReadOnlySpan<Matrix4x4> instances)
         {
-            foreach (var mesh in _meshes)
+            foreach (var mesh in _transparent)
             {
-                mesh.Draw(ctx, textureManager, instanceCount);
+                if (!mesh.Visible || mesh.GuestMaterial == null)
+                    continue;
+
+                foreach (var world in instances)
+                {
+                    var centre = Vector3.Transform(mesh.Centre, world);
+                    sink.Add(new GuestTransparentDraw(mesh, world, Vector3.Transform(centre, view).Z));
+                }
             }
+        }
+
+        private static int DrawBucket(
+            List<ModelMesh> meshes, SlPassContext ctx, GuestDrawContext guest,
+            TextureManager textureManager, in GuestSceneState scene, ReadOnlySpan<Matrix4x4> instances)
+        {
+            var skipped = 0;
+
+            foreach (var mesh in meshes)
+            {
+                if (!mesh.DrawGuest(ctx, guest, textureManager, in scene, instances))
+                {
+                    skipped++;
+                }
+            }
+
+            return skipped;
         }
 
         public void Dispose()
@@ -334,33 +282,88 @@ namespace XNOEdit.Renderer
         }
     }
 
-        public class ModelMesh : IDisposable
+    public readonly record struct GuestTransparentDraw(ModelMesh Mesh, Matrix4x4 World, float ViewDepth);
+
+    public class ModelMesh : IDisposable
     {
-        public int Subobject { get; private set; }
-        public int MeshSet { get; private set; }
+        /// <summary>The game binds material textures to s0-s3.</summary>
+        private const int StageCount = 4;
+
+        public int Subobject { get; }
+        public int MeshSet { get; }
         public bool Visible { get; private set; } = true;
+        public GuestDrawBucket Bucket { get; }
+        public Vector3 Centre { get; }
 
         private readonly MeshGeometry _geometry;
-        private readonly TextureSet _textureSet;
-        private PerMeshConstants _constants;
+        private readonly GuestMeshState _state;
+
+        private readonly Vector4 _diffuse;
+        private readonly Vector4 _ambient;
+        private readonly Vector4 _specular;
+        private readonly Vector4 _emission;
+
+        private readonly Vector2[] _stageOffsets = new Vector2[StageCount];
+        private readonly string?[] _stageTextures = new string?[StageCount];
+
+        public GuestMaterial? GuestMaterial { get; }
 
         public ModelMesh(
             SlDevice device,
             SlBuffer sharedVbo,
             PrimitiveList primitiveList,
-            TextureSet textureSet,
+            TextureListChunk? textureList,
             Material material,
+            GuestMaterial? guestMaterial,
+            GuestDrawBucket bucket,
+            Vector3 centre,
             int subobject,
             int meshSet)
         {
-            _textureSet = textureSet;
+            GuestMaterial = guestMaterial;
             Subobject = subobject;
             MeshSet = meshSet;
+            Bucket = bucket;
+            Centre = centre;
 
             _geometry = MeshGeometry.CreateFromTriangleStrip(
                 device, sharedVbo, primitiveList.StripIndices, primitiveList.IndexIndices);
 
-            _constants = BuildConstants(material, textureSet);
+            BuildStageTextures(material, textureList);
+
+            _state = GuestRenderState.FromLogic(material.Logic);
+            _diffuse = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse);
+            _ambient = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient);
+            _specular = PropertyUtility.MaterialColorToVec4(material.Colour.Specular);
+            _emission = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive);
+        }
+
+        private void BuildStageTextures(Material material, TextureListChunk? textureList)
+        {
+            if (textureList == null)
+                return;
+
+            var stage = 0;
+            var previousIndex = -1;
+
+            foreach (var description in material.TextureMap.Descriptions)
+            {
+                // 0x05 and 0x06 are the colour and alpha operations on one sampler, so
+                // an 0x06 repeating the previous index is the same texture, not a new stage.
+                var op = description.Type & 0xFF;
+
+                if (op == 0x06 && description.Index == previousIndex)
+                    continue;
+
+                if (description.Index >= 0 && description.Index < textureList.Textures.Count && stage < StageCount)
+                {
+                    _stageTextures[stage] = textureList.Textures[description.Index].Name;
+                    _stageOffsets[stage] = description.Offset;
+                    stage++;
+                }
+
+                previousIndex = description.Index;
+            }
         }
 
         public void SetVisible(bool visible)
@@ -368,51 +371,83 @@ namespace XNOEdit.Renderer
             Visible = visible;
         }
 
-        /// <summary>
-        /// Flattens the Ninja material into the push constant block. Texture indices are
-        /// left at zero here and filled per draw, since a texture can finish loading
-        /// after the mesh was built.
-        /// </summary>
-        private static PerMeshConstants BuildConstants(Material material, in TextureSet textureSet) => new()
+        public bool DrawGuest(
+            SlPassContext ctx, GuestDrawContext guest, TextureManager textureManager,
+            in GuestSceneState scene, ReadOnlySpan<Matrix4x4> instances)
         {
-            AmbientColor = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient),
-            DiffuseColor = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse),
-            SpecularColor = PropertyUtility.MaterialColorToVec4(material.Colour.Specular),
-            EmissiveColor = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive),
-            SpecularPower = material.Colour.Power,
-            AlphaRef = material.Logic.AlphaRef / 255.0f,
-            Alpha = material.Logic.Alpha ? 1.0f : 0.0f,
-            Blend = material.Logic.Blend ? 1.0f : 0.0f,
-            Specular = textureSet.Specular ? 1.0f : 0.0f,
-        };
+            if (!Visible) return true;
 
-        public void Draw(SlPassContext ctx, TextureManager textureManager, int instanceCount = 1)
-        {
-            if (!Visible) return;
+            if (GuestMaterial is not { } material)
+                return false;
 
-            var constants = _constants;
+            var state = ApplyMaterial(in scene);
+            var binding = BindStages(ctx, guest, textureManager, material, in state);
 
-            constants.MainTextureIndex = ResolveOrWhite(textureManager, _textureSet.MainTexture);
-            constants.LightMapIndex = ResolveOrWhite(textureManager, _textureSet.LightMap);
-            constants.BlendMapIndex = Resolve(textureManager, _textureSet.BlendMap);
-            constants.NormalMapIndex = Resolve(textureManager, _textureSet.NormalMap);
+            foreach (var world in instances)
+            {
+                guest.BindInstance(ctx, in binding, in state, world, _stageOffsets);
+                ctx.DrawIndexed(_geometry.IndexCount);
+            }
 
-            ctx.PushConstants(in constants, ModelPushConstants.PerMeshOffset);
-
-            _geometry.Bind(ctx, slot: 0, ModelShader.VertexStride);
-            ctx.DrawIndexed(_geometry.IndexCount, (uint)instanceCount);
+            return true;
         }
 
-        private static uint Resolve(TextureManager textureManager, string? name)
-            => textureManager.GetIndex(name).Packed;
+        public void DrawGuestInstance(
+            SlPassContext ctx, GuestDrawContext guest, TextureManager textureManager,
+            in GuestSceneState scene, in Matrix4x4 world)
+        {
+            if (GuestMaterial is not { } material)
+                return;
 
-        private static uint ResolveOrWhite(TextureManager textureManager, string? name)
+            var state = ApplyMaterial(in scene);
+            var binding = BindStages(ctx, guest, textureManager, material, in state);
+
+            guest.BindInstance(ctx, in binding, in state, world, _stageOffsets);
+            ctx.DrawIndexed(_geometry.IndexCount);
+        }
+
+        private GuestSceneState ApplyMaterial(in GuestSceneState scene)
+        {
+            var state = scene;
+
+            state.MaterialDiffuse = _diffuse;
+            state.MaterialAmbient = _ambient;
+            state.MaterialSpecular = _specular;
+            state.MaterialEmission = _emission;
+            state.AlphaThreshold = _state.AlphaThreshold;
+
+            return state;
+        }
+
+        private GuestBinding BindStages(
+            SlPassContext ctx, GuestDrawContext guest, TextureManager textureManager,
+            GuestMaterial material, in GuestSceneState state)
+        {
+            Span<SlTextureIndex> stages = stackalloc SlTextureIndex[StageCount];
+
+            for (var i = 0; i < StageCount; i++)
+            {
+                // An unbound stage samples white rather than black: guest shaders
+                // multiply these in, so black would blank the surface.
+                stages[i] = _stageTextures[i] is { } name
+                    ? ResolveIndex(textureManager, name)
+                    : SlTextureIndex.WhiteTexture2D;
+            }
+
+            var binding = guest.BindMaterial(ctx, material, Bucket, _state, in state, stages);
+
+            _geometry.Bind(ctx, slot: 0, GuestMaterial.VertexStride);
+
+            return binding;
+        }
+
+        private static SlTextureIndex ResolveIndex(TextureManager textureManager, string? name)
         {
             var index = textureManager.GetIndex(name);
 
             return index == SlTextureIndex.NullTexture2D
-                ? SlTextureIndex.WhiteTexture2D.Packed
-                : index.Packed;
+                ? SlTextureIndex.WhiteTexture2D
+                : index;
         }
 
         public void Dispose()

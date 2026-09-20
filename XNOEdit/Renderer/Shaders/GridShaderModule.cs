@@ -20,17 +20,14 @@ namespace XNOEdit.Renderer.Shaders
     {
         public GridShader(SlDevice device, ReadOnlySpan<byte> vertex, ReadOnlySpan<byte> pixel)
             : base(device, vertex, pixel, "Grid Shader",
-                new Dictionary<string, SlPipelineVariant>
+                new()
                 {
-                    ["default"] = new()
-                    {
-                        Topology = RenderPrimitiveTopology.LineList,
-                        CullMode = RenderCullMode.None,
-                        FrontFace = RenderFrontFace.Clockwise,
-                        DepthWrite = true,
-                        DepthCompare = RenderComparisonFunction.Greater,
-                        AlphaBlend = true
-                    }
+                    Topology = RenderPrimitiveTopology.LineList,
+                    CullMode = RenderCullMode.None,
+                    FrontFace = RenderFrontFace.Clockwise,
+                    DepthWrite = true,
+                    DepthCompare = RenderComparisonFunction.Greater,
+                    AlphaBlend = true
                 })
         {
         }

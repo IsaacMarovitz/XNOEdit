@@ -8,6 +8,11 @@ namespace Solaris.Graph
         private readonly SlFrame _frame;
         private readonly RenderCommandList* _commandList;
 
+        private float _viewportX;
+        private float _viewportY;
+        private float _viewportWidth;
+        private float _viewportHeight;
+
         internal SlPassContext(
             SlFrame frame, RenderCommandList* commandList, uint width, uint height, in SlPassSignature signature)
         {
@@ -16,6 +21,9 @@ namespace Solaris.Graph
             Width = width;
             Height = height;
             Signature = signature;
+
+            _viewportWidth = width;
+            _viewportHeight = height;
         }
 
         public uint Width { get; }
@@ -40,7 +48,18 @@ namespace Solaris.Graph
 
         public void SetViewport(float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f)
         {
+            _viewportX = x;
+            _viewportY = y;
+            _viewportWidth = width;
+            _viewportHeight = height;
+
             _commandList->SetViewports(new RenderViewport(x, y, width, height, minDepth, maxDepth));
+        }
+
+        public void SetViewportDepthRange(float minDepth, float maxDepth)
+        {
+            _commandList->SetViewports(
+                new RenderViewport(_viewportX, _viewportY, _viewportWidth, _viewportHeight, minDepth, maxDepth));
         }
 
         public void SetScissor(int left, int top, int right, int bottom)

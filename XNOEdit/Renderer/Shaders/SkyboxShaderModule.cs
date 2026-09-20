@@ -20,17 +20,14 @@ namespace XNOEdit.Renderer.Shaders
 
         public SkyboxShader(SlDevice device, ReadOnlySpan<byte> vertex, ReadOnlySpan<byte> pixel)
             : base(device, vertex, pixel, "Skybox Shader",
-                new Dictionary<string, SlPipelineVariant>
+                new()
                 {
-                    ["default"] = new()
-                    {
-                        Topology = RenderPrimitiveTopology.TriangleStrip,
-                        CullMode = RenderCullMode.None,
-                        FrontFace = RenderFrontFace.Clockwise,
-                        DepthWrite = false,
-                        DepthCompare = RenderComparisonFunction.Always,
-                        DepthTest = false
-                    }
+                    Topology = RenderPrimitiveTopology.TriangleStrip,
+                    CullMode = RenderCullMode.None,
+                    FrontFace = RenderFrontFace.Clockwise,
+                    DepthWrite = false,
+                    DepthCompare = RenderComparisonFunction.Always,
+                    DepthTest = false
                 })
         {
         }

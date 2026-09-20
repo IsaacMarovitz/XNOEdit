@@ -25,6 +25,16 @@ namespace XNOEdit.Renderer
         private GetClipboardTextDelegate _getClipboardText;
         private IntPtr _clipboardText;
 
+        private static readonly SlPipelineVariant Variant = new()
+        {
+            Topology = RenderPrimitiveTopology.TriangleList,
+            CullMode = RenderCullMode.None,
+            FrontFace = RenderFrontFace.Clockwise,
+            DepthWrite = false,
+            DepthTest = false,
+            Blend = SlBlendState.AlphaBlend
+        };
+
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public struct ImGuiTexturePush
         {
@@ -120,19 +130,7 @@ namespace XNOEdit.Renderer
                     new SlVertexAttribute("COLOR", 0, 2, RenderFormat.R8G8B8A8Unorm, 16),
                 ]));
 
-            _material = new SlMaterial(_device, vertexShader, pixelShader, layout,
-                new Dictionary<string, SlPipelineVariant>
-                {
-                    ["default"] = new()
-                    {
-                        Topology = RenderPrimitiveTopology.TriangleList,
-                        CullMode = RenderCullMode.None,
-                        FrontFace = RenderFrontFace.Clockwise,
-                        DepthWrite = false,
-                        DepthTest = false,
-                        Blend = SlBlendState.AlphaBlend
-                    }
-                }, "ImGui Shader");
+            _material = new SlMaterial(_device, vertexShader, pixelShader, layout);
         }
 
         public void PrepareFrame()
@@ -480,7 +478,7 @@ namespace XNOEdit.Renderer
             var mvp = Matrix4x4.CreateOrthographicOffCenter(
                 0f, io.DisplaySize.X, io.DisplaySize.Y, 0.0f, -1.0f, 1.0f);
 
-            ctx.SetPipeline(_material.Pipeline(ctx.Signature));
+            ctx.SetPipeline(_material.Pipeline(in Variant, ctx.Signature));
             ctx.PushConstants(in mvp);
             ctx.SetVertexBuffer(0, vertices.View, (uint)sizeof(ImDrawVert));
             ctx.SetIndexBuffer(indices.View);

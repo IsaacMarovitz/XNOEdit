@@ -2,17 +2,13 @@ using Plume;
 
 namespace Solaris
 {
-    /// <summary>
-    /// A shader pair, a vertex layout, and a set of named pipeline variants.
-    /// </summary>
     public sealed unsafe class SlMaterial : IDisposable
     {
         private readonly SlDevice _device;
         private readonly SlShader _vertexShader;
         private readonly SlShader? _pixelShader;
         private readonly SlVertexLayout _vertexLayout;
-        private readonly Dictionary<string, SlPipelineVariant> _variants;
-        private readonly Dictionary<(string Variant, SlPassSignature Signature), SlPipeline> _pipelines = [];
+        private readonly Dictionary<(SlPipelineVariant Variant, SlPassSignature Signature), SlPipeline> _pipelines = [];
 
         private bool _disposed;
 
@@ -21,38 +17,23 @@ namespace Solaris
             SlShader vertexShader,
             SlShader? pixelShader,
             SlVertexLayout vertexLayout,
-            IReadOnlyDictionary<string, SlPipelineVariant> variants,
             string? name = null)
         {
             ArgumentNullException.ThrowIfNull(device);
             ArgumentNullException.ThrowIfNull(vertexShader);
             ArgumentNullException.ThrowIfNull(vertexLayout);
-            ArgumentNullException.ThrowIfNull(variants);
-
-            if (variants.Count == 0)
-                throw new ArgumentException("A material needs at least one pipeline variant.", nameof(variants));
 
             _device = device;
             _vertexShader = vertexShader;
             _pixelShader = pixelShader;
             _vertexLayout = vertexLayout;
-            _variants = new Dictionary<string, SlPipelineVariant>(variants);
 
             Name = name ?? "Material";
-            DefaultVariant = variants.Keys.First();
         }
 
         public string Name { get; }
 
-        /// <summary>The first declared variant, used when a draw names none.</summary>
-        public string DefaultVariant { get; }
-
-        public IReadOnlyCollection<string> Variants => _variants.Keys;
-
-        /// <summary>
-        /// Returns the pipeline for a variant in the given pass, creating it on first use.
-        /// </summary>
-        public SlPipeline Pipeline(string variant, in SlPassSignature signature)
+        public SlPipeline Pipeline(in SlPipelineVariant variant, in SlPassSignature signature)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -61,31 +42,9 @@ namespace Solaris
             if (_pipelines.TryGetValue(key, out var cached))
                 return cached;
 
-            if (!_variants.TryGetValue(variant, out var state))
-            {
-                throw new ArgumentException(
-                    $"'{Name}' has no variant named '{variant}'. Known variants: {string.Join(", ", _variants.Keys)}.",
-                    nameof(variant));
-            }
-
-            var pipeline = Create(state, signature);
+            var pipeline = Create(in variant, in signature);
             _pipelines[key] = pipeline;
             return pipeline;
-        }
-
-        public SlPipeline Pipeline(in SlPassSignature signature) => Pipeline(DefaultVariant, signature);
-
-        /// <summary>
-        /// Creates every variant for a signature up front. Worth calling once per pass
-        /// configuration after load to keep pipeline compilation out of the first frame
-        /// that happens to need it.
-        /// </summary>
-        public void Warm(in SlPassSignature signature)
-        {
-            foreach (var variant in _variants.Keys)
-            {
-                Pipeline(variant, signature);
-            }
         }
 
         private SlPipeline Create(in SlPipelineVariant state, in SlPassSignature signature)
@@ -96,6 +55,8 @@ namespace Solaris
             fixed (RenderInputSlot* slotPointer = slots)
             fixed (RenderInputElement* elementPointer = elements)
             {
+                var specConstant = new RenderSpecConstant { Index = 0, Value = state.SpecConstants };
+
                 var desc = new RenderGraphicsPipelineDesc
                 {
                     PipelineLayout = _device.Layout.Handle,
@@ -118,6 +79,9 @@ namespace Solaris
                     InputSlotsCount = (uint)slots.Length,
                     InputElements = elementPointer,
                     InputElementsCount = (uint)elements.Length,
+
+                    SpecConstants = state.SpecConstants != 0 ? &specConstant : null,
+                    SpecConstantsCount = state.SpecConstants != 0 ? 1u : 0u,
                 };
 
                 if (signature.ColorCount > 0)

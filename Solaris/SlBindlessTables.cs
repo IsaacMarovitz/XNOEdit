@@ -221,17 +221,25 @@ namespace Solaris
             return set;
         }
 
-        /// <summary>
-        /// Slots 0-2 are 1x1 textures with an all-zero component mapping, one per view
-        /// dimension. Combined with PARTIALLY_BOUND this makes an unwritten or released
-        /// slot sample black instead of undefined memory.
-        /// </summary>
+        private readonly record struct ReservedSlot(
+            uint ArraySize,
+            bool Cube,
+            RenderSwizzle Swizzle);
+
+        private static readonly ReservedSlot[] ReservedSlots =
+        [
+            new(1, false, RenderSwizzle.Zero),  // 0: null 2D
+            new(2, false, RenderSwizzle.Zero),  // 1: null 2D array
+            new(6, true,  RenderSwizzle.Zero),  // 2: null cube
+            new(1, false, RenderSwizzle.One),   // 3: white 2D
+            new(2, false, RenderSwizzle.One),   // 4: white 2D array
+        ];
+
         private void CreateNullTextures()
         {
             for (var i = 0u; i < SlTextureIndex.ReservedCount; i++)
             {
-                var isCube = i == SlTextureIndex.NullTextureCube.Slot;
-                var isWhite = i == SlTextureIndex.WhiteTexture2D.Slot;
+                var slot = ReservedSlots[i];
 
                 var descriptor = new SlTextureDescriptor
                 {
@@ -239,10 +247,10 @@ namespace Solaris
                     Height = 1,
                     Depth = 1,
                     MipLevels = 1,
-                    ArraySize = isCube ? 6u : 1u,
+                    ArraySize = slot.ArraySize,
                     Format = RenderFormat.R8Unorm,
                     Dimension = RenderTextureDimension.Texture2D,
-                    Usage = isCube ? SlTextureUsage.Sampled | SlTextureUsage.Cube : SlTextureUsage.Sampled,
+                    Usage = slot.Cube ? SlTextureUsage.Sampled | SlTextureUsage.Cube : SlTextureUsage.Sampled,
                 };
 
                 var plumeDesc = new RenderTextureDesc
@@ -254,13 +262,14 @@ namespace Solaris
                     MipLevels = descriptor.MipLevels,
                     ArraySize = descriptor.ArraySize,
                     Format = descriptor.Format,
+                    Multisampling = new RenderMultisampling(),
                     Flags = descriptor.ToPlumeFlags(),
                 };
 
                 var texture = _device->CreateTexture(&plumeDesc);
 
                 if (texture == null)
-                    throw new InvalidOperationException("Failed to create a null descriptor texture.");
+                    throw new InvalidOperationException($"Failed to create reserved texture {i}.");
 
                 var wrapper = new SlTexture(texture, descriptor, ownsTexture: true);
                 _nullTextures[i] = wrapper;
@@ -268,14 +277,13 @@ namespace Solaris
                 var viewDesc = new RenderTextureViewDesc
                 {
                     Format = descriptor.Format,
-                    Dimension = SlTexture.ToViewDimension(descriptor),
+                    Dimension = slot.Cube
+                        ? RenderTextureViewDimension.TextureCube
+                        : RenderTextureViewDimension.Texture2D,
                     MipLevels = 1,
                     ArraySize = descriptor.ArraySize,
-                    ComponentMapping = isWhite
-                        ? new RenderComponentMapping(
-                            RenderSwizzle.One, RenderSwizzle.One, RenderSwizzle.One, RenderSwizzle.One)
-                        : new RenderComponentMapping(
-                            RenderSwizzle.Zero, RenderSwizzle.Zero, RenderSwizzle.Zero, RenderSwizzle.Zero),
+                    ComponentMapping = new RenderComponentMapping(
+                        slot.Swizzle, slot.Swizzle, slot.Swizzle, slot.Swizzle),
                 };
 
                 var view = texture->CreateTextureView(&viewDesc);

@@ -28,7 +28,7 @@ namespace Solaris
             _block = device.CreateBuffer(
                 capacity,
                 SlBufferUsage.Upload | SlBufferUsage.Vertex | SlBufferUsage.Index |
-                SlBufferUsage.Constant | SlBufferUsage.Structured,
+                SlBufferUsage.Constant | SlBufferUsage.Structured | SlBufferUsage.DeviceAddressable,
                 "UploadRing");
 
             // Written once at construction. The buffer never changes, so this set is
@@ -140,5 +140,8 @@ namespace Solaris
         /// structured buffer. This is the value to push.
         /// </summary>
         public uint ConstantOffset => checked((uint)(ByteOffset / SlUploadRing.ConstantElementSize));
+
+        /// <summary>GPU address of this allocation, for shaders that dereference pointers.</summary>
+        public ulong DeviceAddress => View.Buffer.DeviceAddress + ByteOffset;
     }
 }

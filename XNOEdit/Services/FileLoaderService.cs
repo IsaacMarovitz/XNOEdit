@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
@@ -7,6 +8,7 @@ using Marathon.IO.Types.FileSystem;
 using Pfim;
 using Plume;
 using Solaris;
+using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
 using XNOEdit.Renderer.Renderers;
@@ -92,7 +94,7 @@ namespace XNOEdit.Services
 
         public async Task<ObjectLoadResult?> ReadXnoAsync(
             IFile file,
-            ArcFile? shaderArchive,
+            GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
@@ -124,7 +126,7 @@ namespace XNOEdit.Services
                     cancellationToken.ThrowIfCancellationRequested();
                     progress?.Report(new LoadProgress(LoadStage.CreatingBuffers, "Creating GPU buffers..."));
 
-                    renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, shaderArchive);
+                    renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, guestMaterials);
                 }
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {xno.Name}", 1, 1));
@@ -136,7 +138,7 @@ namespace XNOEdit.Services
         public async Task<MissionLoadResult?> ReadMissionAsync(
             IFile file,
             ResolverContext resolverContext,
-            ArcFile? shaderArchive,
+            GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
@@ -184,7 +186,7 @@ namespace XNOEdit.Services
                         continue;
                     }
 
-                    var xnoResult = await ReadXnoAsync(modelFile, shaderArchive, null, cancellationToken);
+                    var xnoResult = await ReadXnoAsync(modelFile, guestMaterials, null, cancellationToken);
                     if (xnoResult?.ObjectChunk != null)
                     {
                         loadedGroups.Add(new LoadedObjectGroup(
@@ -286,7 +288,7 @@ namespace XNOEdit.Services
 
         public async Task<StageLoadResult?> ReadArcAsync(
             ArcFile file,
-            ArcFile? shaderArchive,
+            GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
@@ -334,7 +336,7 @@ namespace XNOEdit.Services
                         foreach (var tex in textures)
                             loadedTextureNames.Add(tex.Name);
 
-                        var renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, shaderArchive);
+                        var renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, guestMaterials);
 
                         // Disable shadow meshes by default
                         if (xno.Name.Contains("sdw"))
@@ -385,12 +387,20 @@ namespace XNOEdit.Services
             return result;
         }
 
-        private SlTexture? LoadTexture(IFile file)
+                private SlTexture? LoadTexture(IFile file)
         {
             try
             {
-                using var stream = file.Decompress().Open();
-                using var image = Pfimage.FromStream(stream);
+                byte[] bytes;
+
+                using (var stream = file.Decompress().Open())
+                using (var memory = new MemoryStream())
+                {
+                    stream.CopyTo(memory);
+                    bytes = memory.ToArray();
+                }
+
+                using var image = Pfimage.FromStream(new MemoryStream(bytes));
 
                 var mipLevelCount = image.MipMaps != null && image.MipMaps.Length > 0
                     ? (uint)(image.MipMaps.Length + 1)
@@ -399,10 +409,17 @@ namespace XNOEdit.Services
                 Logger.Debug?.PrintMsg(LogClass.Application,
                     $"  Loading {file.Name}: {image.Width}x{image.Height}, {mipLevelCount} mip levels, format: {image.Format}");
 
-                var texture = _device.CreateTexture(
-                    SlTextureDescriptor.Sampled2D(
-                        (uint)image.Width, (uint)image.Height, RenderFormat.B8G8R8A8Unorm, mipLevelCount),
-                    file.Name);
+                var single = image.Format == ImageFormat.Rgb8;
+
+                var descriptor = SlTextureDescriptor.Sampled2D(
+                    (uint)image.Width, (uint)image.Height,
+                    single ? RenderFormat.R8Unorm : RenderFormat.B8G8R8A8Unorm,
+                    mipLevelCount);
+
+                if (single)
+                    descriptor = descriptor with { ComponentMapping = SingleChannelMapping(bytes) };
+
+                var texture = _device.CreateTexture(descriptor, file.Name);
 
                 UploadMipLevel(texture, image.Data, 0, image.Data.Length,
                     image.Width, image.Height, image.Stride, 0, image.Format);
@@ -426,21 +443,65 @@ namespace XNOEdit.Services
             }
         }
 
+        private static RenderComponentMapping SingleChannelMapping(ReadOnlySpan<byte> dds)
+        {
+            const uint DdpfAlpha = 0x2;
+            const uint DdpfLuminance = 0x20000;
+
+            var flags = dds.Length >= 84
+                ? BinaryPrimitives.ReadUInt32LittleEndian(dds[80..84])
+                : 0u;
+
+            if ((flags & DdpfAlpha) != 0)
+            {
+                return new RenderComponentMapping(
+                    RenderSwizzle.Zero, RenderSwizzle.Zero, RenderSwizzle.Zero, RenderSwizzle.R);
+            }
+
+            if ((flags & DdpfLuminance) != 0)
+            {
+                return new RenderComponentMapping(
+                    RenderSwizzle.R, RenderSwizzle.R, RenderSwizzle.R, RenderSwizzle.One);
+            }
+
+            Logger.Warning?.PrintMsg(LogClass.Application,
+                $"Single-channel DDS with neither the alpha nor luminance flag (0x{flags:X})");
+
+            return new RenderComponentMapping(
+                RenderSwizzle.R, RenderSwizzle.R, RenderSwizzle.R, RenderSwizzle.One);
+        }
+
         private void UploadMipLevel(SlTexture texture, byte[] sourceData, int dataOffset, int dataLen,
             int width, int height, int stride, uint mipLevel, ImageFormat format)
         {
             var mipData = new byte[dataLen];
             Array.Copy(sourceData, dataOffset, mipData, 0, dataLen);
 
-            var imageData = ConvertToRgba(mipData, width, height, stride, format);
+            var single = format == ImageFormat.Rgb8;
+
+            var imageData = single
+                ? PackSingleChannel(mipData, width, height, stride)
+                : ConvertToRgba(mipData, width, height, stride, format);
 
             _uploader.StageTexture(
                 texture,
                 imageData,
                 (uint)width,
                 (uint)height,
-                bytesPerRow: (uint)(width * 4),
+                bytesPerRow: (uint)(width * (single ? 1 : 4)),
                 mipLevel: mipLevel);
+        }
+
+        private static byte[] PackSingleChannel(byte[] data, int width, int height, int stride)
+        {
+            var packed = new byte[width * height];
+
+            for (var y = 0; y < height; y++)
+            {
+                Array.Copy(data, y * stride, packed, y * width, width);
+            }
+
+            return packed;
         }
 
         private static byte[] ConvertToRgba(byte[] data, int width, int height, int stride, ImageFormat format)

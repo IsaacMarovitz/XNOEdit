@@ -8,7 +8,7 @@ namespace Solaris.Graph
     /// </summary>
     public sealed unsafe class SlFrameGraph : IDisposable
     {
-        private const ulong RingBlockSize = 8 * 1024 * 1024;
+        private const ulong RingBlockSize = 8 * 1024 * 1024 * 4;
 
         private readonly SlDevice _device;
         private readonly SlSwapChain _swapChain;

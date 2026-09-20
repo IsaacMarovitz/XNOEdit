@@ -9,9 +9,6 @@
     <ItemGroup>
         <Shader Include="grid_vs"             Profile="vs_6_0" InvertY="-fvk-invert-y" />
         <Shader Include="grid_ps"             Profile="ps_6_0" />
-        <Shader Include="model_vs"            Profile="vs_6_0" InvertY="-fvk-invert-y" />
-        <Shader Include="model_ps"            Profile="ps_6_0" />
-        <Shader Include="instanced_model_vs"  Profile="vs_6_0" InvertY="-fvk-invert-y" />
         <Shader Include="skybox_vs"           Profile="vs_6_0" InvertY="-fvk-invert-y" />
         <Shader Include="skybox_ps"           Profile="ps_6_0" />
         <Shader Include="imgui_vs"            Profile="vs_6_0" InvertY="-fvk-invert-y" />

@@ -24,6 +24,7 @@ namespace Solaris
         public uint SampleCount = 1;
         public RenderFormat Format = RenderFormat.Unknown;
         public RenderTextureDimension Dimension = RenderTextureDimension.Texture2D;
+        public RenderComponentMapping ComponentMapping = new RenderComponentMapping();
         public SlTextureUsage Usage = SlTextureUsage.Sampled;
 
         public SlTextureDescriptor() { }
@@ -116,6 +117,7 @@ namespace Solaris
                     Dimension = ToViewDimension(Descriptor),
                     MipLevels = Descriptor.MipLevels,
                     ArraySize = Descriptor.ArraySize,
+                    ComponentMapping = Descriptor.ComponentMapping,
                 };
 
                 _defaultView = _texture->CreateTextureView(&viewDesc);

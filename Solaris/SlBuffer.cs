@@ -11,6 +11,7 @@ namespace Solaris
         Index = 1 << 1,
         Constant = 1 << 2,
         Structured = 1 << 3,
+        DeviceAddressable = 1 << 4,
 
         /// <summary>CPU-writable. Implies an upload heap rather than device-local memory.</summary>
         Upload = 1 << 16,
@@ -34,6 +35,8 @@ namespace Solaris
         public SlBufferUsage Usage { get; }
 
         public bool IsUpload => (Usage & SlBufferUsage.Upload) != 0;
+
+        public ulong DeviceAddress => _buffer->GetDeviceAddress();
 
         internal RenderBuffer* Handle => _buffer;
 

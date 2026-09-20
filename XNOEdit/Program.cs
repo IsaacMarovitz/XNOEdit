@@ -11,13 +11,13 @@ using Plume;
 using SDL3;
 using Solaris;
 using Solaris.Graph;
+using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.ModelResolver;
 using XNOEdit.Panels;
 using XNOEdit.Renderer;
 using XNOEdit.Renderer.Renderers;
-using XNOEdit.Renderer.Scene;
 using XNOEdit.Services;
 using LogLevel = XNOEdit.Logging.LogLevel;
 
@@ -34,7 +34,10 @@ namespace XNOEdit
 
         private static Camera? _camera;
         private static ArcFile? _shaderArchive;
-        private static IScene? _scene;
+        private static GuestMaterialCache? _guestMaterials;
+        private static GuestShaderCache? _guestCache;
+        private static readonly GuestDrawContext _guestDraw = new();
+        private static Scene? _scene;
         private static GridRenderer? _grid;
         private static SkyboxRenderer? _skybox;
         private static Vector3 _modelCenter = Vector3.Zero;
@@ -107,6 +110,7 @@ namespace XNOEdit
 
             _textureManager = new TextureManager(_device);
             _fileLoader = new FileLoaderService(_device, _uploader);
+            _guestCache = GuestShaderCache.Load(_device, Path.Combine(AppContext.BaseDirectory, "shaders"));
 
             Logger.SetEnable(LogLevel.Debug, Configuration.DebugLogs);
 
@@ -168,7 +172,6 @@ namespace XNOEdit
                         SDL.Keycode.F => SettingsToggle.WireframeMode,
                         SDL.Keycode.G => SettingsToggle.ShowGrid,
                         SDL.Keycode.C => SettingsToggle.BackfaceCulling,
-                        SDL.Keycode.V => SettingsToggle.VertexColors,
                         _ => SettingsToggle.None
                     };
 
@@ -269,10 +272,6 @@ namespace XNOEdit
 
             switch (toggle)
             {
-                case SettingsToggle.WireframeMode:
-                    _settings.WireframeMode = !_settings.WireframeMode;
-                    alert = $"Wireframe Mode: {(_settings.WireframeMode ? "ON" : "OFF")}";
-                    break;
                 case SettingsToggle.ShowGrid:
                     _settings.ShowGrid = !_settings.ShowGrid;
                     alert = $"Grid: {(_settings.ShowGrid ? "ON" : "OFF")}";
@@ -280,14 +279,6 @@ namespace XNOEdit
                 case SettingsToggle.BackfaceCulling:
                     _settings.BackfaceCulling = !_settings.BackfaceCulling;
                     alert = $"Backface Culling: {(_settings.BackfaceCulling ? "ON" : "OFF")}";
-                    break;
-                case SettingsToggle.VertexColors:
-                    _settings.VertexColors = !_settings.VertexColors;
-                    alert = $"Vertex Colors: {(_settings.VertexColors ? "ON" : "OFF")}";
-                    break;
-                case SettingsToggle.Lightmap:
-                    _settings.Lightmap = !_settings.Lightmap;
-                    alert = $"Lightmap: {(_settings.Lightmap ? "ON" : "OFF")}";
                     break;
             }
 
@@ -328,7 +319,7 @@ namespace XNOEdit
             var setName = Path.GetFileNameWithoutExtension(setFile.Name);
             var terrainPath = MissionsMap.GetTerrainPath(setName);
 
-            var currentStage = _scene as StageScene;
+            var currentStage = _scene;
             var canReuseTerrain = currentStage?.TerrainName == terrainPath && terrainPath != null;
 
             if (canReuseTerrain)
@@ -336,7 +327,7 @@ namespace XNOEdit
                 // Same terrain, just clear objects and load new SET
                 DispatchToMainThread(() =>
                 {
-                    currentStage!.ClearInstancedRenderers();
+                    currentStage!.ClearPlaced();
                 });
             }
             else if (terrainPath != null)
@@ -365,7 +356,7 @@ namespace XNOEdit
                 DispatchToMainThread(() =>
                 {
                     _scene?.Dispose();
-                    _scene = new StageScene(_device, []);
+                    _scene = new Scene(_device, []);
                 });
             }
 
@@ -387,10 +378,7 @@ namespace XNOEdit
 
                 visibility.VisibilityChanged += (objectIndex, meshIndex, visible) =>
                 {
-                    if (_scene is ObjectScene objectScene)
-                    {
-                        objectScene.SetVisible(objectIndex, meshIndex, visible);
-                    }
+                    _scene?.SetObjectVisible(0, objectIndex, meshIndex, visible);
                 };
 
                 SDL.SetWindowTitle(_window, $"XNOEdit - {result.Xno.Name}");
@@ -407,7 +395,7 @@ namespace XNOEdit
                 }
 
                 _scene?.Dispose();
-                _scene = new ObjectScene(result.Renderer);
+                _scene = new Scene(_device, [result.Renderer]);
 
                 _modelCenter = result.ObjectChunk.Centre;
                 SetModelRadius(result.ObjectChunk.Radius);
@@ -435,22 +423,16 @@ namespace XNOEdit
 
             visibility.XnoVisibilityChanged += (xnoIndex, visible) =>
             {
-                if (_scene is StageScene stageScene)
-                {
-                    stageScene.SetVisible(xnoIndex, visible);
-                }
+                _scene?.SetVisible(xnoIndex, visible);
             };
 
             visibility.ObjectVisibilityChanged += (xnoIndex, objectIndex, meshIndex, visible) =>
             {
-                if (_scene is StageScene stageScene)
-                {
-                    stageScene.SetObjectVisible(xnoIndex, objectIndex, meshIndex, visible);
-                }
+                _scene?.SetObjectVisible(xnoIndex, objectIndex, meshIndex, visible);
             };
 
             _scene?.Dispose();
-            _scene = new StageScene(_device, renderers, result.Name);
+            _scene = new Scene(_device, renderers, result.Name);
             _modelCenter = Vector3.Zero;
 
             SetModelRadius(result.MaxRadius);
@@ -458,10 +440,10 @@ namespace XNOEdit
 
         private static void ApplyMissionResult(MissionLoadResult result)
         {
-            if (_scene is not StageScene stageScene)
+            if (_scene is not { } scene)
                 return;
 
-            stageScene.ClearInstancedRenderers();
+            scene.ClearPlaced();
 
             foreach (var type in result.FailedTypes)
             {
@@ -484,20 +466,20 @@ namespace XNOEdit
 
             foreach (var group in result.LoadedGroups)
             {
-                var renderer = new InstancedModelRenderer(
+                var renderer = new ModelRenderer(
                     _device,
                     group.ObjectResult.ObjectChunk,
                     group.ObjectResult.Xno.GetChunk<TextureListChunk>(),
                     group.ObjectResult.Xno.GetChunk<EffectListChunk>(),
-                    _shaderArchive);
+                    _guestMaterials);
 
-                var instanceData = group.Instances
-                    .Select(i => InstanceData.Create(i.Position, i.Rotation))
+                var instances = group.Instances
+                    .Select(i => Matrix4x4.CreateFromQuaternion(i.Rotation) * Matrix4x4.CreateTranslation(i.Position))
                     .ToArray();
 
-                renderer.SetInstances(instanceData);
+                renderer.SetInstances(instances);
 
-                stageScene.AddInstancedRenderer(group.ModelPath, renderer);
+                scene.AddPlaced(group.ModelPath, renderer);
 
                 // Add textures to texture manager
                 foreach (var tex in group.ObjectResult.Textures)
@@ -585,11 +567,9 @@ namespace XNOEdit
                             SunDirection = _settings.SunDirection,
                             SunColor = _settings.SunColor,
                             Position = _camera.Position,
-                            VertColorStrength = _settings.VertexColors ? 1.0f : 0.0f,
-                            Wireframe = _settings.WireframeMode,
                             CullBackfaces = _settings.BackfaceCulling,
+                            GuestDraw = _guestDraw,
                             TextureManager = _textureManager,
-                            Lightmap = _settings.Lightmap,
                         });
                 });
 
@@ -674,6 +654,7 @@ namespace XNOEdit
             try
             {
                 _shaderArchive = new ArcFile(shaderArcPath);
+                _guestMaterials = new GuestMaterialCache(_device, _guestCache, _shaderArchive);
                 InitializeLoadChain();
                 UIManager.TriggerAlert(AlertLevel.Info, "Loaded shader.arc");
             }
@@ -685,7 +666,7 @@ namespace XNOEdit
 
         private static void InitializeLoadChain()
         {
-            _loadChain = new LoadChain(_fileLoader, _shaderArchive);
+            _loadChain = new LoadChain(_fileLoader, _guestMaterials);
 
             _loadChain.ProgressChanged += progress =>
             {
@@ -757,8 +738,6 @@ namespace XNOEdit
         WireframeMode,
         ShowGrid,
         BackfaceCulling,
-        VertexColors,
-        Lightmap,
         None
     }
 }
