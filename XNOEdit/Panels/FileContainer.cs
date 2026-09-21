@@ -20,9 +20,8 @@ namespace XNOEdit.Panels
             _files.Clear();
         }
 
-        public void AddFromArcPath(string arcPath, string pattern)
+        public void AddFromArc(ArcFile archive, string pattern)
         {
-            var archive = new ArcFile(arcPath);
             _files.AddRange(archive.EnumerateFiles(pattern, SearchOption.AllDirectories));
         }
 

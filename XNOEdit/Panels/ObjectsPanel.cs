@@ -32,45 +32,17 @@ namespace XNOEdit.Panels
             _object.Clear();
             _win32.Clear();
 
-            var enemyArcPath = Path.Join(
-                Configuration.GameFolder,
-                "xenon",
-                "archives",
-                "enemy.arc"
-            );
+            _enemy.AddFromArc(ArcFiles.EnemyArc, "*.xno");
+            _human.AddFromArc(ArcFiles.HumanArc, "*.xno");
+            _object.AddFromArc(ArcFiles.ObjectArc, "*.xno");
 
-            var humanArcPath = Path.Join(
-                Configuration.GameFolder,
-                "xenon",
-                "archives",
-                "human.arc"
-            );
-
-            var objectArcPath = Path.Join(
-                Configuration.GameFolder,
-                "xenon",
-                "archives",
-                "object.arc"
-            );
-
-            _enemy.AddFromArcPath(enemyArcPath, "*.xno");
-            _human.AddFromArcPath(humanArcPath, "*.xno");
-            _object.AddFromArcPath(objectArcPath, "*.xno");
-
-            var objectArchive = new ArcFile(objectArcPath);
-            var commonFile = objectArchive.GetFile("/xenon/object/Common.bin");
-            var pathObjFile = objectArchive.GetFile("/xenon/object/PathObj.bin");
+            var commonFile = ArcFiles.ObjectArc.GetFile("/xenon/object/Common.bin");
+            var pathObjFile = ArcFiles.ObjectArc.GetFile("/xenon/object/PathObj.bin");
 
             PhysicsParameters = new ObjectPhysicsParameterList(commonFile.Decompress());
             PathParameters = new PathObjParameterList(pathObjFile.Decompress());
 
-            var win32Path = Path.Join(
-                Configuration.GameFolder,
-                "win32",
-                "archives"
-            );
-
-            foreach (var file in Directory.EnumerateFiles(win32Path, "*.arc", SearchOption.AllDirectories))
+            foreach (var file in Directory.EnumerateFiles(ArcFiles.Win32ArcFolder, "*.arc", SearchOption.AllDirectories))
             {
                 var arc = new ArcFile(file);
 

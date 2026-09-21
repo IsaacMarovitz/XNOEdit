@@ -232,7 +232,7 @@ namespace Solaris
             new(2, false, RenderSwizzle.Zero),  // 1: null 2D array
             new(6, true,  RenderSwizzle.Zero),  // 2: null cube
             new(1, false, RenderSwizzle.One),   // 3: white 2D
-            new(2, false, RenderSwizzle.One),   // 4: white 2D array
+            new(4, false, RenderSwizzle.One),   // 4: white 2D array
         ];
 
         private void CreateNullTextures()

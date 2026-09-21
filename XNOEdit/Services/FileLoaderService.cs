@@ -72,6 +72,7 @@ namespace XNOEdit.Services
         string Name,
         List<ArcXnoEntry> Entries,
         List<LoadedTexture> Textures,
+        SceneConfig? SceneConfig,
         float MaxRadius
     );
 
@@ -292,6 +293,9 @@ namespace XNOEdit.Services
             IProgress<LoadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
+            var configTask = StageConfigsMap.GetSceneConfig(file.Name.Replace(".arc", ""));
+            var config = await configTask;
+
             return await Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -353,7 +357,7 @@ namespace XNOEdit.Services
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {name}", total, total));
 
-                return new StageLoadResult(name, entries, allTextures, maxRadius);
+                return new StageLoadResult(name, entries, allTextures, config, maxRadius);
             }, cancellationToken);
         }
 

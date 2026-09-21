@@ -3,8 +3,13 @@ using System.Runtime.InteropServices;
 
 namespace XNOEdit.Guest
 {
-    public static class GuestVertexRegisters
+    public static class GuestRegisters
     {
+        public const uint MaterialDiffuse = 0;
+        public const uint MaterialAmbient = 1;
+        public const uint MaterialSpecular = 2;
+        public const uint MaterialEmission = 3;
+        public const uint Misc = 4;
         public const uint OffsetUv = 5;             // 2 registers
         public const uint Ols = 8;                  // 6: sun colour, Rayleigh/Mie
         public const uint RtDimensions = 14;
@@ -29,23 +34,6 @@ namespace XNOEdit.Guest
         public const uint SystemLightMapWork = 194;
 
         /// <summary>First per-effect local register; nothing below is shader specific.</summary>
-        public const uint LocalsBase = 210;
-    }
-
-    public static class GuestPixelRegisters
-    {
-        public const uint MaterialDiffuse = 0;
-        public const uint MaterialAmbient = 1;
-        public const uint MaterialSpecular = 2;
-        public const uint MaterialEmission = 3;
-        public const uint Misc = 4;
-        public const uint KhronosParam = 16;
-        public const uint LightMiscAmbient = 28;
-        public const uint LightMiscEyePos = 29;
-        public const uint LightMiscEyeVec = 30;
-        public const uint DirectionalLights = 31;
-        public const uint PointLights = 39;
-
         public const uint LocalsBase = 210;
     }
 
@@ -87,8 +75,6 @@ namespace XNOEdit.Guest
                 _registers[register + 3] = new Vector4(t.M41, t.M42, t.M43, t.M44);
             }
         }
-
-        public ReadOnlySpan<byte> AsBytes() => MemoryMarshal.AsBytes<Vector4>(_registers);
     }
 
     /// <summary>

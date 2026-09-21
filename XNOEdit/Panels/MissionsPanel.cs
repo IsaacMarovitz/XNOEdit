@@ -150,10 +150,7 @@ namespace XNOEdit.Panels
             foreach (var leaf in leaves)
                 leaf.Container!.Clear();
 
-            var scriptsArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "scripts.arc");
-            var scriptsArchive = new ArcFile(scriptsArcPath);
-
-            foreach (var node in scriptsArchive.EnumerateFiles("*.set", SearchOption.AllDirectories))
+            foreach (var node in ArcFiles.ScriptsArc.EnumerateFiles("*.set", SearchOption.AllDirectories))
             {
                 var name = Path.GetFileNameWithoutExtension(node.Path);
                 var leaf = leaves.FirstOrDefault(l => l.MissionGroup.Missions.Contains(name));

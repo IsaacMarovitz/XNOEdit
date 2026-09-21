@@ -8,15 +8,15 @@ namespace XNOEdit.Guest
     {
         private readonly SlDevice _device;
         private readonly GuestShaderCache _cache;
-        private readonly ArcFile _shaderArchive;
+        private readonly GuestTechniqueTable _techniques;
 
-        private readonly Dictionary<string, GuestMaterial?> _materials = [];
+        private readonly Dictionary<(string Path, (int Vertex, int Pixel) Indices), GuestMaterial?> _materials = [];
 
-        public GuestMaterialCache(SlDevice device, GuestShaderCache cache, ArcFile shaderArchive)
+        public GuestMaterialCache(SlDevice device, GuestShaderCache cache, GuestTechniqueTable techniques)
         {
             _device = device;
             _cache = cache;
-            _shaderArchive = shaderArchive;
+            _techniques = techniques;
         }
 
         public GuestMaterial? Resolve(string? effectName, string? techniqueName)
@@ -24,17 +24,18 @@ namespace XNOEdit.Guest
             if (string.IsNullOrEmpty(effectName))
                 return null;
 
-            var directory = MapTechnique(techniqueName);
-            var path = $"xenon/shader/{directory}/{effectName}o";
+            var path = $"xenon/shader/std/{effectName}o";
+            var indices = _techniques.Resolve(effectName, techniqueName);
+            var key = (path, indices);
 
-            if (_materials.TryGetValue(path, out var cached))
+            if (_materials.TryGetValue(key, out var cached))
                 return cached;
 
             GuestMaterial? material = null;
 
             try
             {
-                var file = _shaderArchive.GetFile(path);
+                var file = ArcFiles.ShaderArc.GetFile(path);
 
                 if (file != null)
                 {
@@ -43,37 +44,16 @@ namespace XNOEdit.Guest
                     stream.CopyTo(memory);
 
                     material = GuestMaterial.Create(
-                        _device, _cache, $"{directory}/{effectName}", memory.ToArray());
-                }
-                else
-                {
-                    Logger.Debug?.PrintMsg(LogClass.Application, $"No '{path}' in shader.arc");
+                        _device, _cache, path, memory.ToArray(), indices.Vertex, indices.Pixel);
                 }
             }
             catch (Exception ex)
             {
-                Logger.Warning?.PrintMsg(LogClass.Application, $"Failed to load guest shader '{path}': {ex.Message}");
+                Logger.Error?.PrintMsg(LogClass.Application, $"Failed to load guest shader '{path}': {ex.Message}");
             }
 
-            _materials[path] = material;
+            _materials[key] = material;
             return material;
-        }
-
-        private static string MapTechnique(string? techniqueName)
-        {
-            if (string.IsNullOrEmpty(techniqueName))
-                return "std";
-
-            return techniqueName.ToLowerInvariant() switch
-            {
-                "std" or "default" => "std",
-                "std_np" => "std_np",
-                "lm" => "lm",
-                "lm_np" => "lm_np",
-                "skin" => "skin",
-                "morph" => "morph",
-                _ => "std",
-            };
         }
 
         public void Dispose()

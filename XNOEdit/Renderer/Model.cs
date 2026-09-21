@@ -158,8 +158,8 @@ namespace XNOEdit.Renderer
                         var vertexListIndex = meshSet.VertexListIndex;
                         var primitiveList = meshSet.GetPrimitiveList(objectChunk);
                         var material = meshSet.GetMaterial(objectChunk);
-                        string effectName = null;
-                        string techniqueName = null;
+                        string? effectName = null;
+                        string? techniqueName = null;
 
                         if (effectListChunk != null)
                         {
@@ -434,7 +434,7 @@ namespace XNOEdit.Renderer
                     : SlTextureIndex.WhiteTexture2D;
             }
 
-            var binding = guest.BindMaterial(ctx, material, Bucket, _state, in state, stages);
+            var binding = guest.BindMaterial(ctx, material, Bucket, _state, in state, stages, _stageOffsets);
 
             _geometry.Bind(ctx, slot: 0, GuestMaterial.VertexStride);
 

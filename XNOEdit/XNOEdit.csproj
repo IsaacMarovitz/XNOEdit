@@ -14,6 +14,7 @@
         <PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
         <PackageReference Include="Hexa.NET.ImGuizmo" Version="2.2.9" />
         <PackageReference Include="Pfim" Version="0.11.3" />
+        <PackageReference Include="LuaCSharp" Version="0.5.6" />
     </ItemGroup>
 
     <ItemGroup>

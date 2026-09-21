@@ -33,15 +33,13 @@ namespace XNOEdit.Guest
                    || effect.StartsWith("EndSky", StringComparison.Ordinal);
         }
 
-        public static GuestMaterial? Create(SlDevice device, GuestShaderCache cache, string name, byte[] fxo)
+        public static GuestMaterial? Create(
+            SlDevice device, GuestShaderCache cache, string name, byte[] fxo, int vertexIndex, int pixelIndex)
         {
-            ArgumentNullException.ThrowIfNull(device);
-            ArgumentNullException.ThrowIfNull(cache);
-
             var containers = GuestShaderContainer.Scan(fxo);
 
-            var vertexContainer = containers.FirstOrDefault(c => c.Stage == GuestShaderStage.Vertex);
-            var pixelContainer = containers.FirstOrDefault(c => c.Stage == GuestShaderStage.Pixel);
+            var vertexContainer = Select(containers, GuestShaderStage.Vertex, vertexIndex, name);
+            var pixelContainer = Select(containers, GuestShaderStage.Pixel, pixelIndex, name);
 
             if (vertexContainer == null || pixelContainer == null)
             {
@@ -75,6 +73,23 @@ namespace XNOEdit.Guest
                 device,
                 material,
                 name);
+        }
+
+        private static GuestShaderContainer? Select(
+            List<GuestShaderContainer> containers, GuestShaderStage stage, int index, string name)
+        {
+            var matching = containers.Where(c => c.Stage == stage).ToList();
+
+            if (matching.Count == 0)
+                return null;
+
+            if (index < matching.Count)
+                return matching[index];
+
+            Logger.Warning?.PrintMsg(LogClass.Application,
+                $"'{name}' has {matching.Count} {stage} shader(s), wanted index {index}");
+
+            return matching[0];
         }
 
         public SlPipelineVariant Variant(GuestDrawBucket bucket, in GuestMeshState state, bool cull)

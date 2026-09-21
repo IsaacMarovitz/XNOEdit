@@ -41,6 +41,7 @@ namespace XNOEdit
         private static GridRenderer? _grid;
         private static SkyboxRenderer? _skybox;
         private static Vector3 _modelCenter = Vector3.Zero;
+        private static SceneConfig? _sceneConfig;
         private static float _modelRadius = 1.0f;
         private static RenderSettings _settings = new();
         private static UIManager UIManager;
@@ -332,19 +333,12 @@ namespace XNOEdit
             }
             else if (terrainPath != null)
             {
-                // Different terrain, load the arc
-                var fullPath = Path.Join(
-                    Configuration.GameFolder,
-                    "win32",
-                    "archives",
-                    $"{terrainPath}.arc"
-                );
-
-                if (File.Exists(fullPath))
+                try
                 {
-                    _loadChain?.AddArc(new ArcFile(fullPath));
+                    // Different terrain, load the arc
+                    _loadChain?.AddArc(ArcFiles.Win32Arc(terrainPath));
                 }
-                else
+                catch (Exception)
                 {
                     UIManager.TriggerAlert(AlertLevel.Warning, $"Failed to find terrain at {terrainPath}.arc");
                     return;
@@ -360,11 +354,9 @@ namespace XNOEdit
                 });
             }
 
-            var objectArcPath = Path.Join(Configuration.GameFolder, "xenon", "archives", "object.arc");
-            var objectArchive = new ArcFile(objectArcPath);
             var physicsParams = UIManager.ObjectsPanel?.PhysicsParameters.Parameters ?? [];
             var pathParams = UIManager.ObjectsPanel?.PathParameters.Parameters ?? [];
-            var resolverContext = new ResolverContext(physicsParams, pathParams, _propActors, objectArchive);
+            var resolverContext = new ResolverContext(physicsParams, pathParams, _propActors, ArcFiles.ObjectArc);
 
             _loadChain?.AddSet(setFile, resolverContext);
             _loadChain?.Start();
@@ -396,6 +388,7 @@ namespace XNOEdit
 
                 _scene?.Dispose();
                 _scene = new Scene(_device, [result.Renderer]);
+                _sceneConfig = null;
 
                 _modelCenter = result.ObjectChunk.Centre;
                 SetModelRadius(result.ObjectChunk.Radius);
@@ -434,6 +427,7 @@ namespace XNOEdit
             _scene?.Dispose();
             _scene = new Scene(_device, renderers, result.Name);
             _modelCenter = Vector3.Zero;
+            _sceneConfig = result.SceneConfig;
 
             SetModelRadius(result.MaxRadius);
         }
@@ -564,12 +558,12 @@ namespace XNOEdit
                     _scene?.Render(ctx, view, projection,
                         new ModelParameters
                         {
-                            SunDirection = _settings.SunDirection,
-                            SunColor = _settings.SunColor,
                             Position = _camera.Position,
                             CullBackfaces = _settings.BackfaceCulling,
                             GuestDraw = _guestDraw,
                             TextureManager = _textureManager,
+                            Scene = _sceneConfig ?? new SceneConfig(),
+                            EnvMap = new SlTextureIndex()
                         });
                 });
 
@@ -622,25 +616,9 @@ namespace XNOEdit
         private static void LoadGameFolderResources()
         {
             UIManager.LoadGameFolderResources();
-
-            var shaderArcPath = Path.Join(
-                Configuration.GameFolder,
-                "xenon",
-                "archives",
-                "shader.arc"
-            );
-
-            var gameArcPath = Path.Join(
-                Configuration.GameFolder,
-                "xenon",
-                "archives",
-                "game.arc"
-            );
-
             try
             {
-                var gameArchive = new ArcFile(gameArcPath);
-                foreach (var file in gameArchive.EnumerateFiles("*.prop", SearchOption.AllDirectories))
+                foreach (var file in ArcFiles.GameArc.EnumerateFiles("*.prop", SearchOption.AllDirectories))
                 {
                     var propLibrary = new PropLibrary(file.Decompress());
                     _propActors.AddRange(propLibrary.Actors);
@@ -653,8 +631,10 @@ namespace XNOEdit
 
             try
             {
-                _shaderArchive = new ArcFile(shaderArcPath);
-                _guestMaterials = new GuestMaterialCache(_device, _guestCache, _shaderArchive);
+                var techniquePath = Path.Combine(AppContext.BaseDirectory, "shaders", "shader_techniques.bin");
+                var techniqueTable = GuestTechniqueTable.Load(new FileStream(techniquePath, FileMode.Open));
+
+                _guestMaterials = new GuestMaterialCache(_device, _guestCache, techniqueTable);
                 InitializeLoadChain();
                 UIManager.TriggerAlert(AlertLevel.Info, "Loaded shader.arc");
             }

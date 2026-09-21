@@ -10,22 +10,24 @@ namespace XNOEdit.Renderer.Renderers
 {
     public struct ModelParameters
     {
-        public Vector3 SunDirection;
-        public Vector3 SunColor;
         public Vector3 Position;
         public bool CullBackfaces;
         public GuestDrawPhase GuestPhase;
         public GuestDrawContext GuestDraw;
         public TextureManager TextureManager;
+        public SceneConfig Scene;
+        public SlTextureIndex EnvMap;
 
         public readonly GuestSceneState ToSceneState(Matrix4x4 view, Matrix4x4 projection) => new()
         {
             View = view,
             Projection = projection,
             CameraPosition = Position,
-            SunDirection = SunDirection,
-            SunColor = SunColor,
-            Ambient = SunColor * 0.3f,
+            Ambient = Scene.Ambient,
+            Main = Scene.Main,
+            Sub = Scene.Sub,
+            Ols = Scene.Ols,
+            EnvMap = EnvMap,
             CullBackfaces = CullBackfaces,
         };
     }
