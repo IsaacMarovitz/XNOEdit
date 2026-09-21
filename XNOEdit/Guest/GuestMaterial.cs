@@ -120,6 +120,9 @@ namespace XNOEdit.Guest
                 DepthCompare = IsSky ? RenderComparisonFunction.GreaterEqual : state.DepthCompare,
                 Blend = bucket == GuestDrawBucket.Transparent && state.BlendEnabled ? state.Blend : null,
                 SpecConstants = state.AlphaTest ? (uint)GuestSpecConstants.AlphaTest : 0,
+                ColorWriteMask = RenderColorWriteEnable.Red
+                                 | RenderColorWriteEnable.Green
+                                 | RenderColorWriteEnable.Blue,
             };
         }
 
