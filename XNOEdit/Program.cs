@@ -631,10 +631,7 @@ namespace XNOEdit
 
             try
             {
-                var techniquePath = Path.Combine(AppContext.BaseDirectory, "shaders", "shader_techniques.bin");
-                var techniqueTable = GuestTechniqueTable.Load(new FileStream(techniquePath, FileMode.Open));
-
-                _guestMaterials = new GuestMaterialCache(_device, _guestCache, techniqueTable);
+                _guestMaterials = new GuestMaterialCache(_device, _guestCache);
                 InitializeLoadChain();
                 UIManager.TriggerAlert(AlertLevel.Info, "Loaded shader.arc");
             }

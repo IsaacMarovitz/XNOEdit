@@ -34,12 +34,26 @@ namespace XNOEdit.Guest
         }
 
         public static GuestMaterial? Create(
-            SlDevice device, GuestShaderCache cache, string name, byte[] fxo, int vertexIndex, int pixelIndex)
+            SlDevice device, GuestShaderCache cache, string name, byte[] fxo, string? techniqueName)
         {
             var containers = GuestShaderContainer.Scan(fxo);
+            var techniques = GuestEffect.ScanTechniques(fxo, containers);
 
-            var vertexContainer = Select(containers, GuestShaderStage.Vertex, vertexIndex, name);
-            var pixelContainer = Select(containers, GuestShaderStage.Pixel, pixelIndex, name);
+            var technique = techniques.FirstOrDefault(t => t.Name == techniqueName);
+
+            if (technique.Name == null)
+            {
+                if (techniqueName != null && techniques.Count > 0)
+                {
+                    Logger.Warning?.PrintMsg(LogClass.Application,
+                        $"'{name}' has no technique '{techniqueName}'; using '{techniques[0].Name}'");
+                }
+
+                technique = techniques.Count > 0 ? techniques[0] : new GuestTechnique(string.Empty, 0, 0);
+            }
+
+            var vertexContainer = Select(containers, GuestShaderStage.Vertex, technique.Vertex, name);
+            var pixelContainer = Select(containers, GuestShaderStage.Pixel, technique.Pixel, name);
 
             if (vertexContainer == null || pixelContainer == null)
             {

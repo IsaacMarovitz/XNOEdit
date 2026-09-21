@@ -17,11 +17,14 @@ namespace XNOEdit.Guest
         private const uint FlagMask = 0xFFFFFF00;
         private const uint FlagMatch = 0x102A1100;
 
-        private GuestShaderContainer(ulong hash, GuestShaderStage stage)
+        private GuestShaderContainer(int offset, ulong hash, GuestShaderStage stage)
         {
+            Offset = offset;
             Hash = hash;
             Stage = stage;
         }
+
+        public int Offset { get; }
 
         public ulong Hash { get; }
 
@@ -63,6 +66,7 @@ namespace XNOEdit.Guest
                     var stage = (flags & 0x1) != 0 ? GuestShaderStage.Vertex : GuestShaderStage.Pixel;
 
                     results.Add(new GuestShaderContainer(
+                        i,
                         XxHash3.HashToUInt64(container),
                         stage));
 
