@@ -302,6 +302,7 @@ namespace XNOEdit.Renderer
         private readonly Vector4 _ambient;
         private readonly Vector4 _specular;
         private readonly Vector4 _emission;
+        private readonly float _power;
 
         private readonly Vector2[] _stageOffsets = new Vector2[StageCount];
         private readonly string?[] _stageTextures = new string?[StageCount];
@@ -336,6 +337,7 @@ namespace XNOEdit.Renderer
             _ambient = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient);
             _specular = PropertyUtility.MaterialColorToVec4(material.Colour.Specular);
             _emission = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive);
+            _power = material.Colour.Power;
         }
 
         private void BuildStageTextures(Material material, TextureListChunk? textureList)
@@ -414,6 +416,7 @@ namespace XNOEdit.Renderer
             state.MaterialAmbient = _ambient;
             state.MaterialSpecular = _specular;
             state.MaterialEmission = _emission;
+            state.MaterialPower = _power;
             state.AlphaThreshold = _state.AlphaThreshold;
 
             return state;

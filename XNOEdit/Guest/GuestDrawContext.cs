@@ -29,6 +29,7 @@ namespace XNOEdit.Guest
         public Vector4 MaterialAmbient;
         public Vector4 MaterialSpecular;
         public Vector4 MaterialEmission;
+        public float MaterialPower;
 
         public float AlphaThreshold;
         public bool CullBackfaces;
@@ -123,6 +124,8 @@ namespace XNOEdit.Guest
             file.Set(GuestRegisters.MaterialAmbient, scene.MaterialAmbient);
             file.Set(GuestRegisters.MaterialSpecular, scene.MaterialSpecular);
             file.Set(GuestRegisters.MaterialEmission, scene.MaterialEmission);
+
+            file.Set(GuestRegisters.Misc, new Vector4(0.0f, 0.0f, 0.0f, scene.MaterialPower));
 
             file.Set(GuestRegisters.LightMiscAmbient, Intensity(scene.Ambient));
             file.Set(GuestRegisters.LightMiscEyePos, scene.CameraPosition, 1.0f);
