@@ -195,11 +195,12 @@ namespace XNOEdit
             { "stage_e0106", "event/scene_e0106.lub" },
             { "stage_e0120", "event/scene_e0120.lub" },
             { "stage_e0125", "event/scene_e0125.lub" },
-            { "stage_e0206", "event/stage_e0206.lub" },
-            { "stage_e0214", "event/stage_e0214.lub" },
-            { "stage_e0216", "event/stage_e0216.lub" },
-            { "stage_e0221", "event/stage_e0221.lub" },
-            { "stage_e0304", "event/stage_e0304.lub" },
+            // TODO: Check if this is right
+            { "stage_e0206", "event/scene_e0031.lub" },
+            { "stage_e0214", "event/scene_e0214.lub" },
+            { "stage_e0216", "event/scene_e0216.lub" },
+            { "stage_e0221", "event/scene_e0221.lub" },
+            { "stage_e0304", "event/scene_e0304.lub" },
         };
     }
 }
