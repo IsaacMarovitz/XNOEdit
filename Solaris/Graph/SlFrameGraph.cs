@@ -21,10 +21,10 @@ namespace Solaris.Graph
         private readonly bool[] _slotInFlight = new bool[SlDevice.FramesInFlight];
         private bool _disposed;
 
-        public SlFrameGraph(SlDevice device, RenderWindow window, RenderFormat format, uint maxFrameLatency = 0)
+        public SlFrameGraph(SlDevice device, SlSurface surface, RenderFormat format, uint maxFrameLatency = 0)
         {
             _device = device;
-            _swapChain = new SlSwapChain(device, window, format, 2, maxFrameLatency);
+            _swapChain = new SlSwapChain(device, surface.ToPlume(), format, 2, maxFrameLatency);
 
             for (var i = 0; i < SlDevice.FramesInFlight; i++)
             {

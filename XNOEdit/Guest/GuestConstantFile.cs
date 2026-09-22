@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace XNOEdit.Guest
@@ -87,10 +88,10 @@ namespace XNOEdit.Guest
     {
         public const int TextureSlots = 16;
 
-        public unsafe fixed uint Texture2DIndices[TextureSlots];
-        public unsafe fixed uint Texture2DArrayIndices[TextureSlots];
-        public unsafe fixed uint TextureCubeIndices[TextureSlots];
-        public unsafe fixed uint SamplerIndices[TextureSlots];
+        public GuestTextureSlots Texture2DIndices;
+        public GuestTextureSlots Texture2DArrayIndices;
+        public GuestTextureSlots TextureCubeIndices;
+        public GuestTextureSlots SamplerIndices;
 
         public uint Booleans;
         public uint SwappedTexcoords;
@@ -108,6 +109,12 @@ namespace XNOEdit.Guest
         public float AlphaThreshold;
         public uint ConditionalSurveyIndex;
         public uint ConditionalRenderingIndex;
+
+        [InlineArray(GuestSharedConstants.TextureSlots)]
+        public struct GuestTextureSlots
+        {
+            private uint _element0;
+        }
     }
 
     [Flags]

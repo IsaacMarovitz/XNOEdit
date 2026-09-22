@@ -237,7 +237,7 @@ namespace XNOEdit.Panels
             ImGui.Text($"Z Compare Function: {PropertyUtility.CompareFunctionToString(material.Logic.ZCompareFunction)}");
         }
 
-        private unsafe void RenderTextureChunk(TextureManager textureManager, TextureListChunk textureListChunk)
+        private void RenderTextureChunk(TextureManager textureManager, TextureListChunk textureListChunk)
         {
             if (ImGui.BeginTabItem("Texture List"))
             {
@@ -262,7 +262,7 @@ namespace XNOEdit.Panels
                         var textureId = textureManager.GetImGuiTextureId(texture.Name);
                         if (textureId != 0)
                         {
-                            ImGui.Image(new ImTextureRef(null, textureId), new Vector2(150, 150));
+                            ImGuiInterop.Image(textureId, new Vector2(150, 150));
                         }
                     }
                 }

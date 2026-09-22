@@ -30,6 +30,9 @@ namespace Solaris
         private readonly List<nint> _nameAllocations = [];
         private bool _disposed;
 
+        internal ReadOnlySpan<RenderInputSlot> Slots => _slots;
+        internal ReadOnlySpan<RenderInputElement> Elements => _elements;
+
         public SlVertexLayout(params SlVertexBufferLayout[] layouts)
         {
             ArgumentNullException.ThrowIfNull(layouts);
@@ -63,10 +66,6 @@ namespace Solaris
 
             _elements = [.. elements];
         }
-
-        public ReadOnlySpan<RenderInputSlot> Slots => _slots;
-
-        public ReadOnlySpan<RenderInputElement> Elements => _elements;
 
         private sbyte* AllocateName(string name)
         {

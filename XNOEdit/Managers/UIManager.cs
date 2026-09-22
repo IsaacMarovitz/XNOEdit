@@ -43,7 +43,7 @@ namespace XNOEdit.Managers
 
         private ImFontPtr _faFont;
 
-        public unsafe void OnLoad(ImGuiController controller, SlDevice device, nint window)
+        public void OnLoad(ImGuiController controller, SlDevice device, nint window)
         {
             Controller = controller;
             _alertPanel = new AlertPanel();
@@ -59,24 +59,19 @@ namespace XNOEdit.Managers
 
             var interBytes = EmbeddedResources.ReadAllBytes("XNOEdit/Fonts/Inter.ttf");
             var faBytes = EmbeddedResources.ReadAllBytes("XNOEdit/Fonts/FA-Solid.ttf");
-            ushort[] faRanges = [FontAwesome7.IconMin, FontAwesome7.IconMax, 0];
+            uint[] faRanges = [FontAwesome7.IconMin, FontAwesome7.IconMax, 0];
 
-            fixed (byte* pBytes = interBytes)
-            fixed (byte* pFaBytes = faBytes)
-            fixed (ushort* pFaRanges = faRanges)
-            {
-                var config = ImGui.ImFontConfig();
-                config.FontDataOwnedByAtlas = false;
+            var config = ImGui.ImFontConfig();
+            config.FontDataOwnedByAtlas = false;
 
-                var font = io.Fonts.AddFontFromMemoryTTF(pBytes, interBytes.Length, 15f, config);
-                io.FontDefault = font;
+            var font = ImGuiInterop.AddFontFromMemoryTTF(io.Fonts, interBytes, 15f, config);
+            io.FontDefault = font;
 
-                config.GlyphOffset = new Vector2(0, 1);
-                config.MergeMode = true;
-                config.PixelSnapH = true;
+            config.GlyphOffset = new Vector2(0, 1);
+            config.MergeMode = true;
+            config.PixelSnapH = true;
 
-                _faFont = io.Fonts.AddFontFromMemoryTTF(pFaBytes, faBytes.Length, 15f, config, (uint*)pFaRanges);
-            }
+            _faFont = ImGuiInterop.AddFontFromMemoryTTF(io.Fonts, faBytes, 15f, config, faRanges);
 
             var style = ImGui.GetStyle();
             style.FrameRounding = 3.0f;
@@ -241,7 +236,7 @@ namespace XNOEdit.Managers
             SetColors(HueForCategory(category));
         }
 
-        public unsafe void BuildUI(
+        public void BuildUI(
             Matrix4x4 view, double deltaTime, RenderSettings settings, TextureManager textureManager)
         {
             Controller?.Update((float)deltaTime);
@@ -261,8 +256,8 @@ namespace XNOEdit.Managers
 
                 var remainingId = dockspaceId;
 
-                var leftDock = ImGuiP.DockBuilderSplitNode(remainingId, ImGuiDir.Left, 0.2f, null, &remainingId);
-                var bottomDock = ImGuiP.DockBuilderSplitNode(remainingId, ImGuiDir.Down, 0.3f, null, &remainingId);
+                var leftDock = ImGuiInterop.DockBuilderSplitNode(ref remainingId, ImGuiDir.Left, 0.2f);
+                var bottomDock = ImGuiInterop.DockBuilderSplitNode(ref remainingId, ImGuiDir.Down, 0.3f);
                 var centralNode = ImGuiP.DockBuilderGetNode(remainingId);
                 centralNode.LocalFlags |= (ImGuiDockNodeFlags)(ImGuiDockNodeFlagsPrivate.CentralNode | ImGuiDockNodeFlagsPrivate.HiddenTabBar) | ImGuiDockNodeFlags.NoUndocking;
 

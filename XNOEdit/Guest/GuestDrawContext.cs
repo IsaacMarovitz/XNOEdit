@@ -42,7 +42,7 @@ namespace XNOEdit.Guest
         private readonly GuestConstantFile _vertexConstants = new();
         private readonly GuestConstantFile _pixelConstants = new();
 
-        public unsafe GuestBinding BindMaterial(
+        public GuestBinding BindMaterial(
             SlPassContext ctx, GuestMaterial material, GuestDrawBucket bucket,
             in GuestMeshState state, in GuestSceneState scene,
             ReadOnlySpan<SlTextureIndex> stages, ReadOnlySpan<Vector2> offsets)

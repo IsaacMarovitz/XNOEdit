@@ -61,7 +61,7 @@ namespace Solaris
 
         public uint TextureCount => _textureWatermark;
 
-        public SlTextureIndex Register(SlTexture texture, RenderTextureView* view = null)
+        public SlTextureIndex Register(SlTexture texture)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             ArgumentNullException.ThrowIfNull(texture);
@@ -79,7 +79,7 @@ namespace Solaris
                 slot,
                 texture.Handle,
                 RenderTextureLayout.ShaderRead,
-                view != null ? view : texture.DefaultView);
+                texture.DefaultView);
 
             return new SlTextureIndex(slot);
         }

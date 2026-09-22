@@ -18,7 +18,7 @@ namespace XNOEdit.Panels
             }
         }
 
-        public static unsafe bool StyledCheckbox(string label, bool value)
+        public static bool StyledCheckbox(string label, bool value)
         {
             var pos = ImGui.GetCursorScreenPos();
             var icon = value ? FontAwesome7.Eye : FontAwesome7.EyeSlash;
@@ -40,11 +40,11 @@ namespace XNOEdit.Panels
             if (value && !hovered)
                 ImGui.PushStyleColor(ImGuiCol.Text, Vector4.Zero);
             else
-                ImGui.PushStyleColor(ImGuiCol.Text, *ImGui.GetStyleColorVec4(ImGuiCol.CheckMark));
+                ImGui.PushStyleColor(ImGuiCol.Text, style.Colors[(int)ImGuiCol.CheckMark]);
 
-            ImGui.PushStyleColor(ImGuiCol.Button, *ImGui.GetStyleColorVec4(ImGuiCol.FrameBg));
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, *ImGui.GetStyleColorVec4(ImGuiCol.FrameBgActive));
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, *ImGui.GetStyleColorVec4(ImGuiCol.FrameBgHovered));
+            ImGui.PushStyleColor(ImGuiCol.Button, style.Colors[(int)ImGuiCol.FrameBg]);
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive, style.Colors[(int)ImGuiCol.FrameBgActive]);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, style.Colors[(int)ImGuiCol.FrameBgHovered]);
 
             var button = ImGui.Button($"{icon}{label}");
 

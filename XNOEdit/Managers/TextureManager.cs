@@ -7,7 +7,7 @@ namespace XNOEdit.Managers
         private readonly Dictionary<string, ManagedTexture> _textures = new();
         private bool _disposed;
 
-        public unsafe void Add(string name, SlTexture texture)
+        public void Add(string name, SlTexture texture)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(TextureManager));

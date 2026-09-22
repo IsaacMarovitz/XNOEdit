@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Text;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja.Chunks;
@@ -23,7 +22,7 @@ using LogLevel = XNOEdit.Logging.LogLevel;
 
 namespace XNOEdit
 {
-    internal static unsafe class Program
+    internal static class Program
     {
         public static event Action? GameFolderLoaded;
 
@@ -148,12 +147,12 @@ namespace XNOEdit
                     OnFramebufferResize(new Vector2(width, height));
                     break;
                 case (uint)SDL.EventType.DropFile:
-                    var span = MemoryMarshal.CreateReadOnlySpanFromNullTerminated((byte*)@event.Drop.Data);
-                    OnFileDrop(Encoding.UTF8.GetString(span));
+                    if (Marshal.PtrToStringUTF8(@event.Drop.Data) is { } path)
+                        OnFileDrop(path);
                     break;
                 case (uint)SDL.EventType.TextInput:
-                    var input = Encoding.UTF8.GetString((byte*)@event.Text.Text, 32);
-                    UIManager.Controller?.UpdateImguiInput(input);
+                    if (Marshal.PtrToStringUTF8(@event.Text.Text) is { } input)
+                        UIManager.Controller?.UpdateImguiInput(input);
                     break;
                 case (uint)SDL.EventType.KeyDown:
                     UIManager.Controller?.UpdateImGuiKey(@event.Key.Key, true);
@@ -249,17 +248,7 @@ namespace XNOEdit
         private static void InitializeDevice()
         {
             _device = SlDevice.Create();
-
-            var view = SDL.MetalCreateView(_window);
-
-            var renderWindow = new RenderWindow
-            {
-                Window = (void*)SDL.GetPointerProperty(
-                    SDL.GetWindowProperties(_window), SDL.Props.WindowCocoaWindowPointer, IntPtr.Zero),
-                View = (void*)SDL.MetalGetLayer(view),
-            };
-
-            _graph = new SlFrameGraph(_device, renderWindow, RenderFormat.B8G8R8A8Unorm, maxFrameLatency: 2);
+            _graph = new SlFrameGraph(_device, SlSurface.FromSdlWindow(_window), RenderFormat.B8G8R8A8Unorm, maxFrameLatency: 2);
             _graph.SetVsyncEnabled(true);
 
             _uploader = new SlUploader(_device);

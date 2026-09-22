@@ -7,7 +7,7 @@ using Solaris;
 
 namespace XNOEdit.Panels
 {
-    public unsafe class ViewportPanel : IDisposable
+    public class ViewportPanel : IDisposable
     {
         public const string Name = "Viewport";
         public Vector2 ViewportSize { get; private set; } = new(800, 600);
@@ -104,14 +104,11 @@ namespace XNOEdit.Panels
 
         public void Render(Matrix4x4 view, bool renderGuizmos)
         {
-            var windowClass = new ImGuiWindowClass
+            ImGuiInterop.SetNextWindowClass(new ImGuiWindowClass
             {
                 DockNodeFlagsOverrideSet = (ImGuiDockNodeFlags)ImGuiDockNodeFlagsPrivate.NoTabBar
-            };
+            });
 
-            var ptr = new ImGuiWindowClassPtr(&windowClass);
-
-            ImGui.SetNextWindowClass(ptr);
             var windowFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse |
                               ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoTitleBar;
 
@@ -135,7 +132,7 @@ namespace XNOEdit.Panels
                 _pendingWidth = (uint)Math.Max(contentSize.X, 1);
                 _pendingHeight = (uint)Math.Max(contentSize.Y, 1);
 
-                ImGui.Image(new ImTextureRef(null, _resolveIndex.Packed), ViewportSize);
+                ImGuiInterop.Image(_resolveIndex.Packed, ViewportSize);
 
                 if (renderGuizmos)
                 {

@@ -10,7 +10,7 @@ using Solaris.Graph;
 
 namespace XNOEdit.Render
 {
-    public unsafe class ImGuiController : IDisposable
+    public class ImGuiController : IDisposable
     {
         private readonly SlDevice _device;
         private readonly SlUploader _uploader;
@@ -71,7 +71,7 @@ namespace XNOEdit.Render
             DrawImGui(ctx);
         }
 
-        private void Init()
+        private unsafe void Init()
         {
             var context = ImGui.CreateContext();
             ImGui.SetCurrentContext(context);
@@ -123,7 +123,7 @@ namespace XNOEdit.Render
             var pixelShader = SlShader.Create(_device, pixel, "shaderMain");
 
             var layout = new SlVertexLayout(
-                new SlVertexBufferLayout(0, (uint)sizeof(ImDrawVert), SlVertexStepMode.Vertex,
+                new SlVertexBufferLayout(0, (uint)Unsafe.SizeOf<ImDrawVert>(), SlVertexStepMode.Vertex,
                 [
                     new SlVertexAttribute("POSITION", 0, 0, RenderFormat.R32G32Float, 0),
                     new SlVertexAttribute("TEXCOORD", 0, 1, RenderFormat.R32G32Float, 8),
@@ -162,7 +162,7 @@ namespace XNOEdit.Render
             }
         }
 
-        private void CreateTexture(ImTextureDataPtr tex)
+        private unsafe void CreateTexture(ImTextureDataPtr tex)
         {
             var width = (uint)tex.Width;
             var height = (uint)tex.Height;
@@ -185,7 +185,7 @@ namespace XNOEdit.Render
             tex.SetStatus(ImTextureStatus.Ok);
         }
 
-        private void UpdateTexture(ImTextureDataPtr tex)
+        private unsafe void UpdateTexture(ImTextureDataPtr tex)
         {
             var id = (nint)tex.TexID;
 
@@ -221,7 +221,7 @@ namespace XNOEdit.Render
             tex.SetStatus(ImTextureStatus.Ok);
         }
 
-        private void DestroyTexture(ImTextureDataPtr tex)
+        private unsafe void DestroyTexture(ImTextureDataPtr tex)
         {
             var id = (nint)tex.TexID;
 
@@ -351,9 +351,9 @@ namespace XNOEdit.Render
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate void SetClipboardTextDelegate(ImGuiContext* context, char* text);
+        private unsafe delegate void SetClipboardTextDelegate(ImGuiContext* context, char* text);
 
-        public void SetClipboardText(ImGuiContext* context, char* text)
+        public unsafe void SetClipboardText(ImGuiContext* context, char* text)
         {
             var span = MemoryMarshal.CreateReadOnlySpanFromNullTerminated((byte*)text);
             var requestedText = Encoding.UTF8.GetString(span);
@@ -361,9 +361,9 @@ namespace XNOEdit.Render
         }
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate char* GetClipboardTextDelegate(ImGuiContext* context);
+        private unsafe delegate char* GetClipboardTextDelegate(ImGuiContext* context);
 
-        public char* GetClipboardText(ImGuiContext* context)
+        public unsafe char* GetClipboardText(ImGuiContext* context)
         {
             if (_clipboardText != IntPtr.Zero)
                 Marshal.ZeroFreeCoTaskMemUTF8(_clipboardText);
@@ -446,7 +446,7 @@ namespace XNOEdit.Render
             io.DeltaTime = deltaSeconds;
         }
 
-        private void DrawImGui(SlPassContext ctx)
+        private unsafe void DrawImGui(SlPassContext ctx)
         {
             var drawData = ImGui.GetDrawData();
             drawData.ScaleClipRects(ImGui.GetIO().DisplayFramebufferScale);

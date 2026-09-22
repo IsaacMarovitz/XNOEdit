@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Plume;
 
 namespace Solaris.Graph
@@ -88,7 +88,7 @@ namespace Solaris.Graph
 
         public void PushConstants<T>(in T data, uint offset = 0) where T : unmanaged
         {
-            var size = (uint)Marshal.SizeOf<T>();
+            var size = (uint)Unsafe.SizeOf<T>();
 
             if (offset + size > SlGlobalLayout.PushConstantSize)
             {

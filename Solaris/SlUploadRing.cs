@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Plume;
 
@@ -94,14 +95,14 @@ namespace Solaris
         /// </summary>
         public SlAllocation Write<T>(in T value) where T : unmanaged
         {
-            var allocation = Allocate((ulong)Marshal.SizeOf<T>(), ConstantElementSize);
+            var allocation = Allocate((ulong)Unsafe.SizeOf<T>(), ConstantElementSize);
             MemoryMarshal.Write(allocation.Data, in value);
             return allocation;
         }
 
         public SlAllocation Write<T>(ReadOnlySpan<T> values, ulong alignment = ConstantElementSize) where T : unmanaged
         {
-            var allocation = Allocate((ulong)(values.Length * Marshal.SizeOf<T>()), alignment);
+            var allocation = Allocate((ulong)(values.Length * Unsafe.SizeOf<T>()), alignment);
             MemoryMarshal.Cast<T, byte>(values).CopyTo(allocation.Data);
             return allocation;
         }
