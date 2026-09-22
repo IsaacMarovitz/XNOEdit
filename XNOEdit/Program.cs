@@ -76,7 +76,6 @@ namespace XNOEdit
             var imguiController = new ImGuiController(_device, _uploader, _window);
             UIManager = new UIManager();
             UIManager.OnLoad(imguiController, _device, _window);
-            UIManager.EnvironmentPanel?.InitSunAngles(_settings);
             UIManager.ResetCameraAction += _view.ResetCamera;
 
             _input = new InputManager(_window, UIManager, _view, _settings);
@@ -156,7 +155,7 @@ namespace XNOEdit
             var projection = _view.Camera.GetProjectionMatrix(UIManager.ViewportPanel.GetAspectRatio());
 
             // Build the UI and finalise its draw data.
-            UIManager.BuildUI(view, deltaTime, _settings, _textureManager);
+            UIManager.BuildUI(view, deltaTime, _settings, _view.Environment, _textureManager);
             ImGui.Render();
 
             // Servicing texture requests stages uploads, so both must complete before the

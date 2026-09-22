@@ -24,13 +24,15 @@ namespace XNOEdit.Render
             _textureManager = textureManager;
             _grid = new GridRenderer(device);
             _skybox = new SkyboxRenderer(device);
+
+            Environment = new SceneEnvironment(device);;
         }
 
         public Camera Camera { get; } = new();
 
         public Scene? Scene { get; private set; }
 
-        public SceneConfig? Config { get; set; }
+        public SceneEnvironment Environment { get; }
 
         /// <summary>Replaces the current scene without moving the camera.</summary>
         public void SetScene(Scene scene)
@@ -63,12 +65,14 @@ namespace XNOEdit.Render
 
         public void Draw(SlPassContext ctx, Matrix4x4 view, Matrix4x4 projection, RenderSettings settings)
         {
+            var config = Environment.Config;
+
             _skybox.Draw(ctx, view, projection,
                 new SkyboxParameters
                 {
                     CameraPosition = Camera.Position,
-                    SunDirection = settings.SunDirection,
-                    SunColor = settings.SunColor
+                    SunDirection = config.Main.Direction,
+                    SunColor = new Vector3(config.Ols.SunColor.X, config.Ols.SunColor.Y, config.Ols.SunColor.Z)
                 });
 
             if (settings.ShowGrid)
@@ -89,14 +93,15 @@ namespace XNOEdit.Render
                     CullBackfaces = settings.BackfaceCulling,
                     GuestDraw = _guestDraw,
                     TextureManager = _textureManager,
-                    Scene = Config ?? new SceneConfig(),
-                    EnvMap = new SlTextureIndex()
+                    Scene = Environment.Config,
+                    EnvMap = Environment.EnvMap
                 });
         }
 
         public void Dispose()
         {
             Scene?.Dispose();
+            Environment.Dispose();
             _grid.Dispose();
             _skybox.Dispose();
         }

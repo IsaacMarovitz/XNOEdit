@@ -12,13 +12,11 @@ namespace XNOEdit.Render
         private readonly ModelRenderer[] _renderers;
         private readonly Dictionary<string, ModelRenderer> _placed = [];
         private readonly List<GuestTransparentDraw> _transparentDraws = [];
-        private readonly SlTextureIndex _envMap;
 
-        public Scene(SlDevice device, ModelRenderer[] renderers, SlTextureIndex envMap, string? terrainName = null)
+        public Scene(SlDevice device, ModelRenderer[] renderers, string? terrainName = null)
         {
             _device = device;
             _renderers = renderers;
-            _envMap = envMap;
             TerrainName = terrainName;
         }
 
@@ -65,7 +63,6 @@ namespace XNOEdit.Render
             foreach (var phase in GuestDrawPhases.Ordered)
             {
                 modelParameters.GuestPhase = phase;
-                modelParameters.EnvMap = _envMap;
 
                 if (phase == GuestDrawPhase.Transparent)
                 {

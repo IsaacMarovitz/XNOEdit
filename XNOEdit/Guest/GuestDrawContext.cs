@@ -172,11 +172,6 @@ namespace XNOEdit.Guest
         private static Vector4 Weighted(Vector4 value, float weight) =>
             new(value.X * value.W * weight, value.Y * value.W * weight, value.Z * value.W * weight, weight);
 
-        private static Vector4 ToGuestDirection(in SceneLight light)
-        {
-            var direction = Vector3.Normalize(light.Target - light.Position);
-
-            return new Vector4(direction.X, direction.Z, -direction.Y, 0.0f);
-        }
+        private static Vector4 ToGuestDirection(in SceneLight light) => new(-light.Direction, 0.0f);
     }
 }

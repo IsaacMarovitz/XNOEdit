@@ -6,29 +6,45 @@ using XNOEdit.Logging;
 
 namespace XNOEdit
 {
-    public readonly record struct SceneLight(Vector4 Color, Vector3 Position, Vector3 Target);
+    public readonly record struct SceneLight(Vector4 Color, Vector3 Position, Vector3 Target)
+    {
+        public Vector3 Direction
+        {
+            get
+            {
+                var direction = Vector3.Normalize(Position - Target);
+                return new Vector3(direction.X, direction.Z, -direction.Y);
+            }
+        }
+
+        public SceneLight WithDirection(Vector3 direction) => this with
+        {
+            Position = Target + new Vector3(direction.X, -direction.Z, direction.Y),
+        };
+    }
+
     public readonly record struct SceneOls(Vector4 SunColor, Vector4 BRay, Vector4 BMie, float G);
 
-    // Defaults taken from scene_wvo_a.lub
+    // Defaults taken from scene_wvo_a.lub, used until the game's own copy is read
     public readonly struct SceneConfig()
     {
-        public Vector4 Ambient { get; } = new(0.48f, 0.49f, 0.5f, 1.1f);
+        public Vector4 Ambient { get; init; } = new(0.48f, 0.49f, 0.5f, 1.1f);
 
-        public SceneLight Main { get; } = new()
+        public SceneLight Main { get; init; } = new()
         {
             Color = new Vector4(0.92f, 0.92f, 0.92f, 0.85f),
             Position = new Vector3(0.316847f, 0.127879f, 0.939816f),
             Target = Vector3.Zero
         };
 
-        public SceneLight Sub { get; } = new()
+        public SceneLight Sub { get; init; } = new()
         {
             Color = new Vector4(0.18f, 0.28f, 0.35f, 1.0f),
             Position = new Vector3(0.470259f, -0.813585f, -0.341958f),
             Target = Vector3.Zero
         };
 
-        public SceneOls Ols { get; } = new()
+        public SceneOls Ols { get; init; } = new()
         {
             SunColor = new Vector4(1.0f, 1.0f, 0.92f, 13.0f),
             BRay = new Vector4(0.07f, 0.09f, 0.14f, 1.0E-4f),
@@ -36,7 +52,7 @@ namespace XNOEdit
             G = 0.99f
         };
 
-        public string EnvMap { get; } = "stage/wvo/a/wvo_envmap.dds";
+        public string EnvMap { get; init; } = "stage/wvo/a/wvo_envmap.dds";
 
         public SceneConfig(Vector4 ambient,  SceneLight main, SceneLight sub, SceneOls ols,  string envMap) : this()
         {

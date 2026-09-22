@@ -75,6 +75,11 @@ namespace XNOEdit.Services
         float MaxRadius
     );
 
+    public record EnvironmentLoadResult(
+        SceneConfig Config,
+        LoadedTexture? EnvMap
+    );
+
     public record ArcXnoEntry(
         NinjaNext Xno,
         ObjectChunk ObjectChunk,
@@ -204,6 +209,17 @@ namespace XNOEdit.Services
             }, cancellationToken);
         }
 
+        public Task<EnvironmentLoadResult?> ReadEnvironmentAsync(string stageName)
+        {
+            return Task.Run<EnvironmentLoadResult?>(async () =>
+            {
+                if (await StageConfigsMap.GetSceneConfig(stageName) is not { } config)
+                    return null;
+
+                return new EnvironmentLoadResult(config, LoadEnvMap(ArcFiles.Win32Arc(stageName), config));
+            });
+        }
+
         private static (Dictionary<ModelKey, List<ResolvedInstanceData>>, HashSet<string>) ResolveObjects(
             StageSet set,
             ResolverContext context)
@@ -309,20 +325,7 @@ namespace XNOEdit.Services
 
                 progress?.Report(new LoadProgress(LoadStage.Starting, $"Scanning {name}..."));
 
-                LoadedTexture? envMap = null;
-                SlTexture? envMapTexture = null;
-                var envMapPath = config?.EnvMap;
-
-                if (envMapPath != null)
-                {
-                    Logger.Error?.PrintMsg(LogClass.Application, envMapPath);
-                    envMapTexture = LoadTexture(file.GetFile(Path.Join("win32", envMapPath)));
-                    Logger.Error?.PrintMsg(LogClass.Application, $"texture is {envMapTexture == null} null");
-                }
-
-                if (envMapTexture != null)
-                    envMap = new LoadedTexture(envMapPath, envMapTexture);
-
+                var envMap = config is { } sceneConfig ? LoadEnvMap(file, sceneConfig) : null;
                 var models = file.EnumerateFiles("*.xno", SearchOption.AllDirectories).ToList();
                 var total = models.Count;
                 var current = 0;
@@ -372,6 +375,20 @@ namespace XNOEdit.Services
 
                 return new StageLoadResult(name, entries, allTextures, envMap, config, maxRadius);
             }, cancellationToken);
+        }
+
+        private LoadedTexture? LoadEnvMap(ArcFile archive, SceneConfig config)
+        {
+            if (string.IsNullOrEmpty(config.EnvMap))
+                return null;
+
+            if (archive.GetFile(Path.Join("win32", config.EnvMap)) is not { } file)
+            {
+                Logger.Warning?.PrintMsg(LogClass.Application, $"Env map not found: {config.EnvMap}");
+                return null;
+            }
+
+            return LoadTexture(file) is { } texture ? new LoadedTexture(config.EnvMap, texture) : null;
         }
 
         private List<LoadedTexture> LoadTextures(

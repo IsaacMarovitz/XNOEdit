@@ -18,6 +18,8 @@ namespace XNOEdit.Services
 {
     public class SceneLoader
     {
+        private const string DefaultEnvironmentStage = "stage_wvo_a";
+
         private readonly SlDevice _device;
         private readonly nint _window;
         private readonly UIManager _ui;
@@ -30,7 +32,6 @@ namespace XNOEdit.Services
 
         private GuestMaterialCache? _guestMaterials;
         private LoadChain? _loadChain;
-        private SlTextureIndex _envMap = SlTextureIndex.NullTextureCube;
 
         public SceneLoader(
             SlDevice device,
@@ -114,7 +115,8 @@ namespace XNOEdit.Services
                 // No terrain for this mission
                 DispatchToMainThread(() =>
                 {
-                    _view.SetScene(new Scene(_device, [], _envMap));
+                    _view.Environment.ClearOverride();
+                    _view.SetScene(new Scene(_device, []));
                 });
             }
 
@@ -151,6 +153,22 @@ namespace XNOEdit.Services
             catch (Exception ex)
             {
                 _ui.TriggerAlert(AlertLevel.Warning, $"Unable to load shader.arc: \"{ex.Message}\"");
+            }
+
+            _ = LoadDefaultEnvironmentAsync();
+        }
+
+        private async Task LoadDefaultEnvironmentAsync()
+        {
+            try
+            {
+                if (await _fileLoader.ReadEnvironmentAsync(DefaultEnvironmentStage) is { } environment)
+                    DispatchToMainThread(() => _view.Environment.SetDefault(environment.Config, environment.EnvMap));
+            }
+            catch (Exception ex)
+            {
+                DispatchToMainThread(() =>
+                    _ui.TriggerAlert(AlertLevel.Warning, $"Unable to load default environment: \"{ex.Message}\""));
             }
         }
 
@@ -227,8 +245,8 @@ namespace XNOEdit.Services
                     _ui.TriggerAlert(AlertLevel.Warning, "XNO has no geometry");
                 }
 
-                _view.SetScene(new Scene(_device, [result.Renderer], _envMap));
-                _view.Config = null;
+                _view.Environment.ClearOverride();
+                _view.SetScene(new Scene(_device, [result.Renderer]));
                 _view.Frame(result.ObjectChunk.Centre, result.ObjectChunk.Radius);
             }
             else
@@ -262,14 +280,8 @@ namespace XNOEdit.Services
                 _view.Scene?.SetObjectVisible(xnoIndex, objectIndex, meshIndex, visible);
             };
 
-            if (result.EnvMap is { } env)
-            {
-                _textureManager.Add(env.Name, env.Texture);
-                _envMap = _textureManager.GetIndex(env.Name);
-            }
-
-            _view.SetScene(new Scene(_device, renderers, _envMap, result.Name));
-            _view.Config = result.SceneConfig;
+            _view.Environment.Override(result.SceneConfig, result.EnvMap);
+            _view.SetScene(new Scene(_device, renderers, result.Name));
             _view.Frame(Vector3.Zero, result.MaxRadius);
         }
 

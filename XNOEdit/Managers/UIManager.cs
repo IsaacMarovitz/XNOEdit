@@ -237,7 +237,7 @@ namespace XNOEdit.Managers
         }
 
         public void BuildUI(
-            Matrix4x4 view, double deltaTime, RenderSettings settings, TextureManager textureManager)
+            Matrix4x4 view, double deltaTime, RenderSettings settings, SceneEnvironment environment, TextureManager textureManager)
         {
             Controller?.Update((float)deltaTime);
 
@@ -278,7 +278,7 @@ namespace XNOEdit.Managers
             RenderMenuBar(settings);
 
             if (_environmentWindow)
-                EnvironmentPanel?.Render(settings);
+                EnvironmentPanel?.Render(settings, environment);
 
             if (_xnoWindow)
                 XnoPanel?.Render(textureManager);
