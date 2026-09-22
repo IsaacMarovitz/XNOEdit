@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using Plume;
 using Solaris;
 
-namespace XNOEdit.Renderer.Shaders
+namespace XNOEdit.Render.Shaders
 {
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct GridUniforms

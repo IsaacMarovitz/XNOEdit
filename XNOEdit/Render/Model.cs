@@ -7,7 +7,7 @@ using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Render
 {
     public class Model : IDisposable
     {

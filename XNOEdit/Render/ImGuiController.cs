@@ -8,7 +8,7 @@ using SDL3;
 using Solaris;
 using Solaris.Graph;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Render
 {
     public unsafe class ImGuiController : IDisposable
     {

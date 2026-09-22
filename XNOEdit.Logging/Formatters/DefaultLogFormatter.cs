@@ -10,7 +10,7 @@ namespace XNOEdit.Logging.Formatters
 
         public string Format(LogEventArgs args)
         {
-            StringBuilder sb = _stringBuilderPool.Allocate();
+            var sb = _stringBuilderPool.Allocate();
 
             try
             {

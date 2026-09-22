@@ -9,9 +9,9 @@ namespace XNOEdit.Panels
     {
         public const string Name = "Objects";
 
-        public event Action<IFile> LoadObject;
-        public ObjectPhysicsParameterList PhysicsParameters { get; private set; }
-        public PathObjParameterList PathParameters { get; private set; }
+        public event Action<IFile>? LoadObject;
+        public ObjectPhysicsParameterList? PhysicsParameters { get; private set; }
+        public PathObjParameterList? PathParameters { get; private set; }
 
         private readonly FileContainer _enemy = new("Enemy");
         private readonly FileContainer _human = new("Human");

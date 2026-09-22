@@ -1,9 +1,9 @@
 using System.Numerics;
 using Solaris;
 using Solaris.Graph;
-using XNOEdit.Renderer.Shaders;
+using XNOEdit.Render.Shaders;
 
-namespace XNOEdit.Renderer.Renderers
+namespace XNOEdit.Render.Renderers
 {
     public struct GridParameters
     {

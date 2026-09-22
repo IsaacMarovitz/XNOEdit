@@ -6,7 +6,7 @@ using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
 
-namespace XNOEdit.Renderer.Renderers
+namespace XNOEdit.Render.Renderers
 {
     public struct ModelParameters
     {

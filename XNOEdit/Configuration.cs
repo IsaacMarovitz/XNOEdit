@@ -23,10 +23,10 @@ namespace XNOEdit
 
         public static string? GameFolder
         {
-            get => Instance._data.GameFolder;
+            get => Instance._data?.GameFolder;
             set
             {
-                Instance._data.GameFolder = value;
+                Instance._data?.GameFolder = value;
                 Instance.Save();
             }
         }
@@ -41,7 +41,7 @@ namespace XNOEdit
             }
         }
 
-        private ConfigurationData _data;
+        private ConfigurationData? _data;
         private const string DefaultBaseDir = "XNOEdit";
         private const string DefaultConfigFile = "config.json";
         private readonly string _configPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), DefaultBaseDir);

@@ -6,7 +6,7 @@ namespace XNOEdit.Panels
     public class MissionPanel
     {
         public const string Name = "Mission";
-        public event Action<int, NinjaNext> ViewXno;
+        public event Action<int, NinjaNext>? ViewXno;
 
         private readonly string _name;
 

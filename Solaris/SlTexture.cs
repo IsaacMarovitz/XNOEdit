@@ -68,7 +68,7 @@ namespace Solaris
             Usage = SlTextureUsage.DepthTarget,
         };
 
-        internal RenderTextureFlags ToPlumeFlags()
+        internal readonly RenderTextureFlags ToPlumeFlags()
         {
             var flags = RenderTextureFlags.None;
 

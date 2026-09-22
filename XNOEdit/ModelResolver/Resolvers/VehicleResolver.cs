@@ -23,7 +23,8 @@ namespace XNOEdit.ModelResolver.Resolvers
                 1 => "Jeep",
                 2 => "Bike",
                 3 => "Hover",
-                4 => "Glider"
+                4 => "Glider",
+                _ => throw new ArgumentOutOfRangeException()
             };
 
             var modelPath = $"object/Common/vehicle/Gadget_{vehicle}.xno";

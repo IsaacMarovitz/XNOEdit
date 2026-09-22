@@ -1,7 +1,7 @@
 using Solaris;
 using Solaris.Graph;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Render
 {
     /// <summary>
     /// Manages vertex and index buffers for mesh geometry

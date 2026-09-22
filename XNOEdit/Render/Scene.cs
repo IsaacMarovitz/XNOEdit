@@ -2,9 +2,9 @@ using System.Numerics;
 using Solaris;
 using Solaris.Graph;
 using XNOEdit.Guest;
-using XNOEdit.Renderer.Renderers;
+using XNOEdit.Render.Renderers;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Render
 {
     public sealed class Scene : IDisposable
     {

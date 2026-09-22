@@ -5,8 +5,8 @@ using Solaris;
 using XNOEdit.Fonts;
 using XNOEdit.Logging;
 using XNOEdit.Panels;
-using XNOEdit.Renderer;
-using XNOEdit.Renderer.Renderers;
+using XNOEdit.Render;
+using XNOEdit.Render.Renderers;
 using XNOEdit.Services;
 
 namespace XNOEdit.Managers
@@ -14,7 +14,7 @@ namespace XNOEdit.Managers
     public class UIManager : IDisposable
     {
         public const float DefaultHue = 248.8f;
-        public event Action ResetCameraAction;
+        public event Action? ResetCameraAction;
 
         public ViewportPanel? ViewportPanel { get; private set; }
         public EnvironmentPanel? EnvironmentPanel { get; private set; }
@@ -323,7 +323,7 @@ namespace XNOEdit.Managers
 
                     if (ImGui.MenuItem("Reset Camera", "R"))
                     {
-                        ResetCameraAction.Invoke();
+                        ResetCameraAction?.Invoke();
                     }
 
                     ImGui.PopItemFlag();

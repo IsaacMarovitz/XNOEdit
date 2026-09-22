@@ -10,7 +10,7 @@ namespace XNOEdit.Logging
         private static readonly bool[] _enabledClasses;
         private static readonly List<ILogTarget> _logTargets;
 
-        public static event EventHandler<LogEventArgs> Updated;
+        public static event EventHandler<LogEventArgs>? Updated;
 
         public readonly struct Log
         {
@@ -112,7 +112,7 @@ namespace XNOEdit.Logging
         {
             _enabledClasses = new bool[Enum.GetNames<LogClass>().Length];
 
-            for (int index = 0; index < _enabledClasses.Length; index++)
+            for (var index = 0; index < _enabledClasses.Length; index++)
             {
                 _enabledClasses[index] = true;
             }
@@ -138,7 +138,7 @@ namespace XNOEdit.Logging
             _time.Restart();
         }
 
-        private static ILogTarget GetTarget(string targetName)
+        private static ILogTarget? GetTarget(string targetName)
         {
             foreach (var target in _logTargets)
             {
@@ -160,7 +160,7 @@ namespace XNOEdit.Logging
 
         public static void RemoveTarget(string target)
         {
-            ILogTarget logTarget = GetTarget(target);
+            var logTarget = GetTarget(target);
 
             if (logTarget != null)
             {
@@ -204,10 +204,10 @@ namespace XNOEdit.Logging
             switch (logLevel)
             {
 #pragma warning disable IDE0055 // Disable formatting
-                case LogLevel.Debug     : Debug     = enabled ? new Log(LogLevel.Debug)     : new Log?(); break;
-                case LogLevel.Info      : Info      = enabled ? new Log(LogLevel.Info)      : new Log?(); break;
-                case LogLevel.Warning   : Warning   = enabled ? new Log(LogLevel.Warning)   : new Log?(); break;
-                case LogLevel.Error     : Error     = enabled ? new Log(LogLevel.Error)     : new Log?(); break;
+                case LogLevel.Debug   : Debug   = enabled ? new Log(LogLevel.Debug)   : null; break;
+                case LogLevel.Info    : Info    = enabled ? new Log(LogLevel.Info)    : null; break;
+                case LogLevel.Warning : Warning = enabled ? new Log(LogLevel.Warning) : null; break;
+                case LogLevel.Error   : Error   = enabled ? new Log(LogLevel.Error)   : null; break;
                 default: throw new ArgumentException("Unknown Log Level");
 #pragma warning restore IDE0055
             }

@@ -1,14 +1,11 @@
 using System.Numerics;
-using Solaris;
 using Solaris.Graph;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Render
 {
     public abstract class Renderer<TParameters> : IDisposable where TParameters : struct
     {
         protected readonly ShaderModule ShaderModule;
-
-        protected SlMaterial Material => ShaderModule.Material;
 
         public Renderer(ShaderModule shaderModule)
         {

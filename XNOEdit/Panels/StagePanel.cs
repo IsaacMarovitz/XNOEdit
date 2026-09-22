@@ -9,7 +9,7 @@ namespace XNOEdit.Panels
     public class StagePanel
     {
         public const string Name = "Stage";
-        public event Action<int, NinjaNext> ViewXno;
+        public event Action<int, NinjaNext>? ViewXno;
 
         private readonly string _name;
         private readonly List<NinjaNext> _xnos;

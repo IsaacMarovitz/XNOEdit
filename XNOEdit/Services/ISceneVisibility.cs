@@ -1,4 +1,4 @@
-using XNOEdit.Renderer.Renderers;
+using XNOEdit.Render.Renderers;
 
 namespace XNOEdit.Services
 {

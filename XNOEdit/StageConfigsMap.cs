@@ -1,7 +1,6 @@
 using System.Numerics;
 using Lua;
 using Lua.Standard;
-using Marathon.Formats.Archive;
 using Marathon.Formats.Script.Lua;
 using XNOEdit.Logging;
 

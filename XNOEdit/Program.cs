@@ -16,8 +16,8 @@ using XNOEdit.Logging;
 using XNOEdit.Managers;
 using XNOEdit.ModelResolver;
 using XNOEdit.Panels;
-using XNOEdit.Renderer;
-using XNOEdit.Renderer.Renderers;
+using XNOEdit.Render;
+using XNOEdit.Render.Renderers;
 using XNOEdit.Services;
 using LogLevel = XNOEdit.Logging.LogLevel;
 
@@ -33,7 +33,6 @@ namespace XNOEdit
         private static SlUploader _uploader;
 
         private static Camera? _camera;
-        private static ArcFile? _shaderArchive;
         private static GuestMaterialCache? _guestMaterials;
         private static GuestShaderCache? _guestCache;
         private static readonly GuestDrawContext _guestDraw = new();

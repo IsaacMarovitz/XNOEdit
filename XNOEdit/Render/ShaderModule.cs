@@ -1,6 +1,6 @@
 using Solaris;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Render
 {
     public abstract class ShaderModule : IDisposable
     {

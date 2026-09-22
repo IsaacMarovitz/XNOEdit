@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Numerics;
 using Hexa.NET.ImGui;
-using Marathon.Formats.Archive;
 using Marathon.IO.Types.FileSystem;
 using XNOEdit.Logging;
 

@@ -15,7 +15,7 @@ namespace XNOEdit.Logging.Formatters
                 return null;
             }
 
-            StringBuilder sb = _stringBuilderPool.Allocate();
+            var sb = _stringBuilderPool.Allocate();
 
             try
             {
@@ -36,7 +36,7 @@ namespace XNOEdit.Logging.Formatters
                 return;
             }
 
-            PropertyInfo[] props = dynamicObject.GetType().GetProperties();
+            var props = dynamicObject.GetType().GetProperties();
 
             sb.Append('{');
 
@@ -47,7 +47,7 @@ namespace XNOEdit.Logging.Formatters
 
                 if (typeof(Array).IsAssignableFrom(prop.PropertyType))
                 {
-                    Array? array = (Array?)prop.GetValue(dynamicObject);
+                    var array = (Array?)prop.GetValue(dynamicObject);
 
                     if (array is not null)
                     {

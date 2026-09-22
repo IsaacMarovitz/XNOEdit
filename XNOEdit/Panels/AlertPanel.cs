@@ -15,7 +15,7 @@ namespace XNOEdit.Panels
     {
         private const float MessageTime = 2;
         private float _timer = MessageTime;
-        private string _currentMessage;
+        private string? _currentMessage;
         private AlertLevel _currentAlertLevel = AlertLevel.Info;
 
         public void TriggerAlert(AlertLevel level, string message)

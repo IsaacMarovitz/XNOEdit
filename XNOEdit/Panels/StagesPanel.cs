@@ -8,7 +8,7 @@ namespace XNOEdit.Panels
     public class StagesPanel
     {
         public const string Name = "Stages";
-        public event Action<ArcFile> LoadStage;
+        public event Action<ArcFile>? LoadStage;
 
         private readonly UIManager _uiManager;
 

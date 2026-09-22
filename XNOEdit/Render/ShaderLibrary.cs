@@ -1,7 +1,7 @@
 using Plume;
 using Solaris;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Render
 {
     public static class ShaderLibrary
     {

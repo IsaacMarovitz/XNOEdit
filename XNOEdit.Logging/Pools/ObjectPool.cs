@@ -3,8 +3,8 @@ namespace XNOEdit.Logging.Pools
     public class ObjectPool<T>
         where T : class
     {
-        private T _firstItem;
-        private readonly T[] _items;
+        private T? _firstItem;
+        private readonly T?[] _items;
 
         private readonly Func<T> _factory;
 
@@ -16,7 +16,7 @@ namespace XNOEdit.Logging.Pools
 
         public T Allocate()
         {
-            T instance = _firstItem;
+            var instance = _firstItem;
 
             if (instance == null || instance != Interlocked.CompareExchange(ref _firstItem, null, instance))
             {
@@ -28,11 +28,11 @@ namespace XNOEdit.Logging.Pools
 
         private T AllocateInternal()
         {
-            T[] items = _items;
+            var items = _items;
 
-            for (int i = 0; i < items.Length; i++)
+            for (var i = 0; i < items.Length; i++)
             {
-                T instance = items[i];
+                var instance = items[i];
 
                 if (instance != null && instance == Interlocked.CompareExchange(ref items[i], null, instance))
                 {
@@ -57,9 +57,9 @@ namespace XNOEdit.Logging.Pools
 
         private void ReleaseInternal(T obj)
         {
-            T[] items = _items;
+            var items = _items;
 
-            for (int i = 0; i < items.Length; i++)
+            for (var i = 0; i < items.Length; i++)
             {
                 if (items[i] == null)
                 {

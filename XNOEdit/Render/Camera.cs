@@ -1,7 +1,7 @@
 using System.Numerics;
 using SDL3;
 
-namespace XNOEdit.Renderer
+namespace XNOEdit.Render
 {
     public class Camera
     {

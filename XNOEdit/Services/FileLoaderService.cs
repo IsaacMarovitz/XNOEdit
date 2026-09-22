@@ -4,14 +4,12 @@ using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
 using Marathon.IO.Types.FileSystem;
-using Pfim;
-using Plume;
 using Solaris;
 using XNOEdit.Formats;
 using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
-using XNOEdit.Renderer.Renderers;
+using XNOEdit.Render.Renderers;
 
 namespace XNOEdit.Services
 {
