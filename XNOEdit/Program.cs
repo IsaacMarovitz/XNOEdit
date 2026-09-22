@@ -31,16 +31,9 @@ namespace XNOEdit
         private static SlFrameGraph _graph;
         private static SlUploader _uploader;
 
-        private static Camera? _camera;
+        private static SceneView _view;
         private static GuestMaterialCache? _guestMaterials;
         private static GuestShaderCache? _guestCache;
-        private static readonly GuestDrawContext _guestDraw = new();
-        private static Scene? _scene;
-        private static GridRenderer? _grid;
-        private static SkyboxRenderer? _skybox;
-        private static Vector3 _modelCenter = Vector3.Zero;
-        private static SceneConfig? _sceneConfig;
-        private static float _modelRadius = 1.0f;
         private static RenderSettings _settings = new();
         private static UIManager UIManager;
         private static FileLoaderService _fileLoader;
@@ -94,21 +87,18 @@ namespace XNOEdit
             GameFolderLoaded += LoadGameFolderResources;
 
             InitializeDevice();
-
-            _camera = new Camera();
-            _grid = new GridRenderer(_device);
-            _skybox = new SkyboxRenderer(_device);
+            _textureManager = new TextureManager(_device);
+            _view = new SceneView(_device, _textureManager);
 
             var imguiController = new ImGuiController(_device, _uploader, _window);
             UIManager = new UIManager();
             UIManager.OnLoad(imguiController, _device, _window);
             UIManager.EnvironmentPanel?.InitSunAngles(_settings);
-            UIManager.ResetCameraAction += ResetCamera;
+            UIManager.ResetCameraAction += _view.ResetCamera;
             UIManager.ObjectsPanel?.LoadObject += QueueObjectLoad;
             UIManager.StagesPanel?.LoadStage += QueueStageLoad;
             UIManager.MissionsPanel?.LoadMission += QueueMissionLoad;
 
-            _textureManager = new TextureManager(_device);
             _fileLoader = new FileLoaderService(_device, _uploader);
             _guestCache = GuestShaderCache.Load(_device, Path.Combine(AppContext.BaseDirectory, "shaders"));
 
@@ -129,7 +119,7 @@ namespace XNOEdit
             _deltaTime = Math.Max((float)diff / 1000, 0.000001f);
 
             if (UIManager.ViewportWantsInput || !ImGui.GetIO().WantCaptureKeyboard)
-                _camera?.ProcessKeyboard(_deltaTime, _settings.CameraSensitivity);
+                _view.Camera.ProcessKeyboard(_deltaTime, _settings.CameraSensitivity);
 
             ProcessMainThreadQueue();
             OnRender(_deltaTime);
@@ -159,10 +149,10 @@ namespace XNOEdit
                     UIManager.Controller?.UpdateImGuiKeyModifiers(@event.Key.Mod);
 
                     if ((UIManager.ViewportWantsInput && !ImGui.GetIO().WantCaptureKeyboard) || _mouseCaptured) {
-                        _camera?.UpdateKeyDown(@event.Key.Key);
-                    } else if (_camera?.IsKeyDown(@event.Key.Key) ?? false)
+                        _view.Camera.UpdateKeyDown(@event.Key.Key);
+                    } else if (_view.Camera.IsKeyDown(@event.Key.Key))
                     {
-                        _camera.UpdateKeyUp(@event.Key.Key);
+                        _view.Camera.UpdateKeyUp(@event.Key.Key);
                     }
 
                     if (ImGui.GetIO().WantCaptureKeyboard) break;
@@ -181,12 +171,12 @@ namespace XNOEdit
                     if (@event.Key.Key == SDL.Keycode.R)
                     {
                         UIManager.TriggerAlert(AlertLevel.Info, "Camera Reset");
-                        ResetCamera();
+                        _view.ResetCamera();
                     }
 
                     break;
                 case (uint)SDL.EventType.KeyUp:
-                    _camera?.UpdateKeyUp(@event.Key.Key);
+                    _view.Camera.UpdateKeyUp(@event.Key.Key);
                     UIManager.Controller?.UpdateImGuiKey(@event.Key.Key, false);
                     UIManager.Controller?.UpdateImGuiKeyModifiers(@event.Key.Mod);
                     break;
@@ -203,14 +193,14 @@ namespace XNOEdit
                     SDL.WarpMouseInWindow(_window, _captureStartPosition.X, _captureStartPosition.Y);
 
                     if (xOffset != 0 || yOffset != 0)
-                        _camera?.OnMouseMove(xOffset, yOffset);
+                        _view.Camera.OnMouseMove(xOffset, yOffset);
 
                     break;
                 case (uint)SDL.EventType.MouseWheel:
                     UIManager.Controller?.UpdateImGuiMouseWheel(@event.Wheel.X, @event.Wheel.Y);
 
                     if (UIManager.ViewportWantsInput)
-                        _camera?.ProcessMouseScroll(@event.Wheel.Y, _settings.CameraSensitivity);
+                        _view.Camera.ProcessMouseScroll(@event.Wheel.Y, _settings.CameraSensitivity);
 
                     break;
                 case (uint)SDL.EventType.MouseButtonDown:
@@ -309,7 +299,7 @@ namespace XNOEdit
             var setName = Path.GetFileNameWithoutExtension(setFile.Name);
             var terrainPath = MissionsMap.GetTerrainPath(setName);
 
-            var currentStage = _scene;
+            var currentStage = _view.Scene;
             var canReuseTerrain = currentStage?.TerrainName == terrainPath && terrainPath != null;
 
             if (canReuseTerrain)
@@ -338,8 +328,7 @@ namespace XNOEdit
                 // No terrain for this mission
                 DispatchToMainThread(() =>
                 {
-                    _scene?.Dispose();
-                    _scene = new Scene(_device,[], _envMap);
+                    _view.SetScene(new Scene(_device, [], _envMap));
                 });
             }
 
@@ -359,7 +348,7 @@ namespace XNOEdit
 
                 visibility.VisibilityChanged += (objectIndex, meshIndex, visible) =>
                 {
-                    _scene?.SetObjectVisible(0, objectIndex, meshIndex, visible);
+                    _view.Scene?.SetObjectVisible(0, objectIndex, meshIndex, visible);
                 };
 
                 SDL.SetWindowTitle(_window, $"XNOEdit - {result.Xno.Name}");
@@ -375,12 +364,9 @@ namespace XNOEdit
                     UIManager.TriggerAlert(AlertLevel.Warning, "XNO has no geometry");
                 }
 
-                _scene?.Dispose();
-                _scene = new Scene(_device, [result.Renderer], _envMap);
-                _sceneConfig = null;
-
-                _modelCenter = result.ObjectChunk.Centre;
-                SetModelRadius(result.ObjectChunk.Radius);
+                _view.SetScene(new Scene(_device, [result.Renderer], _envMap));
+                _view.Config = null;
+                _view.Frame(result.ObjectChunk.Centre, result.ObjectChunk.Radius);
             }
             else
             {
@@ -405,12 +391,12 @@ namespace XNOEdit
 
             visibility.XnoVisibilityChanged += (xnoIndex, visible) =>
             {
-                _scene?.SetVisible(xnoIndex, visible);
+                _view.Scene?.SetVisible(xnoIndex, visible);
             };
 
             visibility.ObjectVisibilityChanged += (xnoIndex, objectIndex, meshIndex, visible) =>
             {
-                _scene?.SetObjectVisible(xnoIndex, objectIndex, meshIndex, visible);
+                _view.Scene?.SetObjectVisible(xnoIndex, objectIndex, meshIndex, visible);
             };
 
             if (result.EnvMap is { } env)
@@ -419,17 +405,14 @@ namespace XNOEdit
                 _envMap = _textureManager.GetIndex(env.Name);
             }
 
-            _scene?.Dispose();
-            _scene = new Scene(_device, renderers, _envMap, result.Name);
-            _modelCenter = Vector3.Zero;
-            _sceneConfig = result.SceneConfig;
-
-            SetModelRadius(result.MaxRadius);
+            _view.SetScene(new Scene(_device, renderers, _envMap, result.Name));
+            _view.Config = result.SceneConfig;
+            _view.Frame(Vector3.Zero, result.MaxRadius);
         }
 
         private static void ApplyMissionResult(MissionLoadResult result)
         {
-            if (_scene is not { } scene)
+            if (_view.Scene is not { } scene)
                 return;
 
             scene.ClearPlaced();
@@ -488,17 +471,12 @@ namespace XNOEdit
 
         private static void OnRender(float deltaTime)
         {
-            if (_camera == null)
-            {
-                return;
-            }
-
             // Resize the viewport targets from last frame's ImGui layout, before anything
             // samples or renders to them.
             UIManager.ViewportPanel.PrepareFrame();
 
-            var view = _camera.GetViewMatrix();
-            var projection = _camera.GetProjectionMatrix(UIManager.ViewportPanel.GetAspectRatio());
+            var view = _view.Camera.GetViewMatrix();
+            var projection = _view.Camera.GetProjectionMatrix(UIManager.ViewportPanel.GetAspectRatio());
 
             // Build the UI and finalise its draw data.
             UIManager.BuildUI(view, deltaTime, _settings, _textureManager);
@@ -529,38 +507,7 @@ namespace XNOEdit
                 scene.ResolveTo(viewportColor, viewportResolve);
             }
 
-            scene.Execute(ctx =>
-                {
-                    _skybox?.Draw(ctx, view, projection,
-                        new SkyboxParameters
-                        {
-                            CameraPosition = _camera.Position,
-                            SunDirection = _settings.SunDirection,
-                            SunColor = _settings.SunColor
-                        });
-
-                    if (_settings.ShowGrid)
-                    {
-                        _grid?.Draw(ctx, view, projection,
-                            new GridParameters
-                            {
-                                Model = Matrix4x4.CreateTranslation(_modelCenter),
-                                Position = _camera.Position,
-                                FadeDistance = _modelRadius * 5.0f
-                            });
-                    }
-
-                    _scene?.Render(ctx, view, projection,
-                        new ModelParameters
-                        {
-                            Position = _camera.Position,
-                            CullBackfaces = _settings.BackfaceCulling,
-                            GuestDraw = _guestDraw,
-                            TextureManager = _textureManager,
-                            Scene = _sceneConfig ?? new SceneConfig(),
-                            EnvMap = new SlTextureIndex()
-                        });
-                });
+            scene.Execute(ctx => _view.Draw(ctx, view, projection, _settings));
 
             frame.AddPass("UI")
                 .Reads(viewportResolve)
@@ -580,9 +527,7 @@ namespace XNOEdit
             _graph?.WaitForIdle();
 
             _uploader?.Dispose();
-            _scene?.Dispose();
-            _grid?.Dispose();
-            _skybox?.Dispose();
+            _view?.Dispose();
 
             _textureManager?.Dispose();
 
@@ -678,30 +623,6 @@ namespace XNOEdit
                     Logger.Error?.PrintStack(LogClass.Application, "Load chain failed");
                 });
             };
-        }
-
-        private static void SetModelRadius(float radius)
-        {
-            _modelRadius = radius;
-
-            if (_camera != null)
-            {
-                _camera.SetModelRadius(radius);
-                _camera.NearPlane = 0.01f;
-                _camera.FarPlane = Math.Max(radius * 10.0f, 1000.0f);
-            }
-
-            var gridSize = radius * 4.0f;
-            _grid?.Dispose();
-            _grid = new GridRenderer(_device, gridSize);
-
-            ResetCamera();
-        }
-
-        private static void ResetCamera()
-        {
-            var distance = Math.Max(_modelRadius * 2.5f, 10.0f);
-            _camera?.FrameTarget(_modelCenter, distance);
         }
     }
 
