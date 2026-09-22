@@ -8,30 +8,21 @@ namespace XNOEdit.Render
     /// </summary>
     public class MeshGeometry : IDisposable
     {
-        private readonly SlDevice _device;
-
         private SlBuffer? _sharedVertexBuffer;
         private SlBuffer? _indexBuffer;
 
         public uint IndexCount { get; private set; }
 
-        public MeshGeometry(SlDevice device)
+        public void Bind(SlPassContext ctx, uint slot, uint stride)
         {
-            _device = device;
+            ctx.SetVertexBuffer(slot, _sharedVertexBuffer!.View, stride);
+            ctx.SetIndexBuffer(_indexBuffer!.View);
         }
 
-        /// <summary>
-        /// Creates geometry using a shared vertex buffer with owned index buffer
-        /// </summary>
-        public static MeshGeometry CreateWithSharedVertices(
-            SlDevice device,
-            SlBuffer sharedVertexBuffer,
-            ushort[] indices)
+        public void Dispose()
         {
-            var geometry = new MeshGeometry(device);
-            geometry._sharedVertexBuffer = sharedVertexBuffer;
-            geometry.SetIndices(device, indices);
-            return geometry;
+            _indexBuffer?.Dispose();
+            // Don't dispose shared vertex buffer - it's owned elsewhere
         }
 
         /// <summary>
@@ -47,16 +38,10 @@ namespace XNOEdit.Render
             return CreateWithSharedVertices(device, sharedVertexBuffer, triangleIndices);
         }
 
-        private void SetIndices(SlDevice device, ushort[] indices)
-        {
-            IndexCount = (uint)indices.Length;
-            _indexBuffer = device.CreateBuffer(indices, SlBufferUsage.Index);
-        }
-
         /// <summary>
         /// Converts triangle strip indices to triangle list, handling degenerate triangles
         /// </summary>
-        public static ushort[] ConvertStripsToTriangles(List<ushort> stripLengths, List<ushort> indices)
+        private static ushort[] ConvertStripsToTriangles(List<ushort> stripLengths, List<ushort> indices)
         {
             var triangles = new List<ushort>();
             var offset = 0;
@@ -100,49 +85,23 @@ namespace XNOEdit.Render
         }
 
         /// <summary>
-        /// Generates wireframe (line list) indices from triangle indices
+        /// Creates geometry using a shared vertex buffer with owned index buffer
         /// </summary>
-        public static ushort[] GenerateWireframeIndices(ushort[] triangleIndices)
+        private static MeshGeometry CreateWithSharedVertices(
+            SlDevice device,
+            SlBuffer sharedVertexBuffer,
+            ushort[] indices)
         {
-            var lines = new HashSet<(ushort, ushort)>();
-
-            for (var i = 0; i < triangleIndices.Length; i += 3)
-            {
-                var v0 = triangleIndices[i];
-                var v1 = triangleIndices[i + 1];
-                var v2 = triangleIndices[i + 2];
-
-                AddLine(lines, v0, v1);
-                AddLine(lines, v1, v2);
-                AddLine(lines, v2, v0);
-            }
-
-            var result = new List<ushort>(lines.Count * 2);
-            foreach (var (a, b) in lines)
-            {
-                result.Add(a);
-                result.Add(b);
-            }
-
-            return result.ToArray();
+            var geometry = new MeshGeometry();
+            geometry._sharedVertexBuffer = sharedVertexBuffer;
+            geometry.SetIndices(device, indices);
+            return geometry;
         }
 
-        private static void AddLine(HashSet<(ushort, ushort)> lines, ushort a, ushort b)
+        private void SetIndices(SlDevice device, ushort[] indices)
         {
-            // Always store with smaller index first to avoid duplicate reversed edges
-            lines.Add(a < b ? (a, b) : (b, a));
-        }
-
-        public void Bind(SlPassContext ctx, uint slot, uint stride)
-        {
-            ctx.SetVertexBuffer(slot, _sharedVertexBuffer!.View, stride);
-            ctx.SetIndexBuffer(_indexBuffer!.View);
-        }
-
-        public void Dispose()
-        {
-            _indexBuffer?.Dispose();
-            // Don't dispose shared vertex buffer - it's owned elsewhere
+            IndexCount = (uint)indices.Length;
+            _indexBuffer = device.CreateBuffer(indices, SlBufferUsage.Index);
         }
     }
 }

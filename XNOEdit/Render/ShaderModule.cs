@@ -6,9 +6,8 @@ namespace XNOEdit.Render
     {
         private const string EntryPoint = "shaderMain";
 
-        public SlMaterial Material { get; }
-
-        public SlPipelineVariant Variant { get; }
+        private SlMaterial Material { get; }
+        private SlPipelineVariant Variant { get; }
 
         protected ShaderModule(
             SlDevice device,

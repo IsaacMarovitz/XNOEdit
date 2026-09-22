@@ -242,8 +242,7 @@ namespace XNOEdit.Managers
         }
 
         public unsafe void BuildUI(
-            Matrix4x4 view, Matrix4x4 projection,
-            double deltaTime, RenderSettings settings, TextureManager textureManager)
+            Matrix4x4 view, double deltaTime, RenderSettings settings, TextureManager textureManager)
         {
             Controller?.Update((float)deltaTime);
 

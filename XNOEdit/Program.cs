@@ -512,7 +512,7 @@ namespace XNOEdit
             var projection = _camera.GetProjectionMatrix(UIManager.ViewportPanel.GetAspectRatio());
 
             // Build the UI and finalise its draw data.
-            UIManager.BuildUI(view, projection, deltaTime, _settings, _textureManager);
+            UIManager.BuildUI(view, deltaTime, _settings, _textureManager);
             ImGui.Render();
 
             // Servicing texture requests stages uploads, so both must complete before the
