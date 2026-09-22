@@ -48,7 +48,7 @@ namespace XNOEdit.Panels
             ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
 
             ImGui.Text("File Name:");
-            ImGui.Text($"{_xno.Name}");
+            ImGui.Text($"{_xno.Name ?? "<Unknown>"}");
 
             if (ImGui.BeginTabBar("Tab Bar", ImGuiTabBarFlags.AutoSelectNewTabs))
             {
@@ -174,7 +174,7 @@ namespace XNOEdit.Panels
             var meshRadius = meshSet.Radius;
             ImGui.InputFloat("Radius", ref meshRadius, 0f, 0f, "%.1f", ImGuiInputTextFlags.ReadOnly);
 
-            var techniqueShown = false;
+            string? techniqueName = null;
 
             if (effectListChunk != null)
             {
@@ -182,15 +182,13 @@ namespace XNOEdit.Panels
 
                 if (effect != null)
                 {
-                    ImGui.Text($"Technique: {effect.Name}");
-                    techniqueShown = true;
+                    techniqueName = effect.Name;
                 }
             }
 
             ImGui.SeparatorText("Indices");
             ImGui.Text($"Material: {meshSet.MaterialIndex}");
-            if (!techniqueShown)
-                ImGui.Text($"Technique: {meshSet.TechniqueIndex}");
+            ImGui.Text($"Technique: {techniqueName ?? "<Unknown>"} ({meshSet.TechniqueIndex})");
             ImGui.Text($"Matrix: {meshSet.MatrixIndex}");
             ImGui.Text($"Node: {meshSet.NodeIndex}");
             ImGui.Text($"Primitive List: {meshSet.PrimitiveListIndex}");

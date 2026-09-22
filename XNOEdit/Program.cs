@@ -49,6 +49,7 @@ namespace XNOEdit
         private static LoadChain? _loadChain;
         private static readonly ConcurrentQueue<Action> _mainThreadQueue = new();
         private static TextureManager _textureManager;
+        private static SlTextureIndex _envMap = SlTextureIndex.NullTextureCube;
         private static readonly List<Actor> _propActors = [];
 
         private static ulong _previousTick;
@@ -350,7 +351,7 @@ namespace XNOEdit
                 DispatchToMainThread(() =>
                 {
                     _scene?.Dispose();
-                    _scene = new Scene(_device, []);
+                    _scene = new Scene(_device,[], _envMap);
                 });
             }
 
@@ -387,7 +388,7 @@ namespace XNOEdit
                 }
 
                 _scene?.Dispose();
-                _scene = new Scene(_device, [result.Renderer]);
+                _scene = new Scene(_device, [result.Renderer], _envMap);
                 _sceneConfig = null;
 
                 _modelCenter = result.ObjectChunk.Centre;
@@ -424,8 +425,14 @@ namespace XNOEdit
                 _scene?.SetObjectVisible(xnoIndex, objectIndex, meshIndex, visible);
             };
 
+            if (result.EnvMap is { } env)
+            {
+                _textureManager.Add(env.Name, env.Texture);
+                _envMap = _textureManager.GetIndex(env.Name);
+            }
+
             _scene?.Dispose();
-            _scene = new Scene(_device, renderers, result.Name);
+            _scene = new Scene(_device, renderers, _envMap, result.Name);
             _modelCenter = Vector3.Zero;
             _sceneConfig = result.SceneConfig;
 

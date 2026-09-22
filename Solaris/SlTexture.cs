@@ -38,6 +38,18 @@ namespace Solaris
             Usage = SlTextureUsage.Sampled,
         };
 
+        public static SlTextureDescriptor SampledCube(uint size, RenderFormat format, uint mipLevels = 1) => new()
+        {
+            Dimension = RenderTextureDimension.Texture2D,
+            Width = size,
+            Height = size,
+            Depth = 1,
+            MipLevels = mipLevels,
+            ArraySize = 6,
+            Format = format,
+            Usage = SlTextureUsage.Sampled | SlTextureUsage.Cube,
+        };
+
         public static SlTextureDescriptor ColorTarget(uint width, uint height, RenderFormat format, uint sampleCount = 1) => new()
         {
             Width = width,

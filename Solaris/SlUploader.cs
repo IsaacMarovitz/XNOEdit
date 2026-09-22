@@ -89,16 +89,19 @@ namespace Solaris
                 sourceRowPitch = bytesPerRow;
             }
 
-            var bytesPerTexel = bytesPerRow / Math.Max(width, 1u);
+            var (blockSize, bytesPerBlock) = DescribeFormat(texture.Format);
+            var rows = (height + blockSize - 1) / blockSize;
+
+            var bytesPerTexel = blockSize > 1 ? 0u : bytesPerRow / Math.Max(width, 1u);
             var alignedBytesPerRow = (bytesPerRow + RowAlignment - 1) & ~(RowAlignment - 1);
-            var totalSize = (ulong)alignedBytesPerRow * height;
+            var totalSize = (ulong)alignedBytesPerRow * rows;
 
             lock (_lock)
             {
                 var (block, offset) = Reserve(totalSize);
                 var destination = block.AsSpan();
 
-                for (var row = 0u; row < height; row++)
+                for (var row = 0u; row < rows; row++)
                 {
                     var sourceRow = source.Slice((int)(row * sourceRowPitch), (int)bytesPerRow);
                     var destinationStart = (int)(offset + row * alignedBytesPerRow);
@@ -106,7 +109,10 @@ namespace Solaris
                     sourceRow.CopyTo(destination.Slice(destinationStart, (int)bytesPerRow));
                 }
 
-                var rowWidthInTexels = bytesPerTexel > 0 ? alignedBytesPerRow / bytesPerTexel : width;
+                // The copy descriptor wants the padded pitch expressed in texels.
+                var rowWidthInTexels = blockSize > 1
+                    ? alignedBytesPerRow / bytesPerBlock * blockSize
+                    : bytesPerTexel > 0 ? alignedBytesPerRow / bytesPerTexel : width;
 
                 _pending.Add(new PendingTextureCopy(
                     (nint)texture.Handle, offset, mipLevel, arrayIndex,
@@ -116,6 +122,20 @@ namespace Solaris
                 _pendingTextures.Add((nint)texture.Handle);
             }
         }
+
+        private static (uint BlockSize, uint BytesPerBlock) DescribeFormat(RenderFormat format) => format switch
+        {
+            RenderFormat.Bc1Typeless or RenderFormat.Bc1Unorm or RenderFormat.Bc1UnormSrgb
+                or RenderFormat.Bc4Typeless or RenderFormat.Bc4Unorm or RenderFormat.Bc4Snorm => (4u, 8u),
+
+            RenderFormat.Bc2Typeless or RenderFormat.Bc2Unorm or RenderFormat.Bc2UnormSrgb
+                or RenderFormat.Bc3Typeless or RenderFormat.Bc3Unorm or RenderFormat.Bc3UnormSrgb
+                or RenderFormat.Bc5Typeless or RenderFormat.Bc5Unorm or RenderFormat.Bc5Snorm
+                or RenderFormat.Bc6HTypeless or RenderFormat.Bc6HUf16 or RenderFormat.Bc6HSf16
+                or RenderFormat.Bc7Typeless or RenderFormat.Bc7Unorm or RenderFormat.Bc7UnormSrgb => (4u, 16u),
+
+            _ => (1u, 0u),
+        };
 
         /// <summary>
         /// Records every staged copy, submits, and waits for completion. Call from the

@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Numerics;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
@@ -8,6 +7,7 @@ using Marathon.IO.Types.FileSystem;
 using Pfim;
 using Plume;
 using Solaris;
+using XNOEdit.Formats;
 using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
@@ -72,6 +72,7 @@ namespace XNOEdit.Services
         string Name,
         List<ArcXnoEntry> Entries,
         List<LoadedTexture> Textures,
+        LoadedTexture? EnvMap,
         SceneConfig? SceneConfig,
         float MaxRadius
     );
@@ -306,9 +307,23 @@ namespace XNOEdit.Services
                 var maxRadius = 0f;
 
                 var name = Path.GetFileNameWithoutExtension(file.Location);
-                Logger.Info?.PrintMsg(LogClass.Application, $"Loading ARC: {name}");
+                Logger.Info?.PrintMsg(LogClass.Application, $"Loading ARC: {file.Location}");
 
                 progress?.Report(new LoadProgress(LoadStage.Starting, $"Scanning {name}..."));
+
+                LoadedTexture? envMap = null;
+                SlTexture? envMapTexture = null;
+                var envMapPath = config?.EnvMap;
+
+                if (envMapPath != null)
+                {
+                    Logger.Error?.PrintMsg(LogClass.Application, envMapPath);
+                    envMapTexture = LoadTexture(file.GetFile(Path.Join("win32", envMapPath)));
+                    Logger.Error?.PrintMsg(LogClass.Application, $"texture is {envMapTexture == null} null");
+                }
+
+                if (envMapTexture != null)
+                    envMap = new LoadedTexture(envMapPath, envMapTexture);
 
                 var models = file.EnumerateFiles("*.xno", SearchOption.AllDirectories).ToList();
                 var total = models.Count;
@@ -357,7 +372,7 @@ namespace XNOEdit.Services
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {name}", total, total));
 
-                return new StageLoadResult(name, entries, allTextures, config, maxRadius);
+                return new StageLoadResult(name, entries, allTextures, envMap, config, maxRadius);
             }, cancellationToken);
         }
 
@@ -391,7 +406,7 @@ namespace XNOEdit.Services
             return result;
         }
 
-                private SlTexture? LoadTexture(IFile file)
+        private SlTexture? LoadTexture(IFile file)
         {
             try
             {
@@ -404,37 +419,33 @@ namespace XNOEdit.Services
                     bytes = memory.ToArray();
                 }
 
-                using var image = Pfimage.FromStream(new MemoryStream(bytes));
-
-                var mipLevelCount = image.MipMaps != null && image.MipMaps.Length > 0
-                    ? (uint)(image.MipMaps.Length + 1)
-                    : 1u;
+                if (DdsImage.Parse(bytes, file.Name) is not { } dds)
+                    return null;
 
                 Logger.Debug?.PrintMsg(LogClass.Application,
-                    $"  Loading {file.Name}: {image.Width}x{image.Height}, {mipLevelCount} mip levels, format: {image.Format}");
+                    $"  Loading {file.Name}: {dds.Width}x{dds.Height}, {dds.MipLevels} mip levels, " +
+                    $"{dds.Faces} face(s), {dds.Format}");
 
-                var single = image.Format == ImageFormat.Rgb8;
+                var descriptor = dds.IsCubeMap
+                    ? SlTextureDescriptor.SampledCube((uint)dds.Width, dds.Format, (uint)dds.MipLevels)
+                    : SlTextureDescriptor.Sampled2D((uint)dds.Width, (uint)dds.Height, dds.Format, (uint)dds.MipLevels);
 
-                var descriptor = SlTextureDescriptor.Sampled2D(
-                    (uint)image.Width, (uint)image.Height,
-                    single ? RenderFormat.R8Unorm : RenderFormat.B8G8R8A8Unorm,
-                    mipLevelCount);
+                var texture = _device.CreateTexture(descriptor with { ComponentMapping = dds.Mapping }, file.Name);
 
-                if (single)
-                    descriptor = descriptor with { ComponentMapping = SingleChannelMapping(bytes) };
-
-                var texture = _device.CreateTexture(descriptor, file.Name);
-
-                UploadMipLevel(texture, image.Data, 0, image.Data.Length,
-                    image.Width, image.Height, image.Stride, 0, image.Format);
-
-                if (image.MipMaps is { Length: > 0 })
+                for (var face = 0; face < dds.Faces; face++)
                 {
-                    for (var i = 0; i < image.MipMaps.Length; i++)
+                    for (var level = 0; level < dds.MipLevels; level++)
                     {
-                        var mipMap = image.MipMaps[i];
-                        UploadMipLevel(texture, image.Data, mipMap.DataOffset, mipMap.DataLen,
-                            mipMap.Width, mipMap.Height, mipMap.Stride, (uint)(i + 1), image.Format);
+                        var (width, height) = dds.LevelSize(level);
+
+                        _uploader.StageTexture(
+                            texture,
+                            dds.Data.AsSpan(dds.Offset(face, level), dds.LevelLength(level)),
+                            (uint)width,
+                            (uint)height,
+                            bytesPerRow: (uint)dds.RowPitch(level),
+                            mipLevel: (uint)level,
+                            arrayIndex: (uint)face);
                     }
                 }
 
@@ -442,135 +453,11 @@ namespace XNOEdit.Services
             }
             catch (Exception ex)
             {
-                Logger.Error?.PrintMsg(LogClass.Application, $"Failed to load texture {file.Name}: {ex.Message}");
+                Logger.Error?.PrintMsg(LogClass.Application,
+                    $"Failed to load texture {file.Name}: {ex.GetType().Name}: {ex.Message}");
+
                 return null;
             }
-        }
-
-        private static RenderComponentMapping SingleChannelMapping(ReadOnlySpan<byte> dds)
-        {
-            const uint DdpfAlpha = 0x2;
-            const uint DdpfLuminance = 0x20000;
-
-            var flags = dds.Length >= 84
-                ? BinaryPrimitives.ReadUInt32LittleEndian(dds[80..84])
-                : 0u;
-
-            if ((flags & DdpfAlpha) != 0)
-            {
-                return new RenderComponentMapping(
-                    RenderSwizzle.Zero, RenderSwizzle.Zero, RenderSwizzle.Zero, RenderSwizzle.R);
-            }
-
-            if ((flags & DdpfLuminance) != 0)
-            {
-                return new RenderComponentMapping(
-                    RenderSwizzle.R, RenderSwizzle.R, RenderSwizzle.R, RenderSwizzle.One);
-            }
-
-            Logger.Warning?.PrintMsg(LogClass.Application,
-                $"Single-channel DDS with neither the alpha nor luminance flag (0x{flags:X})");
-
-            return new RenderComponentMapping(
-                RenderSwizzle.R, RenderSwizzle.R, RenderSwizzle.R, RenderSwizzle.One);
-        }
-
-        private void UploadMipLevel(SlTexture texture, byte[] sourceData, int dataOffset, int dataLen,
-            int width, int height, int stride, uint mipLevel, ImageFormat format)
-        {
-            var mipData = new byte[dataLen];
-            Array.Copy(sourceData, dataOffset, mipData, 0, dataLen);
-
-            var single = format == ImageFormat.Rgb8;
-
-            var imageData = single
-                ? PackSingleChannel(mipData, width, height, stride)
-                : ConvertToRgba(mipData, width, height, stride, format);
-
-            _uploader.StageTexture(
-                texture,
-                imageData,
-                (uint)width,
-                (uint)height,
-                bytesPerRow: (uint)(width * (single ? 1 : 4)),
-                mipLevel: mipLevel);
-        }
-
-        private static byte[] PackSingleChannel(byte[] data, int width, int height, int stride)
-        {
-            var packed = new byte[width * height];
-
-            for (var y = 0; y < height; y++)
-            {
-                Array.Copy(data, y * stride, packed, y * width, width);
-            }
-
-            return packed;
-        }
-
-        private static byte[] ConvertToRgba(byte[] data, int width, int height, int stride, ImageFormat format)
-        {
-            var bytesPerPixel = GetBytesPerPixel(format);
-            var rgbaData = new byte[width * height * 4];
-
-            for (var y = 0; y < height; y++)
-            {
-                var srcRowStart = y * stride;
-                var dstRowStart = y * width * 4;
-
-                for (var x = 0; x < width; x++)
-                {
-                    var srcIdx = srcRowStart + x * bytesPerPixel;
-                    var dstIdx = dstRowStart + x * 4;
-
-                    switch (format)
-                    {
-                        case ImageFormat.Rgb24:
-                            rgbaData[dstIdx + 0] = data[srcIdx + 0];
-                            rgbaData[dstIdx + 1] = data[srcIdx + 1];
-                            rgbaData[dstIdx + 2] = data[srcIdx + 2];
-                            rgbaData[dstIdx + 3] = 255;
-                            break;
-
-                        case ImageFormat.Rgba32:
-                            rgbaData[dstIdx + 0] = data[srcIdx + 0];
-                            rgbaData[dstIdx + 1] = data[srcIdx + 1];
-                            rgbaData[dstIdx + 2] = data[srcIdx + 2];
-                            rgbaData[dstIdx + 3] = data[srcIdx + 3];
-                            break;
-
-                        case ImageFormat.Rgb8:
-                            var gray = data[srcIdx];
-                            rgbaData[dstIdx + 0] = gray;
-                            rgbaData[dstIdx + 1] = gray;
-                            rgbaData[dstIdx + 2] = gray;
-                            rgbaData[dstIdx + 3] = 255;
-                            break;
-
-                        default:
-                            if (bytesPerPixel >= 4)
-                            {
-                                rgbaData[dstIdx + 0] = data[srcIdx + 0];
-                                rgbaData[dstIdx + 1] = data[srcIdx + 1];
-                                rgbaData[dstIdx + 2] = data[srcIdx + 2];
-                                rgbaData[dstIdx + 3] = data[srcIdx + 3];
-                            }
-                            break;
-                    }
-                }
-            }
-
-            return rgbaData;
-        }
-
-        private static int GetBytesPerPixel(ImageFormat format)
-        {
-            return format switch
-            {
-                ImageFormat.Rgb8 => 1,
-                ImageFormat.Rgb24 => 3,
-                _ => 4
-            };
         }
     }
 }
