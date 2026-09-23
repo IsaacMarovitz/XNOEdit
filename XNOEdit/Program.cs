@@ -7,6 +7,7 @@ using Solaris;
 using Solaris.Graph;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
+using XNOEdit.Panels;
 using XNOEdit.Render;
 using XNOEdit.Services;
 using LogLevel = XNOEdit.Logging.LogLevel;
@@ -98,12 +99,25 @@ namespace XNOEdit
 
         private static SDL.AppResult AppIter(IntPtr appState)
         {
-            var diff = SDL.GetTicks() - _previousTick;
-            _previousTick = SDL.GetTicks();
-            _deltaTime = Math.Max((float)diff / 1000, 0.000001f);
+            var ticks = SDL.GetTicksNS();
+            var diff = ticks - _previousTick;
+            _previousTick = ticks;
+            _deltaTime = Math.Max(diff / 1_000_000_000.0f, 0.000001f);
 
             _input.Update(_deltaTime);
             _loader.ProcessMainThreadQueue();
+
+            UIManager.PerformancePanel?.Record(new PerformanceSample
+            {
+                FrameTime = _deltaTime,
+                ManagedMemory = GC.GetTotalMemory(false),
+                WorkingSet = Environment.WorkingSet,
+                Graph = _graph.Statistics,
+                StagingFlushed = _uploader.LastFlushBytes,
+                StagingCapacity = _uploader.StagingCapacity,
+                PendingRetirements = _device.Retirement.PendingCount,
+                BindlessTextures = _device.Tables.TextureCount,
+            });
 
             OnRender(_deltaTime);
 

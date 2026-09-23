@@ -95,6 +95,8 @@ namespace Solaris
         private readonly bool _ownsTexture;
         private bool _disposed;
 
+        internal bool IsDisposed => _disposed;
+
         internal SlTexture(RenderTexture* texture, in SlTextureDescriptor descriptor, bool ownsTexture)
         {
             _texture = texture;

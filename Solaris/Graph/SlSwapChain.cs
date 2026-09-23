@@ -102,6 +102,29 @@ namespace Solaris.Graph
             return texture;
         }
 
+        public RenderFramebuffer* GetFramebuffer(uint textureIndex)
+        {
+            if (_framebuffers.TryGetValue(textureIndex, out var cached))
+                return (RenderFramebuffer*)cached;
+
+            var colors = stackalloc RenderTexture*[1];
+            colors[0] = GetTexture(textureIndex).Handle;
+
+            var desc = new RenderFramebufferDesc
+            {
+                ColorAttachments = colors,
+                ColorAttachmentsCount = 1,
+            };
+
+            var framebuffer = _device.Handle->CreateFramebuffer(&desc);
+
+            if (framebuffer == null)
+                throw new InvalidOperationException("Failed to create a swap chain framebuffer.");
+
+            _framebuffers[textureIndex] = (nint)framebuffer;
+            return framebuffer;
+        }
+
         public RenderCommandList* CommandList(int frameSlot) => _commandLists[frameSlot];
 
         public RenderCommandFence* Fence(int frameSlot) => _fences[frameSlot];

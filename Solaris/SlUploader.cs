@@ -7,6 +7,10 @@ namespace Solaris
     /// </summary>
     public sealed unsafe class SlUploader : IDisposable
     {
+        public ulong LastFlushBytes { get; private set; }
+
+        public ulong StagingCapacity => StagingBlockSize;
+
         private const ulong StagingBlockSize = 32 * 1024 * 1024;
 
         /// <summary>
@@ -147,6 +151,8 @@ namespace Solaris
 
             lock (_lock)
             {
+                LastFlushBytes = _cursor;
+
                 if (_pending.Count == 0)
                     return;
 

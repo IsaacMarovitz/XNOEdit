@@ -46,5 +46,14 @@ namespace XNOEdit.Panels
             remaining = opposite;
             return node;
         }
+
+        public static void PlotLines(
+            string label, ReadOnlySpan<float> values, int offset, float min, float max, Vector2 size)
+        {
+            fixed (float* pointer = values)
+            {
+                ImGui.PlotLines(label, pointer, values.Length, offset, string.Empty, min, max, size);
+            }
+        }
     }
 }

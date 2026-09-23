@@ -17,6 +17,17 @@ namespace Solaris
 
         private ulong _currentFrame;
 
+        public int PendingCount
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _pending.Count;
+                }
+            }
+        }
+
         public SlRetirementQueue(int framesInFlight)
         {
             if (framesInFlight < 1)

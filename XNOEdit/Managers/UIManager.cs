@@ -25,6 +25,7 @@ namespace XNOEdit.Managers
         public StagePanel? StagePanel { get; private set; }
         public StagesPanel? StagesPanel { get; private set; }
         public MissionsPanel? MissionsPanel { get; private set; }
+        public PerformancePanel? PerformancePanel { get; private set; }
         public LoadProgress? CurrentLoadProgress { get; set; }
         private ISceneVisibility? _currentVisibility;
 
@@ -37,6 +38,7 @@ namespace XNOEdit.Managers
         private bool _xnoWindow = true;
         private bool _stageWindow = true;
         private bool _environmentWindow = true;
+        private bool _performanceWindow = true;
         private bool _fileBrowser = true;
         private bool _guizmos = true;
         private float _hue;
@@ -52,6 +54,7 @@ namespace XNOEdit.Managers
             MissionsPanel = new MissionsPanel();
             ViewportPanel = new ViewportPanel(device, window);
             EnvironmentPanel = new EnvironmentPanel(this);
+            PerformancePanel = new PerformancePanel();
 
             var io = ImGui.GetIO();
             io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
@@ -263,6 +266,7 @@ namespace XNOEdit.Managers
 
                 ImGuiP.DockBuilderDockWindow(ViewportPanel.Name, remainingId);
                 ImGuiP.DockBuilderDockWindow(EnvironmentPanel.Name, leftDock);
+                ImGuiP.DockBuilderDockWindow(PerformancePanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(XnoPanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(StagePanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(MissionPanel.Name, leftDock);
@@ -294,6 +298,9 @@ namespace XNOEdit.Managers
                 StagesPanel?.Render();
                 MissionsPanel?.Render();
             }
+
+            if (_performanceWindow)
+                PerformancePanel?.Render();
 
             ViewportPanel?.Render(view, _guizmos);
 
@@ -343,6 +350,7 @@ namespace XNOEdit.Managers
                     ImGui.MenuItem("Stage", "", ref _stageWindow);
                     ImGui.MenuItem("Environment", "", ref _environmentWindow);
                     ImGui.MenuItem("File Browser", "", ref _fileBrowser);
+                    ImGui.MenuItem("Performance", "", ref _performanceWindow);
 
                     ImGui.Separator();
 

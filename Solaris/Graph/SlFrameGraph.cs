@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Plume;
 
 namespace Solaris.Graph
@@ -8,6 +9,10 @@ namespace Solaris.Graph
     /// </summary>
     public sealed unsafe class SlFrameGraph : IDisposable
     {
+        public readonly record struct SlFrameStatistics(ulong RingBytesUsed, ulong RingCapacity, TimeSpan FenceWait, int TrackedResources);
+
+        public SlFrameStatistics Statistics { get; private set; }
+
         private const ulong RingBlockSize = 8 * 1024 * 1024 * 4;
 
         private readonly SlDevice _device;
@@ -20,6 +25,7 @@ namespace Solaris.Graph
         private int _frameSlot;
         private readonly bool[] _slotInFlight = new bool[SlDevice.FramesInFlight];
         private bool _disposed;
+        private TimeSpan _fenceWait;
 
         public SlFrameGraph(SlDevice device, SlSurface surface, RenderFormat format, uint maxFrameLatency = 0)
         {
@@ -63,13 +69,24 @@ namespace Solaris.Graph
             if (_swapChain.IsEmpty)
                 return null;
 
+            _fenceWait = TimeSpan.Zero;
+
             if (_slotInFlight[_frameSlot])
             {
+                var waitStart = Stopwatch.GetTimestamp();
                 _device.Queue->WaitForCommandFence(_swapChain.Fence(_frameSlot));
+                _fenceWait = Stopwatch.GetElapsedTime(waitStart);
                 _slotInFlight[_frameSlot] = false;
             }
 
             _device.Retirement.BeginFrame();
+
+            foreach (var (id, entry) in _resources)
+            {
+                if (entry.Texture is { IsDisposed: true })
+                    _resources.Remove(id);
+            }
+
             _rings[_frameSlot].Reset();
 
             if (!_swapChain.AcquireTexture(_frameSlot, out var textureIndex))
@@ -93,6 +110,9 @@ namespace Solaris.Graph
 
         internal void EndFrame(uint textureIndex)
         {
+            var ring = _rings[_frameSlot];
+            Statistics = new SlFrameStatistics(ring.BytesUsedThisFrame, ring.Capacity, _fenceWait, _resources.Count);
+
             _slotInFlight[_frameSlot] = true;
             _swapChain.Present(textureIndex, _frameSlot);
 
@@ -249,6 +269,7 @@ namespace Solaris.Graph
                 _graph.Device.Retire(texture);
             }
 
+            _graph.Resources.Remove(SwapChainTarget.Id);
             _graph.EndFrame(_textureIndex);
         }
 
@@ -425,6 +446,7 @@ namespace Solaris.Graph
             SlTexture? depth = null;
             var colors = stackalloc RenderTexture*[8];
             var colorCount = 0u;
+            var swapChainOnly = true;
 
             foreach (var access in pass.Accesses)
             {
@@ -436,6 +458,7 @@ namespace Solaris.Graph
                         colors[colorCount++] = texture.Handle;
                         width = texture.Width;
                         height = texture.Height;
+                        swapChainOnly &= entry.IsSwapChainTarget;
                         break;
 
                     case SlAccess.DepthTarget:
@@ -446,6 +469,9 @@ namespace Solaris.Graph
 
             if (colorCount == 0 && depth == null)
                 return null;
+
+            if (swapChainOnly && colorCount == 1 && depth == null)
+                return _graph.SwapChain.GetFramebuffer(_textureIndex);
 
             var desc = new RenderFramebufferDesc
             {
