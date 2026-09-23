@@ -12,6 +12,12 @@ namespace XNOEdit.Panels
             ImGui.Image(new ImTextureRef(null, textureId), size);
         }
 
+        public static void AddImage(
+            ImDrawListPtr drawList, ulong textureId, Vector2 min, Vector2 max, Vector2 uvMin, Vector2 uvMax)
+        {
+            drawList.AddImage(new ImTextureRef(null, textureId), min, max, uvMin, uvMax);
+        }
+
         public static void SetNextWindowClass(ImGuiWindowClass windowClass)
         {
             ImGui.SetNextWindowClass(new ImGuiWindowClassPtr(&windowClass));

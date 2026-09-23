@@ -131,6 +131,16 @@ namespace XNOEdit.Services
         public void LoadGameFolderResources()
         {
             _ui.LoadGameFolderResources();
+
+            try
+            {
+                _ui.SetGameFonts(_fileLoader.ReadGameFonts());
+            }
+            catch (Exception ex)
+            {
+                _ui.TriggerAlert(AlertLevel.Warning, $"Unable to load text.arc: \"{ex.Message}\"");
+            }
+
             try
             {
                 foreach (var file in ArcFiles.GameArc.EnumerateFiles("*.prop", SearchOption.AllDirectories))

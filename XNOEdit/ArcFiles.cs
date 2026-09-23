@@ -28,6 +28,10 @@ namespace XNOEdit
             XenonArcFolder,
             "game.arc"));
 
+        public static ArcFile TextArc = new(Path.Join(
+            XenonArcFolder,
+            "text.arc"));
+
         public static ArcFile Win32Arc(string name, bool withExtension = false)
         {
             return new ArcFile(Path.Join(

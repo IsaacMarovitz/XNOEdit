@@ -3,12 +3,15 @@ using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
+using Marathon.Formats.Text;
 using Marathon.IO.Types.FileSystem;
+using Plume;
 using Solaris;
 using XNOEdit.Formats;
 using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
+using XNOEdit.Render;
 using XNOEdit.Render.Renderers;
 
 namespace XNOEdit.Services
@@ -80,6 +83,11 @@ namespace XNOEdit.Services
         LoadedTexture? EnvMap
     );
 
+    public record GameFontLoadResult(
+        GameFont Font,
+        LoadedTexture Atlas
+    );
+
     public record ArcXnoEntry(
         NinjaNext Xno,
         ObjectChunk ObjectChunk,
@@ -88,6 +96,9 @@ namespace XNOEdit.Services
 
     public class FileLoaderService
     {
+        private static readonly RenderComponentMapping WhiteCoverage = new(
+            RenderSwizzle.One, RenderSwizzle.One, RenderSwizzle.One, RenderSwizzle.R);
+
         private readonly SlDevice _device;
         private readonly SlUploader _uploader;
 
@@ -421,7 +432,46 @@ namespace XNOEdit.Services
             return result;
         }
 
-        private SlTexture? LoadTexture(IFile file)
+        public List<GameFontLoadResult> ReadGameFonts()
+        {
+            var archive = ArcFiles.TextArc;
+            var result = new List<GameFontLoadResult>();
+
+            foreach (var data in GameFont.TextFonts)
+            {
+                if (ReadGameFont(archive, data) is { } font)
+                    result.Add(font);
+            }
+
+            return result;
+        }
+
+        private GameFontLoadResult? ReadGameFont(ArcFile archive, GameFont.TextFontData data)
+        {
+            if (archive.GetFile(Path.Combine("xenon", data.MapPath)) is not { } mapFile ||
+                archive.GetFile(Path.Combine("common", data.ProportionPath)) is not { } proportionFile ||
+                archive.GetFile(Path.Combine("win32", data.TexturePath)) is not { } atlasFile)
+            {
+                Logger.Warning?.PrintMsg(LogClass.Application, $"Text font not found in text.arc: {data.MapPath}");
+                return null;
+            }
+
+            if (LoadTexture(atlasFile, WhiteCoverage) is not { } atlas)
+                return null;
+
+            var map = new TextFontMap(mapFile.Decompress());
+            var proportion = new TextFontProportion(proportionFile.Decompress());
+
+            var font = new GameFont(
+                map, proportion,
+                new Vector2(data.CellWidth, data.CellHeight),
+                new Vector2(data.TextureWidth, data.TextureHeight),
+                atlasFile.Name);
+
+            return new GameFontLoadResult(font, new LoadedTexture(atlasFile.Name, atlas));
+        }
+
+        private SlTexture? LoadTexture(IFile file, RenderComponentMapping? mapping = null)
         {
             try
             {
@@ -445,7 +495,7 @@ namespace XNOEdit.Services
                     ? SlTextureDescriptor.SampledCube((uint)dds.Width, dds.Format, (uint)dds.MipLevels)
                     : SlTextureDescriptor.Sampled2D((uint)dds.Width, (uint)dds.Height, dds.Format, (uint)dds.MipLevels);
 
-                var texture = _device.CreateTexture(descriptor with { ComponentMapping = dds.Mapping }, file.Name);
+                var texture = _device.CreateTexture(descriptor with { ComponentMapping = mapping ?? dds.Mapping }, file.Name);
 
                 for (var face = 0; face < dds.Faces; face++)
                 {

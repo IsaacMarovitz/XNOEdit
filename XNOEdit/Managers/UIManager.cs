@@ -1,6 +1,8 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
+using Marathon.Formats.Text;
+using Marathon.IO.Types.FileSystem;
 using Solaris;
 using XNOEdit.Fonts;
 using XNOEdit.Logging;
@@ -26,6 +28,8 @@ namespace XNOEdit.Managers
         public StagesPanel? StagesPanel { get; private set; }
         public MissionsPanel? MissionsPanel { get; private set; }
         public PerformancePanel? PerformancePanel { get; private set; }
+        public TextPanel? TextPanel { get; private set; }
+        public TextBookPanel? TextBookPanel { get; private set; }
         public LoadProgress? CurrentLoadProgress { get; set; }
         private ISceneVisibility? _currentVisibility;
 
@@ -33,6 +37,8 @@ namespace XNOEdit.Managers
         public ImFontPtr FaFont => _faFont;
 
         private AlertPanel? _alertPanel;
+        private TextureManager? _textTextures;
+        private List<GameFont> _gameFonts = [];
 
         private bool _firstLoop = true;
         private bool _xnoWindow = true;
@@ -49,9 +55,12 @@ namespace XNOEdit.Managers
         {
             Controller = controller;
             _alertPanel = new AlertPanel();
+            _textTextures = new TextureManager(device);
             ObjectsPanel = new ObjectsPanel();
             StagesPanel = new StagesPanel(this);
             MissionsPanel = new MissionsPanel();
+            TextPanel = new TextPanel();
+            TextPanel.LoadTextBook += InitTextBookPanel;
             ViewportPanel = new ViewportPanel(device, window);
             EnvironmentPanel = new EnvironmentPanel(this);
             PerformancePanel = new PerformancePanel();
@@ -239,6 +248,29 @@ namespace XNOEdit.Managers
             SetColors(HueForCategory(category));
         }
 
+        private void InitTextBookPanel(IFile file)
+        {
+            try
+            {
+                TextBookPanel = new TextBookPanel(new TextBook(file.Decompress()));
+                ImGui.SetWindowFocus(TextBookPanel.Name);
+            }
+            catch (Exception ex)
+            {
+                TriggerAlert(AlertLevel.Error, $"Unable to load {file.Name}: \"{ex.Message}\"");
+            }
+        }
+
+        public void SetGameFonts(List<GameFontLoadResult> results)
+        {
+            _textTextures!.Clear();
+
+            foreach (var result in results)
+                _textTextures.Add(result.Atlas.Name, result.Atlas.Texture);
+
+            _gameFonts = results.Select(x => x.Font).ToList();
+        }
+
         public void BuildUI(
             Matrix4x4 view, double deltaTime, RenderSettings settings, SceneEnvironment environment, TextureManager textureManager)
         {
@@ -270,9 +302,11 @@ namespace XNOEdit.Managers
                 ImGuiP.DockBuilderDockWindow(XnoPanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(StagePanel.Name, leftDock);
                 ImGuiP.DockBuilderDockWindow(MissionPanel.Name, leftDock);
+                ImGuiP.DockBuilderDockWindow(TextBookPanel.Name, bottomDock);
                 ImGuiP.DockBuilderDockWindow(ObjectsPanel.Name, bottomDock);
                 ImGuiP.DockBuilderDockWindow(StagesPanel.Name, bottomDock);
                 ImGuiP.DockBuilderDockWindow(MissionsPanel.Name, bottomDock);
+                ImGuiP.DockBuilderDockWindow(TextPanel.Name, bottomDock);
 
                 ImGuiP.DockBuilderFinish(dockspaceId);
 
@@ -291,12 +325,14 @@ namespace XNOEdit.Managers
                 StagePanel?.Render();
 
             MissionPanel?.Render();
+            TextBookPanel?.Render(_gameFonts, _textTextures!);
 
             if (_fileBrowser)
             {
                 ObjectsPanel?.Render();
                 StagesPanel?.Render();
                 MissionsPanel?.Render();
+                TextPanel?.Render();
             }
 
             if (_performanceWindow)
@@ -433,6 +469,7 @@ namespace XNOEdit.Managers
         public void Dispose()
         {
             ViewportPanel?.Dispose();
+            _textTextures?.Dispose();
             Controller?.Dispose();
         }
 
@@ -446,6 +483,7 @@ namespace XNOEdit.Managers
         {
             ObjectsPanel?.LoadGameFolderResources();
             MissionsPanel?.LoadGameFolderResources();
+            TextPanel?.LoadGameFolderResources();
         }
     }
 }
