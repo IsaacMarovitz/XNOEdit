@@ -11,7 +11,6 @@ namespace XNOEdit.Render
         private readonly SlDevice _device;
         private readonly ModelRenderer[] _renderers;
         private readonly Dictionary<string, ModelRenderer> _placed = [];
-        private readonly List<GuestTransparentDraw> _transparentDraws = [];
 
         public Scene(SlDevice device, ModelRenderer[] renderers, string? terrainName = null)
         {
@@ -64,12 +63,6 @@ namespace XNOEdit.Render
             {
                 modelParameters.GuestPhase = phase;
 
-                if (phase == GuestDrawPhase.Transparent)
-                {
-                    DrawTransparent(ctx, view, projection, in modelParameters);
-                    continue;
-                }
-
                 // Collapsing the depth range puts the sky behind everything; its
                 // pipeline compares GreaterEqual so it fills only untouched pixels.
                 if (phase == GuestDrawPhase.Sky)
@@ -83,35 +76,6 @@ namespace XNOEdit.Render
 
                 if (phase == GuestDrawPhase.Sky)
                     ctx.SetViewportDepthRange(0.0f, 1.0f);
-            }
-        }
-
-        private void DrawTransparent(
-            SlPassContext ctx,
-            Matrix4x4 view,
-            Matrix4x4 projection,
-            in ModelParameters modelParameters)
-        {
-            _transparentDraws.Clear();
-
-            foreach (var renderer in _renderers)
-                renderer.CollectTransparent(_transparentDraws, view);
-
-            foreach (var renderer in _placed.Values)
-                renderer.CollectTransparent(_transparentDraws, view);
-
-            if (_transparentDraws.Count == 0)
-                return;
-
-            // Ascending view-space Z is far to near under a right-handed view.
-            _transparentDraws.Sort((a, b) => a.ViewDepth.CompareTo(b.ViewDepth));
-
-            var scene = modelParameters.ToSceneState(view, projection);
-
-            foreach (var draw in _transparentDraws)
-            {
-                draw.Mesh.DrawGuestInstance(
-                    ctx, modelParameters.GuestDraw, modelParameters.TextureManager, in scene, draw.World);
             }
         }
 

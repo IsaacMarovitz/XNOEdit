@@ -35,7 +35,6 @@ namespace XNOEdit.Render.Renderers
     public class ModelRenderer : IDisposable
     {
         private readonly Model _model;
-        private readonly GuestDrawContext _guestDraw = new();
         private bool _reportedGuestFallback;
 
         private Matrix4x4[] _instances = [Matrix4x4.Identity];
@@ -49,8 +48,6 @@ namespace XNOEdit.Render.Renderers
         {
             _model = new Model(device, objectChunk, textureListChunk, effectListChunk, guestMaterial);
         }
-
-        public int InstanceCount => _instances.Length;
 
         public void SetInstances(Matrix4x4[] instances) => _instances = instances;
 
@@ -79,17 +76,12 @@ namespace XNOEdit.Render.Renderers
                 ctx, modelParameters.GuestDraw, modelParameters.TextureManager,
                 in scene, _instances, modelParameters.GuestPhase);
 
-            if (skipped > 0 && !_reportedGuestFallback && modelParameters.GuestPhase == GuestDrawPhase.Opaque)
+            if (skipped > 0 && !_reportedGuestFallback)
             {
                 _reportedGuestFallback = true;
                 Logger.Warning?.PrintMsg(LogClass.Application,
                     $"{skipped} mesh(es) have no recompiled shader and were not drawn");
             }
-        }
-
-        public void CollectTransparent(List<GuestTransparentDraw> sink, Matrix4x4 view)
-        {
-            _model.CollectTransparent(sink, view, _instances);
         }
 
         public void Dispose()

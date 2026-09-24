@@ -218,6 +218,7 @@ namespace XNOEdit.Render
             {
                 GuestDrawPhase.Sky => _sky,
                 GuestDrawPhase.PunchThrough => _punchThrough,
+                GuestDrawPhase.Transparent => _transparent,
                 _ => _opaque,
             };
 
@@ -225,21 +226,6 @@ namespace XNOEdit.Render
                 return 0;
 
             return DrawBucket(meshes, ctx, guest, textureManager, in scene, instances);
-        }
-
-        public void CollectTransparent(List<GuestTransparentDraw> sink, Matrix4x4 view, ReadOnlySpan<Matrix4x4> instances)
-        {
-            foreach (var mesh in _transparent)
-            {
-                if (!mesh.Visible || mesh.GuestMaterial == null)
-                    continue;
-
-                foreach (var world in instances)
-                {
-                    var centre = Vector3.Transform(mesh.Centre, world);
-                    sink.Add(new GuestTransparentDraw(mesh, world, Vector3.Transform(centre, view).Z));
-                }
-            }
         }
 
         private static int DrawBucket(
@@ -273,6 +259,4 @@ namespace XNOEdit.Render
             _sharedVertexBuffers.Clear();
         }
     }
-
-    public readonly record struct GuestTransparentDraw(ModelMesh Mesh, Matrix4x4 World, float ViewDepth);
 }
