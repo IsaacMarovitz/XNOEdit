@@ -11,6 +11,7 @@ using XNOEdit.Formats;
 using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.ModelResolver;
+using XNOEdit.Panels;
 using XNOEdit.Render;
 using XNOEdit.Render.Renderers;
 
@@ -41,6 +42,7 @@ namespace XNOEdit.Services
 
     public record ObjectLoadResult(
         NinjaNext Xno,
+        MaterialMotionChunk? MaterialMotion,
         ObjectChunk? ObjectChunk,
         ModelRenderer? Renderer,
         List<LoadedTexture> Textures
@@ -109,23 +111,33 @@ namespace XNOEdit.Services
         }
 
         public async Task<ObjectLoadResult?> ReadXnoAsync(
-            IFile file,
+            FileEntry entry,
             GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
             return await Task.Run(() =>
             {
-                Logger.Info?.PrintMsg(LogClass.Application, $"Loading XNO: {file.Name}");
+                Logger.Info?.PrintMsg(LogClass.Application, $"Loading XNO: {entry.File.Name}");
 
                 cancellationToken.ThrowIfCancellationRequested();
-                progress?.Report(new LoadProgress(LoadStage.Decompressing, $"Decompressing {file.Name}..."));
+                progress?.Report(new LoadProgress(LoadStage.Decompressing, $"Decompressing {entry.File.Name}..."));
 
-                var data = file.Decompress();
+                var data = entry.File.Decompress();
                 cancellationToken.ThrowIfCancellationRequested();
 
-                progress?.Report(new LoadProgress(LoadStage.Parsing, $"Parsing {file.Name}..."));
+                progress?.Report(new LoadProgress(LoadStage.Parsing, $"Parsing {entry.File.Name}..."));
                 var xno = new NinjaNext(data);
+
+                var materialMotionPath = entry.File.Path.Replace(".xno", ".xnv");
+                var materialMotionFile = entry.ArcFile.GetFile(materialMotionPath);
+                MaterialMotionChunk? materialMotion = null;
+
+                if (materialMotionFile != null)
+                {
+                    progress?.Report(new LoadProgress(LoadStage.LoadingTextures, $"Parsing {entry.File.Name} material motion..."));
+                    materialMotion = new NinjaNext(materialMotionFile.Decompress()).GetChunk<MaterialMotionChunk>();
+                }
 
                 var objectChunk = xno.GetChunk<ObjectChunk>();
                 var effectChunk = xno.GetChunk<EffectListChunk>();
@@ -134,7 +146,7 @@ namespace XNOEdit.Services
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report(new LoadProgress(LoadStage.LoadingTextures, "Loading textures..."));
 
-                var textures = LoadTextures(file, textureListChunk, cancellationToken);
+                var textures = LoadTextures(entry.File, textureListChunk, cancellationToken);
 
                 ModelRenderer? renderer = null;
                 if (objectChunk != null)
@@ -147,12 +159,12 @@ namespace XNOEdit.Services
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {xno.Name}", 1, 1));
 
-                return new ObjectLoadResult(xno, objectChunk, renderer, textures);
+                return new ObjectLoadResult(xno, materialMotion, objectChunk, renderer, textures);
             }, cancellationToken);
         }
 
         public async Task<MissionLoadResult?> ReadMissionAsync(
-            IFile file,
+            FileEntry entry,
             ResolverContext resolverContext,
             GuestMaterialCache? guestMaterials,
             IProgress<LoadProgress>? progress = null,
@@ -160,15 +172,15 @@ namespace XNOEdit.Services
         {
             return await Task.Run(async () =>
             {
-                Logger.Info?.PrintMsg(LogClass.Application, $"Loading Mission: {file.Name}");
+                Logger.Info?.PrintMsg(LogClass.Application, $"Loading Mission: {entry.File.Name}");
 
                 cancellationToken.ThrowIfCancellationRequested();
-                progress?.Report(new LoadProgress(LoadStage.Decompressing, $"Decompressing {file.Name}..."));
+                progress?.Report(new LoadProgress(LoadStage.Decompressing, $"Decompressing {entry.File.Name}..."));
 
-                var data = file.Decompress();
+                var data = entry.File.Decompress();
                 cancellationToken.ThrowIfCancellationRequested();
 
-                progress?.Report(new LoadProgress(LoadStage.Parsing, $"Parsing {file.Name}..."));
+                progress?.Report(new LoadProgress(LoadStage.Parsing, $"Parsing {entry.File.Name}..."));
                 var set = new StageSet(data);
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -202,7 +214,7 @@ namespace XNOEdit.Services
                         continue;
                     }
 
-                    var xnoResult = await ReadXnoAsync(modelFile, guestMaterials, null, cancellationToken);
+                    var xnoResult = await ReadXnoAsync(new FileEntry(modelFile, resolverContext.ObjectArchive), guestMaterials, null, cancellationToken);
                     if (xnoResult?.ObjectChunk != null)
                     {
                         loadedGroups.Add(new LoadedObjectGroup(
@@ -214,9 +226,9 @@ namespace XNOEdit.Services
                     current++;
                 }
 
-                progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {file.Name}", total, total));
+                progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {entry.File.Name}", total, total));
 
-                return new MissionLoadResult(file.Name, set, loadedGroups, failedTypes);
+                return new MissionLoadResult(entry.File.Name, set, loadedGroups, failedTypes);
             }, cancellationToken);
         }
 

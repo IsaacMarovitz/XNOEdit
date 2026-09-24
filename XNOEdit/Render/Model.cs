@@ -180,13 +180,6 @@ namespace XNOEdit.Render
 
                         var guestMaterial = _guestMaterials?.Resolve(effectName, techniqueName);
 
-                        if ((subObject.Type & 0xFF) == 0x02)
-                        {
-                            Logger.Debug?.PrintMsg(LogClass.Application,
-                                $"  transparent blend src=0x{(uint)material.Logic.SourceBlend:X} " +
-                                $"dst=0x{(uint)material.Logic.DestinationBlend:X} op=0x{(uint)material.Logic.BlendOperation:X}");
-                        }
-
                         var mesh = new ModelMesh(
                             _device, buffer, primitiveList, textureListChunk, material, guestMaterial,
                             (GuestDrawBucket)(subObject.Type & 0xFF), subObject.MeshSets[j].Centre, i, j);

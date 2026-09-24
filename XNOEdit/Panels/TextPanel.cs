@@ -1,5 +1,4 @@
 using Hexa.NET.ImGui;
-using Marathon.IO.Types.FileSystem;
 
 namespace XNOEdit.Panels
 {
@@ -7,7 +6,7 @@ namespace XNOEdit.Panels
     {
         public const string Name = "Text";
 
-        public event Action<IFile>? LoadTextBook;
+        public event Action<FileEntry>? LoadTextBook;
 
         private readonly FileContainer _textBooks = new("Text Books");
 
@@ -19,9 +18,9 @@ namespace XNOEdit.Panels
             _textBooks.AddFromArc(ArcFiles.TextArc, "*.mst");
         }
 
-        private void TriggerTextBookLoad(ImGuiComponents.File file, IReadOnlyCollection<IFile> files)
+        private void TriggerTextBookLoad(ImGuiComponents.File file, IReadOnlyCollection<FileEntry> files)
         {
-            LoadTextBook?.Invoke(files.FirstOrDefault(x => x.Name == file.Identifier));
+            LoadTextBook?.Invoke(files.FirstOrDefault(x => x.File.Name == file.Identifier));
         }
 
         public void Render()

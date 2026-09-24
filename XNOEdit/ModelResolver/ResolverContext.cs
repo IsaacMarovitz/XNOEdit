@@ -68,16 +68,6 @@ namespace XNOEdit.ModelResolver
                 .FirstOrDefault();
         }
 
-        public static Node FindNodeByName(ObjectChunk objectChunk, NodeNameChunk nameChunk, string name)
-        {
-            var indexOf = nameChunk.Names.Select((value, index) => new { value, index })
-                .Where(pair => pair.value == name)
-                .Select(pair => pair.index + 1)
-                .FirstOrDefault() - 1;
-
-            return objectChunk.Nodes[indexOf];
-        }
-
         public static string? GetVariantModel(
             PackageCategory category,
             int variant,

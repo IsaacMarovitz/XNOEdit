@@ -2,6 +2,7 @@ using Marathon.Formats.Archive;
 using Marathon.IO.Types.FileSystem;
 using XNOEdit.Guest;
 using XNOEdit.ModelResolver;
+using XNOEdit.Panels;
 
 namespace XNOEdit.Services
 {
@@ -25,10 +26,10 @@ namespace XNOEdit.Services
     public class ObjectLoadStep : LoadStep
     {
         public override LoadStepType Type => LoadStepType.Object;
-        public IFile File { get; }
+        public FileEntry File { get; }
         public ObjectLoadResult? Result { get; private set; }
 
-        public ObjectLoadStep(IFile file)
+        public ObjectLoadStep(FileEntry file)
         {
             File = file;
         }
@@ -67,11 +68,11 @@ namespace XNOEdit.Services
     public class MissionLoadStep : LoadStep
     {
         public override LoadStepType Type => LoadStepType.Mission;
-        public IFile File { get; }
+        public FileEntry File { get; }
         public ResolverContext ResolverContext { get; }
         public MissionLoadResult? Result { get; private set; }
 
-        public MissionLoadStep(IFile file, ResolverContext resolverContext)
+        public MissionLoadStep(FileEntry file, ResolverContext resolverContext)
         {
             File = file;
             ResolverContext = resolverContext;
@@ -119,8 +120,8 @@ namespace XNOEdit.Services
             return this;
         }
 
-        public LoadChain AddXno(IFile file) => Add(new ObjectLoadStep(file));
-        public LoadChain AddSet(IFile file, ResolverContext resolverContext) => Add(new MissionLoadStep(file, resolverContext));
+        public LoadChain AddXno(FileEntry file) => Add(new ObjectLoadStep(file));
+        public LoadChain AddSet(FileEntry file, ResolverContext resolverContext) => Add(new MissionLoadStep(file, resolverContext));
         public LoadChain AddArc(ArcFile arcFile) => Add(new StageLoadStep(arcFile));
 
         public void Start()

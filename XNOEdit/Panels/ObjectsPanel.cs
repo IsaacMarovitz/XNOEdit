@@ -1,7 +1,6 @@
 using Hexa.NET.ImGui;
 using Marathon.Formats.Archive;
 using Marathon.Formats.Parameter;
-using Marathon.IO.Types.FileSystem;
 
 namespace XNOEdit.Panels
 {
@@ -9,7 +8,7 @@ namespace XNOEdit.Panels
     {
         public const string Name = "Objects";
 
-        public event Action<IFile>? LoadObject;
+        public event Action<FileEntry>? LoadObject;
         public ObjectPhysicsParameterList? PhysicsParameters { get; private set; }
         public PathObjParameterList? PathParameters { get; private set; }
 
@@ -60,14 +59,14 @@ namespace XNOEdit.Panels
                     if (node.Name.Contains("_EventObject"))
                         continue;
 
-                    _win32.Add(node);
+                    _win32.Add(node, arc);
                 }
             }
         }
 
-        private void TriggerFileLoad(ImGuiComponents.File file, IReadOnlyCollection<IFile> files)
+        private void TriggerFileLoad(ImGuiComponents.File file, IReadOnlyCollection<FileEntry> files)
         {
-            LoadObject?.Invoke(files.FirstOrDefault(x => x.Name == file.Identifier));
+            LoadObject?.Invoke(files.FirstOrDefault(x => x.File.Name == file.Identifier));
         }
 
         public void Render()

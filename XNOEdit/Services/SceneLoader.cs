@@ -65,7 +65,7 @@ namespace XNOEdit.Services
             _loadChain?.Cancel();
         }
 
-        public void QueueObjectLoad(IFile file)
+        public void QueueObjectLoad(FileEntry file)
         {
             _loadChain?.Clear();
             _loadChain?.AddXno(file);
@@ -79,11 +79,11 @@ namespace XNOEdit.Services
             _loadChain?.Start();
         }
 
-        public void QueueMissionLoad(IFile setFile)
+        public void QueueMissionLoad(FileEntry setEntry)
         {
             _loadChain?.Clear();
 
-            var setName = Path.GetFileNameWithoutExtension(setFile.Name);
+            var setName = Path.GetFileNameWithoutExtension(setEntry.File.Name);
             var terrainPath = MissionsMap.GetTerrainPath(setName);
 
             var currentStage = _view.Scene;
@@ -124,7 +124,7 @@ namespace XNOEdit.Services
             var pathParams = _ui.ObjectsPanel?.PathParameters.Parameters ?? [];
             var resolverContext = new ResolverContext(physicsParams, pathParams, _propActors, ArcFiles.ObjectArc);
 
-            _loadChain?.AddSet(setFile, resolverContext);
+            _loadChain?.AddSet(setEntry, resolverContext);
             _loadChain?.Start();
         }
 
@@ -235,7 +235,7 @@ namespace XNOEdit.Services
         {
             if (result.ObjectChunk != null && result.Renderer != null)
             {
-                var visibility = _ui.InitXnoPanel(result.Xno, result.Renderer);
+                var visibility = _ui.InitXnoPanel(result);
 
                 visibility.VisibilityChanged += (objectIndex, meshIndex, visible) =>
                 {

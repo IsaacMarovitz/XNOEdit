@@ -2,7 +2,6 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Text;
-using Marathon.IO.Types.FileSystem;
 using Solaris;
 using XNOEdit.Fonts;
 using XNOEdit.Logging;
@@ -201,15 +200,15 @@ namespace XNOEdit.Managers
             };
         }
 
-        public ObjectSceneVisibility InitXnoPanel(NinjaNext xno, ModelRenderer renderer)
+        public ObjectSceneVisibility InitXnoPanel(ObjectLoadResult loadResult)
         {
             StagePanel = null;
             MissionPanel = null;
 
-            var visibility = new ObjectSceneVisibility(renderer);
+            var visibility = new ObjectSceneVisibility(loadResult.Renderer);
             _currentVisibility = visibility;
 
-            XnoPanel = new XnoPanel(xno, visibility);
+            XnoPanel = new XnoPanel(loadResult.Xno, loadResult.MaterialMotion, visibility);
             ImGui.SetWindowFocus(XnoPanel.Name);
             SetColors(HueForCategory(MissionCategory.None));
 
@@ -227,7 +226,8 @@ namespace XNOEdit.Managers
             StagePanel = new StagePanel(name, xnos, visibility);
             StagePanel.ViewXno += (index, xno) =>
             {
-                XnoPanel = new XnoPanel(xno, visibility, index);
+                // TODO: Material Motion in stage scenes.
+                XnoPanel = new XnoPanel(xno, null, visibility, index);
                 ImGui.SetWindowFocus(XnoPanel.Name);
             };
 
@@ -248,16 +248,16 @@ namespace XNOEdit.Managers
             SetColors(HueForCategory(category));
         }
 
-        private void InitTextBookPanel(IFile file)
+        private void InitTextBookPanel(FileEntry file)
         {
             try
             {
-                TextBookPanel = new TextBookPanel(new TextBook(file.Decompress()));
+                TextBookPanel = new TextBookPanel(new TextBook(file.File.Decompress()));
                 ImGui.SetWindowFocus(TextBookPanel.Name);
             }
             catch (Exception ex)
             {
-                TriggerAlert(AlertLevel.Error, $"Unable to load {file.Name}: \"{ex.Message}\"");
+                TriggerAlert(AlertLevel.Error, $"Unable to load {file.File.Name}: \"{ex.Message}\"");
             }
         }
 
@@ -291,7 +291,7 @@ namespace XNOEdit.Managers
 
                 var remainingId = dockspaceId;
 
-                var leftDock = ImGuiInterop.DockBuilderSplitNode(ref remainingId, ImGuiDir.Left, 0.2f);
+                var leftDock = ImGuiInterop.DockBuilderSplitNode(ref remainingId, ImGuiDir.Left, 0.25f);
                 var bottomDock = ImGuiInterop.DockBuilderSplitNode(ref remainingId, ImGuiDir.Down, 0.3f);
                 var centralNode = ImGuiP.DockBuilderGetNode(remainingId);
                 centralNode.LocalFlags |= (ImGuiDockNodeFlags)(ImGuiDockNodeFlagsPrivate.CentralNode | ImGuiDockNodeFlagsPrivate.HiddenTabBar) | ImGuiDockNodeFlags.NoUndocking;

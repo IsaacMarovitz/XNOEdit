@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Numerics;
 using Hexa.NET.ImGui;
-using Marathon.IO.Types.FileSystem;
 using XNOEdit.Logging;
 
 namespace XNOEdit.Panels
@@ -9,7 +8,7 @@ namespace XNOEdit.Panels
     public class MissionsPanel
     {
         public const string Name = "Missions";
-        public event Action<IFile> LoadMission;
+        public event Action<FileEntry> LoadMission;
 
         private class TreeNode
         {
@@ -144,6 +143,7 @@ namespace XNOEdit.Panels
 
         public void LoadGameFolderResources()
         {
+            var scriptsArc = ArcFiles.ScriptsArc;
             var leaves = _tree.GetAllLeaves().ToList();
 
             foreach (var leaf in leaves)
@@ -155,15 +155,15 @@ namespace XNOEdit.Panels
                 var leaf = leaves.FirstOrDefault(l => l.MissionGroup.Missions.Contains(name));
 
                 if (leaf != null)
-                    leaf.Container!.Add(node);
+                    leaf.Container!.Add(node, scriptsArc);
                 else
                     Logger.Warning?.PrintMsg(LogClass.Application, $"Failed to categorise {name}.set");
             }
         }
 
-        private void TriggerFileLoad(ImGuiComponents.File file, ReadOnlyCollection<IFile> files)
+        private void TriggerFileLoad(ImGuiComponents.File file, ReadOnlyCollection<FileEntry> files)
         {
-            LoadMission?.Invoke(files.FirstOrDefault(x => x.Name == file.Identifier));
+            LoadMission?.Invoke(files.FirstOrDefault(x => x.File.Name == file.Identifier));
         }
 
         private void DrawTreeNode(TreeNode node)

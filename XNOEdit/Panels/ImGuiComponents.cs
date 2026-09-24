@@ -153,5 +153,71 @@ namespace XNOEdit.Panels
 
             ImGui.EndChild();
         }
+
+        private const float LabelWidth = 100f;
+
+        public static void SetNextItemFillWidth()
+        {
+            ImGui.SetNextItemWidth(-float.Epsilon);
+        }
+
+        private static string Label(string label)
+        {
+            // Get visible portion only (before ##)
+            var hashIndex = label.IndexOf("##", StringComparison.Ordinal);
+            var visibleLabel = hashIndex >= 0 ? label[..hashIndex] : label;
+
+            if (visibleLabel.Length == 0)
+                return label;
+
+            var x = ImGui.GetCursorPosX();
+
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextUnformatted(visibleLabel);
+            ImGui.SameLine(x + LabelWidth);
+            SetNextItemFillWidth();
+
+            return $"##{label}";
+        }
+
+        public static bool InputFloat(string label, ref float value, float step = 0f, float stepFast = 0f, string format = "%.3f", ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
+        {
+            return ImGui.InputFloat(Label(label), ref value, step, stepFast, format, flags);
+        }
+
+        public static bool InputFloat(string label, ref float value, string format, ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
+        {
+            return ImGui.InputFloat(Label(label), ref value, format, flags);
+        }
+
+        public static bool InputFloat3(string label, ref Vector3 value, string format = "%.3f", ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
+        {
+            return ImGui.InputFloat3(Label(label), ref value, format, flags);
+        }
+
+        public static bool ColorEdit4(string label, ref Vector4 color, ImGuiColorEditFlags flags = ImGuiColorEditFlags.None)
+        {
+            return ImGui.ColorEdit4(Label(label), ref color, flags);
+        }
+
+        public static bool ColorEdit3(string label, ref Vector3 color, ImGuiColorEditFlags flags = ImGuiColorEditFlags.None)
+        {
+            return ImGui.ColorEdit3(Label(label), ref color, flags);
+        }
+
+        public static bool SliderFloat(string label, ref float value, float min, float max, string format = "%.3f", ImGuiSliderFlags flags = ImGuiSliderFlags.None)
+        {
+            return ImGui.SliderFloat(Label(label), ref value, min, max, format, flags);
+        }
+
+        public static bool DragFloat(string label, ref float value, float speed = 1f, float min = 0f, float max = 0f, string format = "%.3f", ImGuiSliderFlags flags = ImGuiSliderFlags.None)
+        {
+            return ImGui.DragFloat(Label(label), ref value, speed, min, max, format, flags);
+        }
+
+        public static bool Checkbox(string label, ref bool value)
+        {
+            return ImGui.Checkbox(Label(label), ref value);
+        }
     }
 }

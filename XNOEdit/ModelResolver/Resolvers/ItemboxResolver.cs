@@ -38,7 +38,7 @@ namespace XNOEdit.ModelResolver.Resolvers
                 {
                     var objectChunk = xno.GetChunk<ObjectChunk>();
                     var nodeNameChunk = xno.GetChunk<NodeNameChunk>();
-                    var node = ResolverContext.FindNodeByName(objectChunk, nodeNameChunk, "Itempoint_ground");
+                    var node = PropertyUtility.FindNodeByName(objectChunk, nodeNameChunk, "Itempoint_ground");
                     contentsOffset = node.Translation;
 
                     instances.Add(new ResolvedInstance

@@ -23,7 +23,7 @@ namespace XNOEdit.Panels
             ImGui.PushItemWidth(ImGui.GetContentRegionAvail().X * 0.65f);
 
             ImGui.Text("Camera Sensitivity");
-            ImGui.SliderFloat("##CameraSensitivity", ref settings.CameraSensitivity, 0.0f, 1.0f);
+            ImGuiComponents.SliderFloat("##CameraSensitivity", ref settings.CameraSensitivity, 0.0f, 1.0f);
 
             var config = environment.Config;
             var edited = false;
@@ -50,7 +50,7 @@ namespace XNOEdit.Panels
             edited |= EditColor("Mie", config.Ols.BMie, 0.00001f, out var bMie);
 
             var g = config.Ols.G;
-            edited |= ImGui.SliderFloat("Anisotropy", ref g, 0.0f, 0.999f);
+            edited |= ImGuiComponents.SliderFloat("Anisotropy", ref g, 0.0f, 0.999f);
 
             if (edited)
             {
@@ -66,7 +66,7 @@ namespace XNOEdit.Panels
             ImGui.SeparatorText("UI");
 
             var hue = _uiManager.GetHue();
-            var editedHue = ImGui.SliderFloat("Accent Hue", ref hue, 0.0f, 360.0f);
+            var editedHue = ImGuiComponents.SliderFloat("Accent Hue", ref hue, 0.0f, 360.0f);
 
             if (editedHue)
             {
@@ -80,11 +80,13 @@ namespace XNOEdit.Panels
         {
             var color = new Vector3(value.X, value.Y, value.Z);
             var intensity = value.W;
+            var spacing = ImGui.GetStyle().ItemInnerSpacing.X;
 
             ImGui.PushID(label);
-            var edited = ImGui.ColorEdit3("##Color", ref color, ImGuiColorEditFlags.NoInputs);
-            ImGui.SameLine();
-            edited |= ImGui.DragFloat(label, ref intensity, speed, 0.0f, 1000.0f, "%.4g");
+            var edited = ImGuiComponents.ColorEdit3(label, ref color, ImGuiColorEditFlags.NoInputs);
+            ImGui.SameLine(0.0f, spacing);
+            ImGuiComponents.SetNextItemFillWidth();
+            edited |= ImGuiComponents.DragFloat("##Intensity", ref intensity, speed, 0.0f, 1000.0f, "%.4g");
             ImGui.PopID();
 
             result = new Vector4(color, intensity);
@@ -103,8 +105,8 @@ namespace XNOEdit.Panels
                 azimuth += 360.0f;
 
             ImGui.PushID(label);
-            var editedAzimuth = ImGui.SliderFloat("Azimuth", ref azimuth, 0.0f, 360.0f, "%.1f°");
-            var editedAltitude = ImGui.SliderFloat("Altitude", ref altitude, -89.0f, 89.0f, "%.1f°");
+            var editedAzimuth = ImGuiComponents.SliderFloat("Azimuth", ref azimuth, 0.0f, 360.0f, "%.1f°");
+            var editedAltitude = ImGuiComponents.SliderFloat("Altitude", ref altitude, -89.0f, 89.0f, "%.1f°");
             ImGui.PopID();
 
             result = light with { Color = color };

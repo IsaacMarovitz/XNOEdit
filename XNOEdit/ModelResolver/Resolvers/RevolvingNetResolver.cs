@@ -46,7 +46,7 @@ namespace XNOEdit.ModelResolver.Resolvers
                         {
                             var objectChunk = xno.GetChunk<ObjectChunk>();
                             var nodeNameChunk = xno.GetChunk<NodeNameChunk>();
-                            var node = ResolverContext.FindNodeByName(objectChunk, nodeNameChunk, "netpoint");
+                            var node = PropertyUtility.FindNodeByName(objectChunk, nodeNameChunk, "netpoint");
                             netOffset = node.Translation;
                         }
                         else
