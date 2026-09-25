@@ -118,28 +118,12 @@ namespace XNOEdit.Panels
                     .ToLookup(x => x.MeshSet.NodeIndex);
 
                 ImGui.SeparatorText("Nodes");
-                foreach (var i in Enumerable.Range(0, objectChunk.Nodes.Count).OrderByDescending(meshSetsByNode.Contains))
+                for (var i = 0; i < objectChunk.Nodes.Count; i++)
                 {
-                    ImGui.PushID(i);
-
-                    var meshSets = meshSetsByNode[i];
-                    var visible = GetMeshSetsVisibility(meshSets);
-
-                    ImGui.BeginDisabled(!meshSets.Any());
-                    if (ImGuiComponents.StyledCheckbox($"##VisibilityNode{i + 1}", visible))
+                    if (objectChunk.Nodes[i].ParentIndex == -1)
                     {
-                        SetMeshSetsVisibility(meshSets, !visible);
+                        RenderNodeTree(objectChunk, i, meshSetsByNode, effectListChunk, nodeNameChunk);
                     }
-                    ImGui.EndDisabled();
-
-                    ImGui.SameLine();
-
-                    if (ImGui.CollapsingHeader(PropertyUtility.GetNodeName(nodeNameChunk, i), ImGuiTreeNodeFlags.AllowOverlap))
-                    {
-                        RenderNode(objectChunk, objectChunk.Nodes[i], meshSets.GroupBy(x => x.SubobjectIndex), effectListChunk);
-                    }
-
-                    ImGui.PopID();
                 }
 
                 ImGui.SeparatorText("Materials");
@@ -187,8 +171,57 @@ namespace XNOEdit.Panels
             ImGui.Text($"Vertex List: {meshSet.VertexListIndex + 1}");
         }
 
+        private void RenderNodeTree(ObjectChunk objectChunk, int index, ILookup<int, MeshSetEntry> meshSetsByNode, EffectListChunk? effectListChunk, NodeNameChunk? nodeNameChunk)
+        {
+            ImGui.PushID(index);
+
+            var node = objectChunk.Nodes[index];
+            var meshSets = meshSetsByNode[index];
+            var branchMeshSets = GetBranchMeshSets(objectChunk, index, meshSetsByNode).ToList();
+            var visible = GetMeshSetsVisibility(branchMeshSets);
+
+            ImGui.BeginDisabled(branchMeshSets.Count == 0);
+            if (ImGuiComponents.StyledCheckbox($"##VisibilityNode{index + 1}", visible))
+            {
+                SetMeshSetsVisibility(branchMeshSets, !visible);
+            }
+            ImGui.EndDisabled();
+
+            ImGui.SameLine();
+
+            if (ImGui.TreeNodeEx(PropertyUtility.GetNodeName(nodeNameChunk, index), ImGuiTreeNodeFlags.Framed | ImGuiTreeNodeFlags.AllowOverlap))
+            {
+                RenderNode(objectChunk, node, meshSets.GroupBy(x => x.SubobjectIndex), effectListChunk);
+
+                for (var child = node.ChildIndex; child != -1; child = objectChunk.Nodes[child].SiblingIndex)
+                {
+                    RenderNodeTree(objectChunk, child, meshSetsByNode, effectListChunk, nodeNameChunk);
+                }
+
+                ImGui.TreePop();
+            }
+
+            ImGui.PopID();
+        }
+
+        private static IEnumerable<MeshSetEntry> GetBranchMeshSets(ObjectChunk objectChunk, int index, ILookup<int, MeshSetEntry> meshSetsByNode)
+        {
+            var meshSets = meshSetsByNode[index].AsEnumerable();
+
+            for (var child = objectChunk.Nodes[index].ChildIndex; child != -1; child = objectChunk.Nodes[child].SiblingIndex)
+            {
+                meshSets = meshSets.Concat(GetBranchMeshSets(objectChunk, child, meshSetsByNode));
+            }
+
+            return meshSets;
+        }
+
         private void RenderNode(ObjectChunk objectChunk, Node node, IEnumerable<IGrouping<int, MeshSetEntry>> subobjects, EffectListChunk? effectListChunk)
         {
+            ImGui.PushTextWrapPos();
+            ImGui.Text($"Type: {PropertyUtility.NodeTypeToString(node.Type)}");
+            ImGui.PopTextWrapPos();
+
             var translation = node.Translation;
             ImGuiComponents.InputFloat3("Translation", ref translation, "%.1f", ImGuiInputTextFlags.ReadOnly);
 

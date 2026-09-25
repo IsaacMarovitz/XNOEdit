@@ -20,6 +20,10 @@ namespace XNOEdit.ModelResolver
             Register(new WindSwitchResolver());
             Register(new GateResolver());
             Register(new PsiMarkResolver());
+            Register(new CscGlassBuildResolver());
+            Register(new CscGlassResolver());
+            Register(new PlayerNpcResolver());
+            Register(new TownsmanResolver());
             Register(new ItemboxResolver());
             Register(new ChaosEmeraldResolver());
             Register(new VehicleResolver());

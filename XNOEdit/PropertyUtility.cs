@@ -223,6 +223,83 @@ namespace XNOEdit
             return string.Join(", ", flagNames.Where(x => interpolationType.HasFlag(x.Item1)).Select(x => x.Item2));
         }
 
+        public static string NodeTypeToString(NodeType type)
+        {
+            var flagNames = new (NodeType Flag, string Name)[]
+            {
+                // Matrix types
+                (NodeType.NND_NODETYPE_UNIT_TRANSLATION,         "Unit Translation"),
+                (NodeType.NND_NODETYPE_UNIT_ROTATION,            "Unit Rotation"),
+                (NodeType.NND_NODETYPE_UNIT_SCALING,             "Unit Scaling"),
+                (NodeType.NND_NODETYPE_UNIT_INIT_MATRIX,         "Unit Init Matrix"),
+                (NodeType.NND_NODETYPE_UNIT33_INIT_MATRIX,       "Unit 3x3 Init Matrix"),
+                (NodeType.NND_NODETYPE_ORTHO33_INIT_MATRIX,      "Ortho 3x3 Init Matrix"),
+                (NodeType.NND_NODETYPE_INHERIT_ONLY_TRANSLATION, "Inherit Only Translation"),
+
+                // Visibility types
+                (NodeType.NND_NODETYPE_HIDE,                     "Hide"),
+                (NodeType.NND_NODETYPE_HIDE_BRANCH,              "Hide Branch"),
+
+                // IK types
+                (NodeType.NND_NODETYPE_IK_EFFECTOR,              "IK Effector"),
+                (NodeType.NND_NODETYPE_1BONE_IK_JOINT1,          "1-Bone IK Joint 1"),
+                (NodeType.NND_NODETYPE_2BONE_IK_JOINT1,          "2-Bone IK Joint 1"),
+                (NodeType.NND_NODETYPE_2BONE_IK_JOINT2,          "2-Bone IK Joint 2"),
+                (NodeType.NND_NODETYPE_IK_MINUS_PREFROT_Z,       "IK Minus Pref Rot Z"),
+                (NodeType.NND_NODETYPE_1BONE_IK_CHAIN_ROOT,      "1-Bone IK Chain Root"),
+                (NodeType.NND_NODETYPE_2BONE_IK_CHAIN_ROOT,      "2-Bone IK Chain Root"),
+                (NodeType.NND_NODETYPE_XSIIK,                    "XSI IK"),
+
+                // Bounding box types
+                (NodeType.NND_NODETYPE_BBOX_DATA,                "BBox Data"),
+                (NodeType.NND_NODETYPE_BBOX_PRIOR_SPHERE,        "BBox Prior Sphere")
+            };
+
+            var resetScalingAxes = new (NodeType Flag, string Axis)[]
+            {
+                (NodeType.NND_NODETYPE_RESET_SCALING_X, "X"),
+                (NodeType.NND_NODETYPE_RESET_SCALING_Y, "Y"),
+                (NodeType.NND_NODETYPE_RESET_SCALING_Z, "Z")
+            };
+
+            var rotateTypes = new (NodeType Value, string Name)[]
+            {
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_XZY, "Rotate XZY"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_YXZ, "Rotate YXZ"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_YZX, "Rotate YZX"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_ZXY, "Rotate ZXY"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_ZYX, "Rotate ZYX"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_XYX, "Rotate XYX"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_XZX, "Rotate XZX"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_YXY, "Rotate YXY"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_YZY, "Rotate YZY"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_ZXZ, "Rotate ZXZ"),
+                (NodeType.NND_NODETYPE_ROTATE_TYPE_ZYZ, "Rotate ZYZ")
+            };
+
+            var dominateTypes = new (NodeType Value, string Name)[]
+            {
+                (NodeType.NND_NODETYPE_BBOX_DOMINATE_X, "BBox Dominate X"),
+                (NodeType.NND_NODETYPE_BBOX_DOMINATE_Y, "BBox Dominate Y"),
+                (NodeType.NND_NODETYPE_BBOX_DOMINATE_Z, "BBox Dominate Z")
+            };
+
+            var names = flagNames.Where(x => type.HasFlag(x.Flag)).Select(x => x.Name);
+
+            var resetScaling = string.Concat(resetScalingAxes.Where(x => type.HasFlag(x.Flag)).Select(x => x.Axis));
+
+            if (resetScaling.Length > 0)
+                names = names.Append($"{resetScaling} Reset Scaling");
+
+            var rotateType = type & NodeType.NND_NODETYPE_ROTATE_TYPE_MASK;
+            var dominateType = type & NodeType.NND_NODETYPE_BBOX_DOMINATE_MASK;
+
+            names = names.Concat(rotateTypes.Where(x => x.Value == rotateType).Select(x => x.Name));
+            names = names.Concat(dominateTypes.Where(x => x.Value == dominateType).Select(x => x.Name));
+
+            return string.Join(", ", names);
+        }
+
         public static string GetNodeName(NodeNameChunk? nameChunk, int index)
         {
             var name = nameChunk?.Names.ElementAtOrDefault(index);
