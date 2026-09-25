@@ -1,6 +1,7 @@
 using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
+using Marathon.Formats.Placement;
 using Marathon.Formats.Text;
 using Solaris;
 using XNOEdit.Fonts;
@@ -237,11 +238,11 @@ namespace XNOEdit.Managers
             return visibility;
         }
 
-        public void InitMissionPanel(string name)
+        public void InitMissionPanel(string name, StageSet stageSet, List<LoadedObjectGroup> loadedGroups, HashSet<string> failedTypes)
         {
             MissionPanel = null;
 
-            MissionPanel = new MissionPanel(name);
+            MissionPanel = new MissionPanel(name, stageSet, loadedGroups, failedTypes);
 
             ImGui.SetWindowFocus(MissionPanel.Name);
             var category = MissionsMap.GetMissionCategory(Path.GetFileNameWithoutExtension(name));

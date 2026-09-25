@@ -15,6 +15,11 @@ namespace XNOEdit.ModelResolver
             Register(new RevolvingNetResolver());
             Register(new EnemyResolver());
             Register(new AqaMagnetResolver());
+            Register(new BrickWallResolver());
+            Register(new EagleResolver());
+            Register(new WindSwitchResolver());
+            Register(new GateResolver());
+            Register(new PsiMarkResolver());
             Register(new ItemboxResolver());
             Register(new ChaosEmeraldResolver());
             Register(new VehicleResolver());

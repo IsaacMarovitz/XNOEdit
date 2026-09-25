@@ -195,6 +195,11 @@ namespace XNOEdit.Panels
             return ImGui.InputFloat3(Label(label), ref value, format, flags);
         }
 
+        public static bool InputFloat4(string label, ref Vector4 value, string format = "%.3f", ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
+        {
+            return ImGui.InputFloat4(Label(label), ref value, format, flags);
+        }
+
         public static bool ColorEdit4(string label, ref Vector4 color, ImGuiColorEditFlags flags = ImGuiColorEditFlags.None)
         {
             return ImGui.ColorEdit4(Label(label), ref color, flags);

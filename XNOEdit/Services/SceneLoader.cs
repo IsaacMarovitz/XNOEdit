@@ -349,7 +349,7 @@ namespace XNOEdit.Services
             }
 
             SDL.SetWindowTitle(_window, $"XNOEdit - {result.Name}");
-            _ui.InitMissionPanel(result.Name);
+            _ui.InitMissionPanel(result.Name, result.Set, result.LoadedGroups, result.FailedTypes);
 
             Logger.Info?.PrintMsg(LogClass.Application, $"Loaded {loadedCount} object types with {totalInstances} total instances");
         }
