@@ -46,7 +46,7 @@ namespace XNOEdit.Guest
             }
 
             // Technique records
-            var previous = int.MinValue;
+            var previous = -TechniqueRecordSize;
 
             for (var i = 0; i + TechniqueRecordSize <= file.Length; i += 4)
             {
