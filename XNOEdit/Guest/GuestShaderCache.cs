@@ -57,9 +57,9 @@ namespace XNOEdit.Guest
 
             var blobName = format switch
             {
-                RenderShaderFormat.Metal => "shader_cache_air.zst",
-                RenderShaderFormat.Spirv => "shader_cache_spirv.zst",
-                RenderShaderFormat.Dxil => "shader_cache_dxil.zst",
+                RenderShaderFormat.Metal => "shader_cache_air.br",
+                RenderShaderFormat.Spirv => "shader_cache_spirv.br",
+                RenderShaderFormat.Dxil => "shader_cache_dxil.br",
                 _ => throw new PlatformNotSupportedException("The device reported no usable shader format."),
             };
 
@@ -131,7 +131,7 @@ namespace XNOEdit.Guest
 
             var blob = GC.AllocateUninitializedArray<byte>((int)decompressedSize);
 
-            if (!ZstandardDecoder.TryDecompress(file.AsSpan(sizeof(ulong)), blob, out var written) ||
+            if (!BrotliDecoder.TryDecompress(file.AsSpan(sizeof(ulong)), blob, out var written) ||
                 written != blob.Length)
             {
                 throw new InvalidDataException(
