@@ -209,7 +209,7 @@ namespace XNOEdit.Managers
             var visibility = new ObjectSceneVisibility(loadResult.Renderer);
             _currentVisibility = visibility;
 
-            XnoPanel = new XnoPanel(loadResult.Xno, loadResult.MaterialMotion, visibility);
+            XnoPanel = new XnoPanel(loadResult.Xno, loadResult.NodeNames, loadResult.Renderer, visibility);
             ImGui.SetWindowFocus(XnoPanel.Name);
             SetColors(HueForCategory(MissionCategory.None));
 
@@ -227,8 +227,7 @@ namespace XNOEdit.Managers
             StagePanel = new StagePanel(name, xnos, visibility);
             StagePanel.ViewXno += (index, xno) =>
             {
-                // TODO: Material Motion in stage scenes.
-                XnoPanel = new XnoPanel(xno, null, visibility, index);
+                XnoPanel = new XnoPanel(xno, null, renderers[index], visibility, index);
                 ImGui.SetWindowFocus(XnoPanel.Name);
             };
 

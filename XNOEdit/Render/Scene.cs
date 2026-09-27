@@ -53,6 +53,15 @@ namespace XNOEdit.Render
             _renderers[xnoIndex].SetVisible(objectIndex, meshIndex, visibility);
         }
 
+        public void Update(float deltaTime)
+        {
+            foreach (var renderer in _renderers)
+                renderer.Update(deltaTime);
+
+            foreach (var renderer in _placed.Values)
+                renderer.Update(deltaTime);
+        }
+
         public void Render(
             SlPassContext ctx,
             Matrix4x4 view,

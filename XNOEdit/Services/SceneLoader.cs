@@ -1,9 +1,7 @@
 using System.Collections.Concurrent;
 using System.Numerics;
 using Marathon.Formats.Archive;
-using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Placement;
-using Marathon.IO.Types.FileSystem;
 using SDL3;
 using Solaris;
 using XNOEdit.Guest;
@@ -12,7 +10,6 @@ using XNOEdit.Managers;
 using XNOEdit.ModelResolver;
 using XNOEdit.Panels;
 using XNOEdit.Render;
-using XNOEdit.Render.Renderers;
 
 namespace XNOEdit.Services
 {
@@ -298,7 +295,12 @@ namespace XNOEdit.Services
         private void ApplyMissionResult(MissionLoadResult result)
         {
             if (_view.Scene is not { } scene)
+            {
+                foreach (var group in result.LoadedGroups)
+                    group.ObjectResult.Renderer?.Dispose();
+
                 return;
+            }
 
             scene.ClearPlaced();
 
@@ -323,12 +325,8 @@ namespace XNOEdit.Services
 
             foreach (var group in result.LoadedGroups)
             {
-                var renderer = new ModelRenderer(
-                    _device,
-                    group.ObjectResult.ObjectChunk,
-                    group.ObjectResult.Xno.GetChunk<TextureListChunk>(),
-                    group.ObjectResult.Xno.GetChunk<EffectListChunk>(),
-                    _guestMaterials);
+                if (group.ObjectResult.Renderer is not { } renderer)
+                    continue;
 
                 var instances = group.Instances
                     .Select(i => Matrix4x4.CreateFromQuaternion(i.Rotation) * Matrix4x4.CreateTranslation(i.Position))

@@ -2,10 +2,14 @@ using System.Numerics;
 using Hexa.NET.ImGui;
 using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
+using Marathon.Formats.Ninja.Flags;
 using Marathon.Formats.Ninja.Types;
+using XNOEdit.Fonts;
 using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
+using XNOEdit.Render.Animation;
+using XNOEdit.Render.Renderers;
 using XNOEdit.Services;
 
 namespace XNOEdit.Panels
@@ -14,18 +18,25 @@ namespace XNOEdit.Panels
     {
         public const string Name = "XNO";
         private readonly NinjaNext _xno;
+        private readonly NodeNameChunk? _nodeNameChunk;
         private readonly MaterialMotionChunk? _materialMotion;
+        private readonly ModelRenderer? _renderer;
         private readonly ISceneVisibility _visibility;
         private readonly int _xnoIndex;
 
         private readonly record struct MeshSetEntry(int SubobjectIndex, int MeshSetIndex, MeshSet MeshSet);
 
-        public XnoPanel(NinjaNext xno, MaterialMotionChunk? materialMotion, ISceneVisibility visibility, int xnoIndex = 0)
+        public XnoPanel(NinjaNext xno, NodeNameChunk? nodeNames, ModelRenderer? renderer, ISceneVisibility visibility, int xnoIndex = 0)
         {
             _xno = xno;
-            _materialMotion = materialMotion;
+            _nodeNameChunk = nodeNames;
+            _materialMotion = renderer?.MaterialMotion;
             _visibility = visibility;
             _xnoIndex = xnoIndex;
+
+            _nodeNameChunk ??= _xno.GetChunk<NodeNameChunk>();
+
+            _renderer = renderer;
         }
 
         private bool GetMeshSetsVisibility(IEnumerable<MeshSetEntry> entries)
@@ -64,16 +75,15 @@ namespace XNOEdit.Panels
                 var objectChunk = _xno.GetChunk<ObjectChunk>();
                 var textureListChunk = _xno.GetChunk<TextureListChunk>();
                 var effectListChunk = _xno.GetChunk<EffectListChunk>();
-                var nodeNameChunk = _xno.GetChunk<NodeNameChunk>();
 
                 if (objectChunk != null)
                 {
-                    RenderObjectChunk(objectChunk, effectListChunk, nodeNameChunk);
+                    RenderObjectChunk(objectChunk, effectListChunk, _nodeNameChunk);
                 }
 
                 if (_materialMotion != null)
                 {
-                    RenderMaterialMotionChunk(_materialMotion, nodeNameChunk);
+                    RenderMaterialMotionChunk(_materialMotion, _nodeNameChunk);
                 }
 
                 if (textureListChunk != null)
@@ -222,20 +232,29 @@ namespace XNOEdit.Panels
             ImGui.Text($"Type: {PropertyUtility.NodeTypeToString(node.Type)}");
             ImGui.PopTextWrapPos();
 
-            var translation = node.Translation;
-            ImGuiComponents.InputFloat3("Translation", ref translation, "%.1f", ImGuiInputTextFlags.ReadOnly);
+            if (node.Type.HasFlag(NodeType.NND_NODETYPE_UNIT_TRANSLATION))
+            {
+                var translation = node.Translation;
+                ImGuiComponents.InputFloat3("Translation", ref translation, "%.1f", ImGuiInputTextFlags.ReadOnly);
+            }
 
             var center = node.Center;
             ImGuiComponents.InputFloat3("Center", ref center, "%.1f", ImGuiInputTextFlags.ReadOnly);
 
-            var boundingBox = node.BoundingBox;
-            ImGuiComponents.InputFloat3("Bounding Box", ref boundingBox, "%.1f", ImGuiInputTextFlags.ReadOnly);
+            if (node.Type.HasFlag(NodeType.NND_NODETYPE_BBOX_DATA))
+            {
+                var boundingBox = node.BoundingBox;
+                ImGuiComponents.InputFloat3("Bounding Box", ref boundingBox, "%.1f", ImGuiInputTextFlags.ReadOnly);
+            }
 
             var rotation = node.Rotation;
             ImGuiComponents.InputFloat3("Rotation", ref rotation, "%.1f", ImGuiInputTextFlags.ReadOnly);
 
-            var scale = node.Scale;
-            ImGuiComponents.InputFloat3("Scale", ref scale, "%.1f", ImGuiInputTextFlags.ReadOnly);
+            if (node.Type.HasFlag(NodeType.NND_NODETYPE_UNIT_SCALING))
+            {
+                var scale = node.Scale;
+                ImGuiComponents.InputFloat3("Scale", ref scale, "%.1f", ImGuiInputTextFlags.ReadOnly);
+            }
 
             var radius = node.Radius;
             ImGuiComponents.InputFloat("Radius", ref radius, "%.1f", ImGuiInputTextFlags.ReadOnly);
@@ -400,6 +419,9 @@ namespace XNOEdit.Panels
                 ImGui.Text($"End Frame: {materialMotionChunk.EndFrame}");
                 ImGui.Text($"FPS: {materialMotionChunk.FPS}");
 
+                if (_renderer?.MaterialPlayer is { } player)
+                    RenderTransport(player);
+
                 if (ImGui.CollapsingHeader("Submotions", ImGuiTreeNodeFlags.AllowOverlap))
                 {
                     var subMotionGroups = materialMotionChunk.SubMotions
@@ -437,6 +459,20 @@ namespace XNOEdit.Panels
 
                 ImGui.EndTabItem();
             }
+        }
+
+        private static void RenderTransport(MotionPlayer player)
+        {
+            if (ImGui.Button($"{(player.Playing ? FontAwesome7.Pause : FontAwesome7.Play)}##PlayPause"))
+                player.TogglePlaying();
+
+            ImGui.SameLine();
+            ImGuiComponents.SetNextItemFillWidth();
+
+            var frame = player.Frame;
+
+            if (ImGui.SliderFloat("##Frame", ref frame, player.StartFrame, player.EndFrame, "%.1f"))
+                player.Seek(frame);
         }
 
         private void RenderKeyframe(object keyframe)

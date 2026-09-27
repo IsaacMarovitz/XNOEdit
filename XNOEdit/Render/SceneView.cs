@@ -63,6 +63,11 @@ namespace XNOEdit.Render
             Camera.FrameTarget(_center, distance);
         }
 
+        public void Update(float deltaTime)
+        {
+            Scene?.Update(deltaTime);
+        }
+
         public void Draw(SlPassContext ctx, Matrix4x4 view, Matrix4x4 projection, RenderSettings settings)
         {
             var config = Environment.Config;

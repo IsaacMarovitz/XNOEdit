@@ -5,6 +5,7 @@ using Solaris;
 using Solaris.Graph;
 using XNOEdit.Guest;
 using XNOEdit.Managers;
+using XNOEdit.Render.Animation;
 
 namespace XNOEdit.Render
 {
@@ -18,13 +19,13 @@ namespace XNOEdit.Render
         public bool Visible { get; private set; } = true;
         public GuestDrawBucket Bucket { get; }
         public Vector3 Centre { get; }
+        public int MaterialIndex { get; }
+        public MaterialValues BindValues { get; }
 
         private readonly MeshGeometry _geometry;
         private readonly GuestMeshState _state;
 
-        private readonly Vector4 _diffuse;
-        private readonly Vector4 _ambient;
-        private readonly Vector4 _specular;
+        private MaterialValues _values;
         private readonly Vector4 _emission;
         private readonly float _power;
 
@@ -43,11 +44,13 @@ namespace XNOEdit.Render
             GuestDrawBucket bucket,
             Vector3 centre,
             int subobject,
-            int meshSet)
+            int meshSet,
+            int materialIndex)
         {
             GuestMaterial = guestMaterial;
             Subobject = subobject;
             MeshSet = meshSet;
+            MaterialIndex = materialIndex;
             Bucket = bucket;
             Centre = centre;
 
@@ -57,9 +60,14 @@ namespace XNOEdit.Render
             BuildStageTextures(material, textureList);
 
             _state = GuestRenderState.FromLogic(material.Logic);
-            _diffuse = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse);
-            _ambient = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient);
-            _specular = PropertyUtility.MaterialColorToVec4(material.Colour.Specular);
+            BindValues = new MaterialValues
+            {
+                Diffuse = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse),
+                Ambient = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient),
+                Specular = PropertyUtility.MaterialColorToVec4(material.Colour.Specular),
+                Offset = _stageOffsets[0],
+            };
+            _values = BindValues;
             _emission = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive);
             _power = material.Colour.Power;
         }
@@ -97,11 +105,17 @@ namespace XNOEdit.Render
             Visible = visible;
         }
 
+        public void SetValues(in MaterialValues values)
+        {
+            _values = values;
+            _stageOffsets[0] = values.Offset;
+        }
+
         public bool DrawGuest(
             SlPassContext ctx, GuestDrawContext guest, TextureManager textureManager,
             in GuestSceneState scene, ReadOnlySpan<Matrix4x4> instances)
         {
-            if (!Visible) return true;
+            if (!Visible || _values.Hidden) return true;
 
             if (GuestMaterial is not { } material)
                 return false;
@@ -136,9 +150,9 @@ namespace XNOEdit.Render
         {
             var state = scene;
 
-            state.MaterialDiffuse = _diffuse;
-            state.MaterialAmbient = _ambient;
-            state.MaterialSpecular = _specular;
+            state.MaterialDiffuse = _values.Diffuse;
+            state.MaterialAmbient = _values.Ambient;
+            state.MaterialSpecular = _values.Specular;
             state.MaterialEmission = _emission;
             state.MaterialPower = _power;
             state.AlphaThreshold = _state.AlphaThreshold;

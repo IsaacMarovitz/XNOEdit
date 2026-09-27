@@ -5,6 +5,7 @@ using Solaris.Graph;
 using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
+using XNOEdit.Render.Animation;
 
 namespace XNOEdit.Render
 {
@@ -18,16 +19,19 @@ namespace XNOEdit.Render
         private readonly List<ModelMesh> _transparent = [];
         private readonly Dictionary<int, SlBuffer> _sharedVertexBuffers = new();
         private readonly GuestMaterialCache? _guestMaterials;
+        private readonly MaterialAnimation? _materialAnimation;
 
         public Model(
             SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
+            MaterialMotionChunk? materialMotion,
             GuestMaterialCache? guestMaterial)
         {
             _device = device;
             _guestMaterials = guestMaterial;
+            _materialAnimation = materialMotion != null ? new MaterialAnimation(materialMotion) : null;
 
             LoadModel(objectChunk, textureListChunk, effectListChunk);
         }
@@ -70,6 +74,17 @@ namespace XNOEdit.Render
                 {
                     mesh.SetVisible(visibility);
                 }
+            }
+        }
+
+        public void SetFrame(float frame)
+        {
+            if (_materialAnimation == null)
+                return;
+
+            foreach (var mesh in _meshes)
+            {
+                mesh.SetValues(_materialAnimation.Sample(mesh.MaterialIndex, frame, mesh.BindValues));
             }
         }
 
@@ -182,7 +197,7 @@ namespace XNOEdit.Render
 
                         var mesh = new ModelMesh(
                             _device, buffer, primitiveList, textureListChunk, material, guestMaterial,
-                            (GuestDrawBucket)(subObject.Type & 0xFF), subObject.MeshSets[j].Centre, i, j);
+                            (GuestDrawBucket)(subObject.Type & 0xFF), subObject.MeshSets[j].Centre, i, j, meshSet.MaterialIndex);
 
                         _meshes.Add(mesh);
 

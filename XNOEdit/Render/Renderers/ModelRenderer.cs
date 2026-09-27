@@ -5,6 +5,7 @@ using Solaris.Graph;
 using XNOEdit.Guest;
 using XNOEdit.Logging;
 using XNOEdit.Managers;
+using XNOEdit.Render.Animation;
 
 namespace XNOEdit.Render.Renderers
 {
@@ -39,14 +40,25 @@ namespace XNOEdit.Render.Renderers
 
         private Matrix4x4[] _instances = [Matrix4x4.Identity];
 
+        public MaterialMotionChunk? MaterialMotion { get; }
+        public MotionPlayer? MaterialPlayer { get; }
+
         public ModelRenderer(
             SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
+            MaterialMotionChunk? materialMotion,
             GuestMaterialCache? guestMaterial)
         {
-            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, guestMaterial);
+            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, materialMotion, guestMaterial);
+
+            if (materialMotion != null)
+            {
+                MaterialMotion = materialMotion;
+                MaterialPlayer = new MotionPlayer(
+                    materialMotion.StartFrame, materialMotion.EndFrame, materialMotion.FPS, materialMotion.Type.ToRepeat());
+            }
         }
 
         public void SetInstances(Matrix4x4[] instances) => _instances = instances;
@@ -59,6 +71,15 @@ namespace XNOEdit.Render.Renderers
         public void SetVisible(int subobject, int? meshSet, bool visibility)
         {
             _model.SetVisible(subobject, meshSet, visibility);
+        }
+
+        public void Update(float deltaTime)
+        {
+            if (MaterialPlayer == null)
+                return;
+
+            MaterialPlayer.Advance(deltaTime);
+            _model.SetFrame(MaterialPlayer.Frame);
         }
 
         public void Draw(

@@ -1,7 +1,5 @@
 using Marathon.Formats.Archive;
 using Marathon.Formats.Ninja;
-using Marathon.Formats.Ninja.Chunks;
-using Marathon.Formats.Ninja.Types;
 using Marathon.Formats.Parameter;
 using Marathon.Formats.Placement;
 

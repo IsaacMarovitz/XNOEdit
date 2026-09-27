@@ -106,6 +106,7 @@ namespace XNOEdit
 
             _input.Update(_deltaTime);
             _loader.ProcessMainThreadQueue();
+            _view.Update(_deltaTime);
 
             UIManager.PerformancePanel?.Record(new PerformanceSample
             {

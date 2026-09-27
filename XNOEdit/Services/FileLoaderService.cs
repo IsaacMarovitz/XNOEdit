@@ -42,6 +42,8 @@ namespace XNOEdit.Services
 
     public record ObjectLoadResult(
         NinjaNext Xno,
+        NodeNameChunk? NodeNames,
+        MotionChunk? NodeMotion,
         MaterialMotionChunk? MaterialMotion,
         ObjectChunk? ObjectChunk,
         ModelRenderer? Renderer,
@@ -135,8 +137,28 @@ namespace XNOEdit.Services
 
                 if (materialMotionFile != null)
                 {
-                    progress?.Report(new LoadProgress(LoadStage.LoadingTextures, $"Parsing {entry.File.Name} material motion..."));
+                    progress?.Report(new LoadProgress(LoadStage.Parsing, $"Parsing {entry.File.Name} material motion..."));
                     materialMotion = new NinjaNext(materialMotionFile.Decompress()).GetChunk<MaterialMotionChunk>();
+                }
+
+                var nodeNamesPath = entry.File.Path.Replace(".xno", ".xna");
+                var nodeNamesFile = entry.ArcFile.GetFile(nodeNamesPath);
+                NodeNameChunk? nodeNameChunk = null;
+
+                if (nodeNamesFile != null)
+                {
+                    progress?.Report(new LoadProgress(LoadStage.Parsing, $"Parsing {entry.File.Name} node names..."));
+                    nodeNameChunk = new NinjaNext(nodeNamesFile.Decompress()).GetChunk<NodeNameChunk>();
+                }
+
+                var nodeMotionPath = entry.File.Path.Replace(".xno", ".xnm");
+                var nodeMotionFile = entry.ArcFile.GetFile(nodeMotionPath);
+                MotionChunk? nodeMotionChunk = null;
+
+                if (nodeMotionFile != null)
+                {
+                    progress?.Report(new LoadProgress(LoadStage.Parsing, $"Parsing {entry.File.Name} motion..."));
+                    nodeMotionChunk = new NinjaNext(nodeMotionFile.Decompress()).GetChunk<MotionChunk>();
                 }
 
                 var objectChunk = xno.GetChunk<ObjectChunk>();
@@ -154,12 +176,12 @@ namespace XNOEdit.Services
                     cancellationToken.ThrowIfCancellationRequested();
                     progress?.Report(new LoadProgress(LoadStage.CreatingBuffers, "Creating GPU buffers..."));
 
-                    renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, guestMaterials);
+                    renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, materialMotion, guestMaterials);
                 }
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {xno.Name}", 1, 1));
 
-                return new ObjectLoadResult(xno, materialMotion, objectChunk, renderer, textures);
+                return new ObjectLoadResult(xno, nodeNameChunk, nodeMotionChunk, materialMotion, objectChunk, renderer, textures);
             }, cancellationToken);
         }
 
@@ -206,15 +228,15 @@ namespace XNOEdit.Services
                         current,
                         total));
 
-                    var modelFile = GetModelFile(modelKey, resolverContext.ObjectArchive, archiveCache);
-                    if (modelFile == null)
+                    var modelEntry = GetModelFile(modelKey, resolverContext.ObjectArchive, archiveCache);
+                    if (modelEntry == null)
                     {
                         Logger.Warning?.PrintMsg(LogClass.Application, $"Model not found: {modelKey.ModelPath}");
                         current++;
                         continue;
                     }
 
-                    var xnoResult = await ReadXnoAsync(new FileEntry(modelFile, resolverContext.ObjectArchive), guestMaterials, null, cancellationToken);
+                    var xnoResult = await ReadXnoAsync(modelEntry.Value, guestMaterials, null, cancellationToken);
                     if (xnoResult?.ObjectChunk != null)
                     {
                         loadedGroups.Add(new LoadedObjectGroup(
@@ -294,7 +316,7 @@ namespace XNOEdit.Services
             return path;
         }
 
-        private static IFile? GetModelFile(
+        private static FileEntry? GetModelFile(
             ModelKey modelKey,
             ArcFile objectArchive,
             Dictionary<string, ArcFile> archiveCache)
@@ -302,7 +324,9 @@ namespace XNOEdit.Services
             if (modelKey.ArchiveHint == null)
             {
                 // Default: look in object.arc
-                return objectArchive.GetFile($"{modelKey.ModelPath}");
+                return objectArchive.GetFile($"{modelKey.ModelPath}") is { } file
+                    ? new FileEntry(file, objectArchive)
+                    : null;
             }
 
             // Look in the hinted archive
@@ -322,7 +346,9 @@ namespace XNOEdit.Services
                 archiveCache[modelKey.ArchiveHint] = archive;
             }
 
-            return archive.GetFile($"{modelKey.ModelPath}");
+            return archive.GetFile($"{modelKey.ModelPath}") is { } hinted
+                ? new FileEntry(hinted, archive)
+                : null;
         }
 
         public async Task<StageLoadResult?> ReadArcAsync(
@@ -379,7 +405,13 @@ namespace XNOEdit.Services
                         foreach (var tex in textures)
                             loadedTextureNames.Add(tex.Name);
 
-                        var renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, guestMaterials);
+                        var materialMotionFile = file.GetFile(model.Path.Replace(".xno", ".xnv"));
+                        MaterialMotionChunk? materialMotion = null;
+
+                        if (materialMotionFile != null)
+                            materialMotion = new NinjaNext(materialMotionFile.Decompress()).GetChunk<MaterialMotionChunk>();
+
+                        var renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, materialMotion, guestMaterials);
 
                         // Disable shadow meshes by default
                         if (xno.Name.Contains("sdw"))
