@@ -92,9 +92,12 @@ namespace XNOEdit.Render.Animation
         }
 
         private static Vector3 Wrap16(Vector3 delta) => new(
-            delta.X - Turn16 * MathF.Round(delta.X / Turn16),
-            delta.Y - Turn16 * MathF.Round(delta.Y / Turn16),
-            delta.Z - Turn16 * MathF.Round(delta.Z / Turn16));
+            Wrap16(delta.X),
+            Wrap16(delta.Y),
+            Wrap16(delta.Z));
+
+        private static float Wrap16(float delta) =>
+            delta - Turn16 * MathF.Ceiling((delta - Turn16 / 2.0f) / Turn16);
 
         private static (float Frame, Vector3 Value) Decode(object keyframe, MotionValueType valueType) => keyframe switch
         {

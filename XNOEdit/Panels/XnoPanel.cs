@@ -4,6 +4,7 @@ using Marathon.Formats.Ninja;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Flags;
 using Marathon.Formats.Ninja.Types;
+using Marathon.IO.Types.FileSystem;
 using XNOEdit.Fonts;
 using XNOEdit.Guest;
 using XNOEdit.Logging;
@@ -21,12 +22,16 @@ namespace XNOEdit.Panels
         private readonly NodeNameChunk? _nodeNameChunk;
         private readonly MaterialMotionChunk? _materialMotion;
         private readonly ModelRenderer? _renderer;
+        private readonly List<IFile> _motionFiles;
+        private readonly int _motionPrefixLength;
+        private string _motionFilter = string.Empty;
+        private string? _motionPath;
         private readonly ISceneVisibility _visibility;
         private readonly int _xnoIndex;
 
         private readonly record struct MeshSetEntry(int SubobjectIndex, int MeshSetIndex, MeshSet MeshSet);
 
-        public XnoPanel(NinjaNext xno, NodeNameChunk? nodeNames, ModelRenderer? renderer, ISceneVisibility visibility, int xnoIndex = 0)
+        public XnoPanel(NinjaNext xno, NodeNameChunk? nodeNames, ModelRenderer? renderer, FileEntry? entry, ISceneVisibility visibility, int xnoIndex = 0)
         {
             _xno = xno;
             _nodeNameChunk = nodeNames;
@@ -37,6 +42,13 @@ namespace XNOEdit.Panels
             _nodeNameChunk ??= _xno.GetChunk<NodeNameChunk>();
 
             _renderer = renderer;
+
+            _motionFiles = entry is { } source
+                ? source.ArcFile.EnumerateFiles("*.xnm", SearchOption.AllDirectories).OrderBy(f => f.Path).ToList()
+                : [];
+
+            _motionPath = renderer?.NodeMotion != null ? entry?.File.Path.Replace(".xno", ".xnm") : null;
+            _motionPrefixLength = CommonDirectoryLength(_motionFiles);
         }
 
         private bool GetMeshSetsVisibility(IEnumerable<MeshSetEntry> entries)
@@ -86,9 +98,9 @@ namespace XNOEdit.Panels
                     RenderMaterialMotionChunk(_materialMotion, _nodeNameChunk);
                 }
 
-                if (_renderer?.NodeMotion is { } nodeMotion)
+                if (_renderer?.NodeMotion != null || _motionFiles.Count > 0)
                 {
-                    RenderNodeMotionChunk(nodeMotion);
+                    RenderNodeMotion();
                 }
 
                 if (textureListChunk != null)
@@ -466,20 +478,95 @@ namespace XNOEdit.Panels
             }
         }
 
-        private void RenderNodeMotionChunk(MotionChunk nodeMotionChunk)
+        private void RenderNodeMotion()
         {
             if (ImGui.BeginTabItem("Node Motion"))
             {
-                ImGui.Text($"Type: {PropertyUtility.MotionTypeToString(nodeMotionChunk.Type)}");
-                ImGui.Text($"Start Frame: {nodeMotionChunk.StartFrame}");
-                ImGui.Text($"End Frame: {nodeMotionChunk.EndFrame}");
-                ImGui.Text($"FPS: {nodeMotionChunk.FPS}");
+                if (_motionFiles.Count > 0)
+                    RenderMotionPicker();
 
-                if (_renderer?.NodePlayer is { } player)
-                    RenderTransport(player);
+                if (_renderer?.NodeMotion is { } nodeMotionChunk)
+                {
+                    ImGui.Text($"Type: {PropertyUtility.MotionTypeToString(nodeMotionChunk.Type)}");
+                    ImGui.Text($"Start Frame: {nodeMotionChunk.StartFrame}");
+                    ImGui.Text($"End Frame: {nodeMotionChunk.EndFrame}");
+                    ImGui.Text($"FPS: {nodeMotionChunk.FPS}");
+
+                    if (_renderer.NodePlayer is { } player)
+                        RenderTransport(player);
+                }
 
                 ImGui.EndTabItem();
             }
+        }
+
+        private void RenderMotionPicker()
+        {
+            ImGuiComponents.SetNextItemFillWidth();
+            ImGui.InputTextWithHint("##MotionFilter", "Search...", ref _motionFilter, 256);
+
+            if (ImGui.BeginListBox("##Motions", new Vector2(-float.Epsilon, ImGui.GetTextLineHeightWithSpacing() * 8)))
+            {
+                if (ImGui.Selectable("<None>", _motionPath == null))
+                    SelectMotion(null);
+
+                foreach (var file in _motionFiles)
+                {
+                    var name = file.Path[_motionPrefixLength..];
+
+                    if (!name.Contains(_motionFilter, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (ImGui.Selectable(name, file.Path == _motionPath))
+                        SelectMotion(file);
+                }
+
+                ImGui.EndListBox();
+            }
+        }
+
+        private void SelectMotion(IFile? file)
+        {
+            MotionChunk? motion = null;
+
+            if (file != null)
+            {
+                try
+                {
+                    motion = new NinjaNext(file.Decompress()).GetChunk<MotionChunk>();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error?.PrintMsg(LogClass.Application, $"Failed to load {file.Path}: {ex.Message}");
+                    return;
+                }
+
+                if (motion == null)
+                {
+                    Logger.Error?.PrintMsg(LogClass.Application, $"{file.Path} has no node motion");
+                    return;
+                }
+            }
+
+            _renderer?.SetNodeMotion(motion);
+            _motionPath = file?.Path;
+
+            // Make one shot anims play on select
+            if (_renderer?.NodePlayer is { Playing: false } player)
+                player.TogglePlaying();
+        }
+
+        private static int CommonDirectoryLength(List<IFile> files)
+        {
+            if (files.Count == 0)
+                return 0;
+
+            var prefix = files[0].Path.AsSpan();
+
+            foreach (var file in files)
+                prefix = prefix[..prefix.CommonPrefixLength(file.Path.AsSpan())];
+
+            return prefix.LastIndexOfAny('/', '\\') + 1;
         }
 
         private static void RenderTransport(MotionPlayer player)

@@ -209,7 +209,7 @@ namespace XNOEdit.Managers
             var visibility = new ObjectSceneVisibility(loadResult.Renderer);
             _currentVisibility = visibility;
 
-            XnoPanel = new XnoPanel(loadResult.Xno, loadResult.NodeNames, loadResult.Renderer, visibility);
+            XnoPanel = new XnoPanel(loadResult.Xno, loadResult.NodeNames, loadResult.Renderer, loadResult.Entry, visibility);
             ImGui.SetWindowFocus(XnoPanel.Name);
             SetColors(HueForCategory(MissionCategory.None));
 
@@ -227,7 +227,7 @@ namespace XNOEdit.Managers
             StagePanel = new StagePanel(name, xnos, visibility);
             StagePanel.ViewXno += (index, xno) =>
             {
-                XnoPanel = new XnoPanel(xno, null, renderers[index], visibility, index);
+                XnoPanel = new XnoPanel(xno, null, renderers[index], null, visibility, index);
                 ImGui.SetWindowFocus(XnoPanel.Name);
             };
 

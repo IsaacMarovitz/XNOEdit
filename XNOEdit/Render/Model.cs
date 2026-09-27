@@ -22,15 +22,14 @@ namespace XNOEdit.Render
         private readonly GuestMaterialCache? _guestMaterials;
         private readonly MaterialAnimation? _materialAnimation;
         private readonly Skeleton? _skeleton;
-        private readonly NodeAnimation? _nodeAnimation;
         private readonly NodeTransform[] _transforms = [];
+        private NodeAnimation? _nodeAnimation;
 
         public Model(
             SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
-            MotionChunk? nodeMotion,
             MaterialMotionChunk? materialMotion,
             GuestMaterialCache? guestMaterial)
         {
@@ -47,11 +46,8 @@ namespace XNOEdit.Render
                 Logger.Error?.PrintMsg(LogClass.Application, $"Drawing unposed: {ex.Message}");
             }
 
-            if (_skeleton != null && nodeMotion != null)
-            {
-                _nodeAnimation = new NodeAnimation(nodeMotion, objectChunk.Nodes.Count);
+            if (_skeleton != null)
                 _transforms = new NodeTransform[objectChunk.Nodes.Count];
-            }
 
             LoadModel(objectChunk, textureListChunk, effectListChunk);
         }
@@ -106,6 +102,16 @@ namespace XNOEdit.Render
             {
                 mesh.SetValues(_materialAnimation.Sample(mesh.MaterialIndex, frame, mesh.BindValues));
             }
+        }
+
+        public void SetNodeMotion(MotionChunk? motion)
+        {
+            if (_skeleton == null)
+                return;
+
+            _nodeAnimation = motion != null ? new NodeAnimation(motion, _transforms.Length) : null;
+
+            _skeleton.Reset();
         }
 
         public void SetNodeFrame(float frame)

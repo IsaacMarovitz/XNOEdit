@@ -41,6 +41,7 @@ namespace XNOEdit.Services
     }
 
     public record ObjectLoadResult(
+        FileEntry Entry,
         NinjaNext Xno,
         NodeNameChunk? NodeNames,
         MotionChunk? NodeMotion,
@@ -181,7 +182,7 @@ namespace XNOEdit.Services
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {xno.Name}", 1, 1));
 
-                return new ObjectLoadResult(xno, nodeNameChunk, nodeMotionChunk, materialMotion, objectChunk, renderer, textures);
+                return new ObjectLoadResult(entry, xno, nodeNameChunk, nodeMotionChunk, materialMotion, objectChunk, renderer, textures);
             }, cancellationToken);
         }
 

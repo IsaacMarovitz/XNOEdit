@@ -2,6 +2,7 @@ using System.Numerics;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Flags;
 using Marathon.Formats.Ninja.Types;
+using XNOEdit.Logging;
 
 namespace XNOEdit.Render
 {
@@ -78,11 +79,26 @@ namespace XNOEdit.Render
 
             Pose(_bind);
 
+            var offBind = 0;
+
             for (var i = 0; i < _nodes.Count; i++)
             {
-                if (!IsNearIdentity(Skin[i], _world[i].Translation.Length()))
-                    throw new InvalidDataException($"Node {i} ({_nodes[i].Type}) disagrees with its inverse bind matrix");
+                if (_nodes[i].MatrixIndex >= 0 && !IsNearIdentity(Skin[i], _world[i].Translation.Length()))
+                    offBind++;
             }
+
+            if (offBind > 0)
+            {
+                Logger.Warning?.PrintMsg(LogClass.Application,
+                    $"{offBind} node(s) rest away from their bind pose");
+            }
+
+            Reset();
+        }
+
+        public void Reset()
+        {
+            Array.Fill(Skin, Matrix4x4.Identity);
         }
 
         public Matrix4x4[] Skin { get; }

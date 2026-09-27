@@ -40,8 +40,8 @@ namespace XNOEdit.Render.Renderers
 
         private Matrix4x4[] _instances = [Matrix4x4.Identity];
 
-        public MotionChunk? NodeMotion { get; }
-        public MotionPlayer? NodePlayer { get; }
+        public MotionChunk? NodeMotion { get; private set; }
+        public MotionPlayer? NodePlayer { get; private set; }
         public MaterialMotionChunk? MaterialMotion { get; }
         public MotionPlayer? MaterialPlayer { get; }
 
@@ -54,7 +54,9 @@ namespace XNOEdit.Render.Renderers
             MaterialMotionChunk? materialMotion,
             GuestMaterialCache? guestMaterial)
         {
-            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, nodeMotion, materialMotion, guestMaterial);
+            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, materialMotion, guestMaterial);
+
+            SetNodeMotion(nodeMotion);
 
             if (nodeMotion != null)
             {
@@ -67,6 +69,14 @@ namespace XNOEdit.Render.Renderers
                 MaterialMotion = materialMotion;
                 MaterialPlayer = new MotionPlayer(materialMotion);
             }
+        }
+
+        public void SetNodeMotion(MotionChunk? motion)
+        {
+            _model.SetNodeMotion(motion);
+
+            NodeMotion = motion;
+            NodePlayer = motion != null ? new MotionPlayer(motion) : null;
         }
 
         public void SetInstances(Matrix4x4[] instances) => _instances = instances;
