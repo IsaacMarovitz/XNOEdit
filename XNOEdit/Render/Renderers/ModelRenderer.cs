@@ -40,6 +40,8 @@ namespace XNOEdit.Render.Renderers
 
         private Matrix4x4[] _instances = [Matrix4x4.Identity];
 
+        public MotionChunk? NodeMotion { get; }
+        public MotionPlayer? NodePlayer { get; }
         public MaterialMotionChunk? MaterialMotion { get; }
         public MotionPlayer? MaterialPlayer { get; }
 
@@ -48,16 +50,22 @@ namespace XNOEdit.Render.Renderers
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
+            MotionChunk? nodeMotion,
             MaterialMotionChunk? materialMotion,
             GuestMaterialCache? guestMaterial)
         {
-            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, materialMotion, guestMaterial);
+            _model = new Model(device, objectChunk, textureListChunk, effectListChunk, nodeMotion, materialMotion, guestMaterial);
+
+            if (nodeMotion != null)
+            {
+                NodeMotion = nodeMotion;
+                NodePlayer = new MotionPlayer(nodeMotion);
+            }
 
             if (materialMotion != null)
             {
                 MaterialMotion = materialMotion;
-                MaterialPlayer = new MotionPlayer(
-                    materialMotion.StartFrame, materialMotion.EndFrame, materialMotion.FPS, materialMotion.Type.ToRepeat());
+                MaterialPlayer = new MotionPlayer(materialMotion);
             }
         }
 
@@ -75,11 +83,17 @@ namespace XNOEdit.Render.Renderers
 
         public void Update(float deltaTime)
         {
-            if (MaterialPlayer == null)
-                return;
+            if (NodePlayer != null)
+            {
+                NodePlayer.Advance(deltaTime);
+                _model.SetNodeFrame(NodePlayer.Frame);
+            }
 
-            MaterialPlayer.Advance(deltaTime);
-            _model.SetFrame(MaterialPlayer.Frame);
+            if (MaterialPlayer != null)
+            {
+                MaterialPlayer.Advance(deltaTime);
+                _model.SetMaterialFrame(MaterialPlayer.Frame);
+            }
         }
 
         public void Draw(

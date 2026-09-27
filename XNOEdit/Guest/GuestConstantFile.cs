@@ -30,6 +30,7 @@ namespace XNOEdit.Guest
         public const uint MatVp = 88;               // 4
         public const uint CsmViewProj = 92;         // 4
         public const uint BoneMatrices = 96;        // 32 x 3
+        public const int BoneMatrixCount = 32;
         public const uint Morph = 192;
         public const uint MorphFlags = 193;
         public const uint SystemLightMapWork = 194;

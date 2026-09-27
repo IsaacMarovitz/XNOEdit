@@ -176,7 +176,7 @@ namespace XNOEdit.Services
                     cancellationToken.ThrowIfCancellationRequested();
                     progress?.Report(new LoadProgress(LoadStage.CreatingBuffers, "Creating GPU buffers..."));
 
-                    renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, materialMotion, guestMaterials);
+                    renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, nodeMotionChunk, materialMotion, guestMaterials);
                 }
 
                 progress?.Report(new LoadProgress(LoadStage.Complete, $"Loaded {xno.Name}", 1, 1));
@@ -411,7 +411,7 @@ namespace XNOEdit.Services
                         if (materialMotionFile != null)
                             materialMotion = new NinjaNext(materialMotionFile.Decompress()).GetChunk<MaterialMotionChunk>();
 
-                        var renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, materialMotion, guestMaterials);
+                        var renderer = new ModelRenderer(_device, objectChunk, textureListChunk, effectChunk, null, materialMotion, guestMaterials);
 
                         // Disable shadow meshes by default
                         if (xno.Name.Contains("sdw"))

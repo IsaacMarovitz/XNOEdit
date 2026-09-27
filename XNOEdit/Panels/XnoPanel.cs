@@ -86,6 +86,11 @@ namespace XNOEdit.Panels
                     RenderMaterialMotionChunk(_materialMotion, _nodeNameChunk);
                 }
 
+                if (_renderer?.NodeMotion is { } nodeMotion)
+                {
+                    RenderNodeMotionChunk(nodeMotion);
+                }
+
                 if (textureListChunk != null)
                 {
                     RenderTextureChunk(textureManager, textureListChunk);
@@ -412,7 +417,7 @@ namespace XNOEdit.Panels
 
         private void RenderMaterialMotionChunk(MaterialMotionChunk materialMotionChunk, NodeNameChunk? nodeNameChunk)
         {
-            if (ImGui.BeginTabItem("Motion"))
+            if (ImGui.BeginTabItem("Material Motion"))
             {
                 ImGui.Text($"Type: {PropertyUtility.MotionTypeToString(materialMotionChunk.Type)}");
                 ImGui.Text($"Start Frame: {materialMotionChunk.StartFrame}");
@@ -456,6 +461,22 @@ namespace XNOEdit.Panels
                         ImGui.TreePop();
                     }
                 }
+
+                ImGui.EndTabItem();
+            }
+        }
+
+        private void RenderNodeMotionChunk(MotionChunk nodeMotionChunk)
+        {
+            if (ImGui.BeginTabItem("Node Motion"))
+            {
+                ImGui.Text($"Type: {PropertyUtility.MotionTypeToString(nodeMotionChunk.Type)}");
+                ImGui.Text($"Start Frame: {nodeMotionChunk.StartFrame}");
+                ImGui.Text($"End Frame: {nodeMotionChunk.EndFrame}");
+                ImGui.Text($"FPS: {nodeMotionChunk.FPS}");
+
+                if (_renderer?.NodePlayer is { } player)
+                    RenderTransport(player);
 
                 ImGui.EndTabItem();
             }

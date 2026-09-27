@@ -24,6 +24,8 @@ namespace XNOEdit.Render
 
         private readonly MeshGeometry _geometry;
         private readonly GuestMeshState _state;
+        private readonly int _node;
+        private readonly int[] _paletteNodes;
 
         private MaterialValues _values;
         private readonly Vector4 _emission;
@@ -45,7 +47,9 @@ namespace XNOEdit.Render
             Vector3 centre,
             int subobject,
             int meshSet,
-            int materialIndex)
+            int materialIndex,
+            int node,
+            int[] paletteNodes)
         {
             GuestMaterial = guestMaterial;
             Subobject = subobject;
@@ -53,6 +57,8 @@ namespace XNOEdit.Render
             MaterialIndex = materialIndex;
             Bucket = bucket;
             Centre = centre;
+            _node = node;
+            _paletteNodes = paletteNodes;
 
             _geometry = MeshGeometry.CreateFromTriangleStrip(
                 device, sharedVbo, primitiveList.StripIndices, primitiveList.IndexIndices);
@@ -113,7 +119,7 @@ namespace XNOEdit.Render
 
         public bool DrawGuest(
             SlPassContext ctx, GuestDrawContext guest, TextureManager textureManager,
-            in GuestSceneState scene, ReadOnlySpan<Matrix4x4> instances)
+            in GuestSceneState scene, ReadOnlySpan<Matrix4x4> instances, ReadOnlySpan<Matrix4x4> skin)
         {
             if (!Visible || _values.Hidden) return true;
 
@@ -123,27 +129,25 @@ namespace XNOEdit.Render
             var state = ApplyMaterial(in scene);
             var binding = BindStages(ctx, guest, textureManager, material, in state);
 
+            Span<Matrix4x4> palette = stackalloc Matrix4x4[_paletteNodes.Length];
+
+            for (var i = 0; i < palette.Length; i++)
+                palette[i] = Pose(skin, _paletteNodes[i]);
+
+            var rigid = Pose(skin, _node);
+
             foreach (var world in instances)
             {
-                guest.BindInstance(ctx, in binding, in state, world, _stageOffsets);
+                guest.BindInstance(ctx, in binding, in state, rigid * world, palette, _stageOffsets);
                 ctx.DrawIndexed(_geometry.IndexCount);
             }
 
             return true;
         }
 
-        public void DrawGuestInstance(
-            SlPassContext ctx, GuestDrawContext guest, TextureManager textureManager,
-            in GuestSceneState scene, in Matrix4x4 world)
+        private static Matrix4x4 Pose(ReadOnlySpan<Matrix4x4> skin, int node)
         {
-            if (GuestMaterial is not { } material)
-                return;
-
-            var state = ApplyMaterial(in scene);
-            var binding = BindStages(ctx, guest, textureManager, material, in state);
-
-            guest.BindInstance(ctx, in binding, in state, world, _stageOffsets);
-            ctx.DrawIndexed(_geometry.IndexCount);
+            return node < 0 || skin.IsEmpty ? Matrix4x4.Identity : skin[node];
         }
 
         private GuestSceneState ApplyMaterial(in GuestSceneState scene)

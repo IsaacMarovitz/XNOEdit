@@ -1,9 +1,16 @@
+using Marathon.Formats.Ninja.Chunks;
+
 namespace XNOEdit.Render.Animation
 {
     public sealed class MotionPlayer
     {
         private readonly MotionRepeat _repeat;
         private float _time;
+
+        public MotionPlayer(MotionChunk motion)
+            : this(motion.StartFrame, motion.EndFrame, motion.FPS, motion.Type.ToRepeat())
+        {
+        }
 
         public MotionPlayer(float startFrame, float endFrame, float fps, MotionRepeat repeat)
         {

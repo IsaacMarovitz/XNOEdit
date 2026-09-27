@@ -82,17 +82,18 @@ namespace XNOEdit.Guest
 
         public void BindInstance(
             SlPassContext ctx, in GuestBinding binding,
-            in GuestSceneState scene, in Matrix4x4 world, ReadOnlySpan<Vector2> offsets)
+            in GuestSceneState scene, in Matrix4x4 world, ReadOnlySpan<Matrix4x4> palette, ReadOnlySpan<Vector2> offsets)
         {
             _vertexConstants.Clear();
             WriteShared(_vertexConstants, in scene, offsets);
 
             var view = scene.View;
             var projection = scene.Projection;
+            var worldView = world * view;
 
             _vertexConstants.SetMatrix(GuestRegisters.MatW, world, rows: 3);
-            _vertexConstants.SetMatrix(GuestRegisters.MatWv, world * view, rows: 3);
-            _vertexConstants.SetMatrix(GuestRegisters.MatWvp, world * view * projection);
+            _vertexConstants.SetMatrix(GuestRegisters.MatWv, worldView, rows: 3);
+            _vertexConstants.SetMatrix(GuestRegisters.MatWvp, worldView * projection);
             _vertexConstants.SetMatrix(GuestRegisters.MatV, view, rows: 3);
             _vertexConstants.SetMatrix(GuestRegisters.MatVp, view * projection);
             _vertexConstants.SetMatrix(GuestRegisters.MatP, projection);
@@ -101,6 +102,11 @@ namespace XNOEdit.Guest
             _vertexConstants.SetMatrix(GuestRegisters.MatVi, inverseView, rows: 3);
 
             _vertexConstants.SetMatrix(GuestRegisters.CsmViewProj, Matrix4x4.Identity);
+
+            for (var i = 0; i < palette.Length; i++)
+            {
+                _vertexConstants.SetMatrix(GuestRegisters.BoneMatrices + (uint)i * 3, palette[i] * worldView, rows: 3);
+            }
 
             // Only the vertex stage derives the eye vector; it comes from the camera
             // rather than from anything the pixel shaders can see.

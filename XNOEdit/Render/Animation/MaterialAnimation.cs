@@ -38,7 +38,7 @@ namespace XNOEdit.Render.Animation
 
                 try
                 {
-                    curve = new MotionCurve(subMotion);
+                    curve = new MotionCurve(subMotion, MotionValueType.Float);
                 }
                 catch (Exception ex) when (ex is NotSupportedException or InvalidDataException)
                 {

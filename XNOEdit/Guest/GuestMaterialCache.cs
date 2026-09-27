@@ -16,12 +16,12 @@ namespace XNOEdit.Guest
             _cache = cache;
         }
 
-        public GuestMaterial? Resolve(string? effectName, string? techniqueName)
+        public GuestMaterial? Resolve(string directory, string? effectName, string? techniqueName)
         {
             if (string.IsNullOrEmpty(effectName))
                 return null;
 
-            var path = $"xenon/shader/std/{effectName}o";
+            var path = $"xenon/shader/{directory}/{effectName}o";
             var key = (path, techniqueName ?? string.Empty);
 
             if (_materials.TryGetValue(key, out var cached))

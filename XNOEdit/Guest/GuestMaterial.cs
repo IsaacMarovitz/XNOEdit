@@ -6,7 +6,7 @@ namespace XNOEdit.Guest
 {
     public sealed class GuestMaterial : IDisposable
     {
-        public const uint VertexStride = 96;
+        public const uint VertexStride = 124;
 
         private GuestMaterial(
             SlDevice device,
@@ -136,6 +136,8 @@ namespace XNOEdit.Guest
                 new SlVertexAttribute("COLOR", 0, 17, RenderFormat.R32G32B32A32Float, 48),
                 new SlVertexAttribute("TEXCOORD", 0, 13, RenderFormat.R32G32B32A32Float, 64),
                 new SlVertexAttribute("TEXCOORD", 1, 14, RenderFormat.R32G32B32A32Float, 80),
+                new SlVertexAttribute("BLENDWEIGHT", 0, 19, RenderFormat.R32G32B32Float, 96),
+                new SlVertexAttribute("BLENDINDICES", 0, 18, RenderFormat.R32G32B32A32Uint, 108),
             ]));
 
         public void Dispose()

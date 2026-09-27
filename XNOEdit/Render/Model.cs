@@ -1,5 +1,6 @@
 using System.Numerics;
 using Marathon.Formats.Ninja.Chunks;
+using Marathon.Formats.Ninja.Flags;
 using Solaris;
 using Solaris.Graph;
 using XNOEdit.Guest;
@@ -20,18 +21,37 @@ namespace XNOEdit.Render
         private readonly Dictionary<int, SlBuffer> _sharedVertexBuffers = new();
         private readonly GuestMaterialCache? _guestMaterials;
         private readonly MaterialAnimation? _materialAnimation;
+        private readonly Skeleton? _skeleton;
+        private readonly NodeAnimation? _nodeAnimation;
+        private readonly NodeTransform[] _transforms = [];
 
         public Model(
             SlDevice device,
             ObjectChunk objectChunk,
             TextureListChunk textureListChunk,
             EffectListChunk effectListChunk,
+            MotionChunk? nodeMotion,
             MaterialMotionChunk? materialMotion,
             GuestMaterialCache? guestMaterial)
         {
             _device = device;
             _guestMaterials = guestMaterial;
             _materialAnimation = materialMotion != null ? new MaterialAnimation(materialMotion) : null;
+
+            try
+            {
+                _skeleton = new Skeleton(objectChunk);
+            }
+            catch (Exception ex) when (ex is InvalidDataException or NotSupportedException)
+            {
+                Logger.Error?.PrintMsg(LogClass.Application, $"Drawing unposed: {ex.Message}");
+            }
+
+            if (_skeleton != null && nodeMotion != null)
+            {
+                _nodeAnimation = new NodeAnimation(nodeMotion, objectChunk.Nodes.Count);
+                _transforms = new NodeTransform[objectChunk.Nodes.Count];
+            }
 
             LoadModel(objectChunk, textureListChunk, effectListChunk);
         }
@@ -77,7 +97,7 @@ namespace XNOEdit.Render
             }
         }
 
-        public void SetFrame(float frame)
+        public void SetMaterialFrame(float frame)
         {
             if (_materialAnimation == null)
                 return;
@@ -87,6 +107,18 @@ namespace XNOEdit.Render
                 mesh.SetValues(_materialAnimation.Sample(mesh.MaterialIndex, frame, mesh.BindValues));
             }
         }
+
+        public void SetNodeFrame(float frame)
+        {
+            if (_nodeAnimation == null)
+                return;
+
+            _skeleton!.Bind.CopyTo(_transforms);
+            _nodeAnimation.Sample(frame, _transforms);
+            _skeleton.Pose(_transforms);
+        }
+
+        private int SlotNode(int slot) => _skeleton?.SlotNode(slot) ?? -1;
 
         private void LoadModel(
             ObjectChunk objectChunk,
@@ -153,6 +185,13 @@ namespace XNOEdit.Render
                         vertices.Add(coordinate.X);
                         vertices.Add(coordinate.Y);
                     }
+
+                    var weight = vertex.Weight ?? Vector3.Zero;
+                    vertices.Add(weight.X);
+                    vertices.Add(weight.Y);
+                    vertices.Add(weight.Z);
+
+                    vertices.AddRange(vertex.MatrixIndices.Select(index => BitConverter.UInt32BitsToSingle(index)));
                 }
 
                 var vbo = _device.CreateBuffer(vertices.ToArray(), SlBufferUsage.Vertex);
@@ -193,11 +232,22 @@ namespace XNOEdit.Render
                             continue;
                         }
 
-                        var guestMaterial = _guestMaterials?.Resolve(effectName, techniqueName);
+                        var vertexList = objectChunk.VertexLists[vertexListIndex];
+                        var skinned = vertexList.Format.HasFlag(VertexFormat.NND_VTXTYPE_XB_MTX_INDEX4);
+                        int[] paletteNodes = skinned ? vertexList.BoneMatrixIndices.Select(SlotNode).ToArray() : [];
+                        var node = skinned ? -1 : SlotNode(meshSet.MatrixIndex);
+
+                        if (paletteNodes.Length > GuestRegisters.BoneMatrixCount)
+                        {
+                            throw new InvalidDataException(
+                                $"Vertex list {vertexListIndex} has {paletteNodes.Length} bones; the palette holds {GuestRegisters.BoneMatrixCount}");
+                        }
+
+                        var guestMaterial = _guestMaterials?.Resolve(skinned ? "skin" : "std", effectName, techniqueName);
 
                         var mesh = new ModelMesh(
                             _device, buffer, primitiveList, textureListChunk, material, guestMaterial,
-                            (GuestDrawBucket)(subObject.Type & 0xFF), subObject.MeshSets[j].Centre, i, j, meshSet.MaterialIndex);
+                            (GuestDrawBucket)(subObject.Type & 0xFF), subObject.MeshSets[j].Centre, i, j, meshSet.MaterialIndex, node, paletteNodes);
 
                         _meshes.Add(mesh);
 
@@ -240,18 +290,19 @@ namespace XNOEdit.Render
             if (meshes.Count == 0)
                 return 0;
 
-            return DrawBucket(meshes, ctx, guest, textureManager, in scene, instances);
+            return DrawBucket(meshes, ctx, guest, textureManager, in scene, instances, _skeleton?.Skin);
         }
 
         private static int DrawBucket(
             List<ModelMesh> meshes, SlPassContext ctx, GuestDrawContext guest,
-            TextureManager textureManager, in GuestSceneState scene, ReadOnlySpan<Matrix4x4> instances)
+            TextureManager textureManager, in GuestSceneState scene, ReadOnlySpan<Matrix4x4> instances,
+            ReadOnlySpan<Matrix4x4> skin)
         {
             var skipped = 0;
 
             foreach (var mesh in meshes)
             {
-                if (!mesh.DrawGuest(ctx, guest, textureManager, in scene, instances))
+                if (!mesh.DrawGuest(ctx, guest, textureManager, in scene, instances, skin))
                 {
                     skipped++;
                 }
