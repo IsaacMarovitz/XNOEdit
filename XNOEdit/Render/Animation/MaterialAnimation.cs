@@ -1,6 +1,7 @@
 using System.Numerics;
 using Marathon.Formats.Ninja.Chunks;
 using Marathon.Formats.Ninja.Flags;
+using Marathon.Formats.Ninja.Types;
 using XNOEdit.Logging;
 
 namespace XNOEdit.Render.Animation
@@ -10,27 +11,45 @@ namespace XNOEdit.Render.Animation
         public Vector4 Diffuse;
         public Vector4 Ambient;
         public Vector4 Specular;
-        public Vector2 Offset;
         public bool Hidden;
     }
 
     public sealed class MaterialAnimation
     {
-        private readonly record struct Channel(SubMotionType Type, MotionCurve Curve);
+        private readonly record struct Channel(SubMotionType Type, int Map, MotionCurve Curve);
 
         private readonly Dictionary<int, List<Channel>> _channels = [];
 
-        public MaterialAnimation(MaterialMotionChunk chunk)
+        public MaterialAnimation(MaterialMotionChunk chunk, List<Material> materials)
         {
             foreach (var subMotion in chunk.SubMotions)
             {
                 var type = subMotion.Type & SubMotionType.NND_SMOTTYPE_VALUETYPE_MASK;
                 var probe = default(MaterialValues);
 
-                if (!Apply(ref probe, type, Vector3.Zero))
+                var material = subMotion.NodeIndex & 0xFFFF;
+                var map = subMotion.NodeIndex >>> 16;
+
+                if (material >= materials.Count)
+                {
+                    Logger.Error?.PrintMsg(LogClass.Application,
+                        $"Submotion targets material {material} of {materials.Count}");
+                    continue;
+                }
+
+                if (IsOffset(type))
+                {
+                    if (map >= materials[material].TextureMap.Descriptions.Count)
+                    {
+                        Logger.Error?.PrintMsg(LogClass.Application,
+                            $"Material {material}: offset targets texture map {map} of {materials[material].TextureMap.Descriptions.Count}");
+                        continue;
+                    }
+                }
+                else if (!Apply(ref probe, type, Vector3.Zero))
                 {
                     Logger.Warning?.PrintMsg(LogClass.Application,
-                        $"Material {subMotion.NodeIndex}: {PropertyUtility.SubmotionTypeToString(type)} is not applied");
+                        $"Material {material}: {PropertyUtility.SubmotionTypeToString(type)} is not applied");
                     continue;
                 }
 
@@ -42,32 +61,44 @@ namespace XNOEdit.Render.Animation
                 }
                 catch (Exception ex) when (ex is NotSupportedException or InvalidDataException)
                 {
-                    Logger.Error?.PrintMsg(LogClass.Application, $"Material {subMotion.NodeIndex}: {ex.Message}");
+                    Logger.Error?.PrintMsg(LogClass.Application, $"Material {material}: {ex.Message}");
                     continue;
                 }
 
-                if (!_channels.TryGetValue(subMotion.NodeIndex, out var channels))
+                if (!_channels.TryGetValue(material, out var channels))
                 {
                     channels = [];
-                    _channels[subMotion.NodeIndex] = channels;
+                    _channels[material] = channels;
                 }
 
-                channels.Add(new Channel(type, curve));
+                channels.Add(new Channel(type, map, curve));
             }
         }
 
-        public MaterialValues Sample(int material, float frame, in MaterialValues bind)
+        public MaterialValues Sample(int material, float frame, in MaterialValues bind, Span<Vector2> offsets)
         {
             var values = bind;
 
             if (_channels.TryGetValue(material, out var channels))
             {
                 foreach (var channel in channels)
-                    Apply(ref values, channel.Type, channel.Curve.Sample(frame));
+                {
+                    var value = channel.Curve.Sample(frame);
+
+                    if (channel.Type == SubMotionType.NND_SMOTTYPE_OFFSET_U)
+                        offsets[channel.Map].X = value.X;
+                    else if (channel.Type == SubMotionType.NND_SMOTTYPE_OFFSET_V)
+                        offsets[channel.Map].Y = value.X;
+                    else
+                        Apply(ref values, channel.Type, value);
+                }
             }
 
             return values;
         }
+
+        private static bool IsOffset(SubMotionType type) =>
+            type is SubMotionType.NND_SMOTTYPE_OFFSET_U or SubMotionType.NND_SMOTTYPE_OFFSET_V;
 
         private static bool Apply(ref MaterialValues values, SubMotionType type, Vector3 value)
         {
@@ -78,12 +109,6 @@ namespace XNOEdit.Render.Animation
                     return true;
                 case SubMotionType.NND_SMOTTYPE_ALPHA:
                     values.Diffuse.W = value.X;
-                    return true;
-                case SubMotionType.NND_SMOTTYPE_OFFSET_U:
-                    values.Offset.X = value.X;
-                    return true;
-                case SubMotionType.NND_SMOTTYPE_OFFSET_V:
-                    values.Offset.Y = value.X;
                     return true;
             }
 

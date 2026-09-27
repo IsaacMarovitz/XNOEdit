@@ -45,6 +45,72 @@ namespace XNOEdit.Render.Animation
 
             for (var i = 0; i < subMotion.Keyframes.Count; i++)
                 (_frames[i], _values[i]) = Decode(subMotion.Keyframes[i], valueType);
+
+            if (valueType == MotionValueType.Angle16)
+                Unwrap(_values);
+        }
+
+        private static void Unwrap(Vector3[] values)
+        {
+            var axis = new float[values.Length];
+
+            for (var component = 0; component < 3; component++)
+            {
+                for (var i = 0; i < values.Length; i++)
+                    axis[i] = values[i][component];
+
+                UnwrapAxis(axis);
+
+                for (var i = 0; i < values.Length; i++)
+                    values[i][component] = axis[i];
+            }
+        }
+
+        private static void UnwrapAxis(float[] axis)
+        {
+            const float Half = Turn16 / 2.0f;
+
+            var steps = new float[axis.Length];
+
+            for (var i = 1; i < axis.Length; i++)
+            {
+                var step = axis[i] - axis[i - 1];
+                steps[i] = step - Turn16 * MathF.Round(step / Turn16);
+            }
+
+            var direction = 0.0f;
+
+            for (var i = 1; i < axis.Length; i++)
+            {
+                if (MathF.Abs(steps[i]) != Half)
+                {
+                    if (steps[i] != 0.0f)
+                        direction = MathF.Sign(steps[i]);
+
+                    continue;
+                }
+
+                if (direction == 0.0f)
+                    direction = NextDirection(steps, i);
+
+                steps[i] = Half * direction;
+            }
+
+            for (var i = 1; i < axis.Length; i++)
+                axis[i] = axis[i - 1] + steps[i];
+        }
+
+        private static float NextDirection(float[] steps, int from)
+        {
+            const float Half = Turn16 / 2.0f;
+
+            for (var i = from + 1; i < steps.Length; i++)
+            {
+                if (steps[i] != 0.0f && MathF.Abs(steps[i]) != Half)
+                    return MathF.Sign(steps[i]);
+            }
+
+            return -1.0f;
         }
 
         public Vector3 Sample(float frame)
@@ -82,22 +148,8 @@ namespace XNOEdit.Render.Animation
 
             var t = (frame - _frames[previous]) / (_frames[next] - _frames[previous]);
 
-            var from = _values[previous];
-            var delta = _values[next] - from;
-
-            if (_valueType == MotionValueType.Angle16)
-                delta = Wrap16(delta);
-
-            return from + delta * t;
+            return Vector3.Lerp(_values[previous], _values[next], t);
         }
-
-        private static Vector3 Wrap16(Vector3 delta) => new(
-            Wrap16(delta.X),
-            Wrap16(delta.Y),
-            Wrap16(delta.Z));
-
-        private static float Wrap16(float delta) =>
-            delta - Turn16 * MathF.Ceiling((delta - Turn16 / 2.0f) / Turn16);
 
         private static (float Frame, Vector3 Value) Decode(object keyframe, MotionValueType valueType) => keyframe switch
         {

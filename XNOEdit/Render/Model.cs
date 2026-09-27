@@ -21,6 +21,7 @@ namespace XNOEdit.Render
         private readonly Dictionary<int, SlBuffer> _sharedVertexBuffers = new();
         private readonly GuestMaterialCache? _guestMaterials;
         private readonly MaterialAnimation? _materialAnimation;
+        private readonly Vector2[] _offsets;
         private readonly Skeleton? _skeleton;
         private readonly NodeTransform[] _transforms = [];
         private NodeAnimation? _nodeAnimation;
@@ -35,7 +36,8 @@ namespace XNOEdit.Render
         {
             _device = device;
             _guestMaterials = guestMaterial;
-            _materialAnimation = materialMotion != null ? new MaterialAnimation(materialMotion) : null;
+            _materialAnimation = materialMotion != null ? new MaterialAnimation(materialMotion, objectChunk.Materials) : null;
+            _offsets = new Vector2[objectChunk.Materials.Select(m => m.TextureMap.Descriptions.Count).DefaultIfEmpty(0).Max()];
 
             try
             {
@@ -100,7 +102,11 @@ namespace XNOEdit.Render
 
             foreach (var mesh in _meshes)
             {
-                mesh.SetValues(_materialAnimation.Sample(mesh.MaterialIndex, frame, mesh.BindValues));
+                var offsets = _offsets.AsSpan(0, mesh.BindOffsets.Length);
+                mesh.BindOffsets.CopyTo(offsets);
+
+                var values = _materialAnimation.Sample(mesh.MaterialIndex, frame, mesh.BindValues, offsets);
+                mesh.SetValues(in values, offsets);
             }
         }
 
@@ -136,6 +142,9 @@ namespace XNOEdit.Render
             {
                 var vertexList = objectChunk.VertexLists[i];
                 var vertices = new List<float>();
+
+                var implicitIndices = vertexList.Format.HasFlag(VertexFormat.NND_VTXTYPE_XB_WEIGHT3) &&
+                                      !vertexList.Format.HasFlag(VertexFormat.NND_VTXTYPE_XB_MTX_INDEX4);
 
                 foreach (var vertex in vertexList.Vertices)
                 {
@@ -197,7 +206,11 @@ namespace XNOEdit.Render
                     vertices.Add(weight.Y);
                     vertices.Add(weight.Z);
 
-                    vertices.AddRange(vertex.MatrixIndices.Select(index => BitConverter.UInt32BitsToSingle(index)));
+                    for (var index = 0u; index < 4; index++)
+                    {
+                        var matrix = implicitIndices ? index : vertex.MatrixIndices[index];
+                        vertices.Add(BitConverter.UInt32BitsToSingle(matrix));
+                    }
                 }
 
                 var vbo = _device.CreateBuffer(vertices.ToArray(), SlBufferUsage.Vertex);
@@ -239,7 +252,8 @@ namespace XNOEdit.Render
                         }
 
                         var vertexList = objectChunk.VertexLists[vertexListIndex];
-                        var skinned = vertexList.Format.HasFlag(VertexFormat.NND_VTXTYPE_XB_MTX_INDEX4);
+                        var skinned = vertexList.Format.HasFlag(VertexFormat.NND_VTXTYPE_XB_WEIGHT3) ||
+                                      vertexList.Format.HasFlag(VertexFormat.NND_VTXTYPE_XB_MTX_INDEX4);
                         int[] paletteNodes = skinned ? vertexList.BoneMatrixIndices.Select(SlotNode).ToArray() : [];
                         var node = skinned ? -1 : SlotNode(meshSet.MatrixIndex);
 

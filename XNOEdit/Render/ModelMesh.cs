@@ -20,7 +20,9 @@ namespace XNOEdit.Render
         public GuestDrawBucket Bucket { get; }
         public Vector3 Centre { get; }
         public int MaterialIndex { get; }
+        public GuestMaterial? GuestMaterial { get; }
         public MaterialValues BindValues { get; }
+        public ReadOnlySpan<Vector2> BindOffsets => _bindOffsets;
 
         private readonly MeshGeometry _geometry;
         private readonly GuestMeshState _state;
@@ -33,8 +35,9 @@ namespace XNOEdit.Render
 
         private readonly Vector2[] _stageOffsets = new Vector2[StageCount];
         private readonly string?[] _stageTextures = new string?[StageCount];
-
-        public GuestMaterial? GuestMaterial { get; }
+        private readonly Vector2[] _bindOffsets;
+        private readonly int[] _descriptionStages;
+        private readonly bool[] _descriptionAliases;
 
         public ModelMesh(
             SlDevice device,
@@ -63,6 +66,11 @@ namespace XNOEdit.Render
             _geometry = MeshGeometry.CreateFromTriangleStrip(
                 device, sharedVbo, primitiveList.StripIndices, primitiveList.IndexIndices);
 
+            _bindOffsets = material.TextureMap.Descriptions.Select(d => d.Offset).ToArray();
+            _descriptionStages = new int[_bindOffsets.Length];
+            _descriptionAliases = new bool[_bindOffsets.Length];
+            Array.Fill(_descriptionStages, -1);
+
             BuildStageTextures(material, textureList);
 
             _state = GuestRenderState.FromLogic(material.Logic);
@@ -71,7 +79,6 @@ namespace XNOEdit.Render
                 Diffuse = PropertyUtility.MaterialColorToVec4(material.Colour.Diffuse),
                 Ambient = PropertyUtility.MaterialColorToVec4(material.Colour.Ambient),
                 Specular = PropertyUtility.MaterialColorToVec4(material.Colour.Specular),
-                Offset = _stageOffsets[0],
             };
             _values = BindValues;
             _emission = PropertyUtility.MaterialColorToVec4(material.Colour.Emissive);
@@ -85,20 +92,25 @@ namespace XNOEdit.Render
 
             var stage = 0;
             var previousIndex = -1;
+            var descriptions = material.TextureMap.Descriptions;
 
-            foreach (var description in material.TextureMap.Descriptions)
+            for (var k = 0; k < descriptions.Count; k++)
             {
-                // 0x05 and 0x06 are the colour and alpha operations on one sampler, so
-                // an 0x06 repeating the previous index is the same texture, not a new stage.
+                var description = descriptions[k];
                 var op = description.Type & 0xFF;
 
-                if (op == 0x06 && description.Index == previousIndex)
+                if (op == 0x06 && description.Index == previousIndex && k > 0)
+                {
+                    _descriptionStages[k] = _descriptionStages[k - 1];
+                    _descriptionAliases[k] = true;
                     continue;
+                }
 
                 if (description.Index >= 0 && description.Index < textureList.Textures.Count && stage < StageCount)
                 {
                     _stageTextures[stage] = textureList.Textures[description.Index].Name;
                     _stageOffsets[stage] = description.Offset;
+                    _descriptionStages[k] = stage;
                     stage++;
                 }
 
@@ -111,10 +123,19 @@ namespace XNOEdit.Render
             Visible = visible;
         }
 
-        public void SetValues(in MaterialValues values)
+        public void SetValues(in MaterialValues values, ReadOnlySpan<Vector2> offsets)
         {
             _values = values;
-            _stageOffsets[0] = values.Offset;
+
+            for (var k = 0; k < offsets.Length; k++)
+            {
+                var stage = _descriptionStages[k];
+
+                if (stage < 0 || (_descriptionAliases[k] && offsets[k] == _bindOffsets[k]))
+                    continue;
+
+                _stageOffsets[stage] = offsets[k];
+            }
         }
 
         public bool DrawGuest(
