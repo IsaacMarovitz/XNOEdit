@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <PublishAot>true</PublishAot>
         <InvariantGlobalization>true</InvariantGlobalization>
@@ -10,7 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="SDL3-CS" Version="3.4.16.1" />
+        <PackageReference Include="SDL3-CS" Version="3.4.20" />
         <PackageReference Include="SDL3-CS.Native" Version="3.4.2" />
     </ItemGroup>
 

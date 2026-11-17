@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <PublishAot>true</PublishAot>
         <InvariantGlobalization>true</InvariantGlobalization>
@@ -13,7 +13,7 @@
     <ItemGroup>
         <PackageReference Include="Hexa.NET.ImGui" Version="2.2.9" />
         <PackageReference Include="Hexa.NET.ImGuizmo" Version="2.2.9" />
-        <PackageReference Include="LuaCSharp" Version="0.5.6" />
+        <PackageReference Include="LuaCSharp" Version="0.5.8" />
     </ItemGroup>
 
     <ItemGroup>
